@@ -1,13 +1,8 @@
 const fs = require('fs-extra')
-const GziIndexedBlockGzippedFile = require('../src/bgzFileWithGzi')
-
-async function directRead(path, buffer, offset, length, position) {
-  const fd = await fs.open(path, 'r')
-  return fs.read(fd, buffer, offset, length, position)
-}
+const { BgzfFilehandle } = require('../src')
 
 async function testRead(basename, length, position) {
-  const f = new GziIndexedBlockGzippedFile({
+  const f = new BgzfFilehandle({
     path: require.resolve(`./data/${basename}.gz`),
     gziPath: require.resolve(`./data/${basename}.gz.gzi`),
   })
@@ -15,8 +10,9 @@ async function testRead(basename, length, position) {
   const buf1 = Buffer.allocUnsafe(length)
   const buf2 = Buffer.allocUnsafe(length)
   const { bytesRead } = await f.read(buf1, 0, length, position)
-  const { bytesRead: directBytesRead } = await directRead(
-    require.resolve(`./data/${basename}`),
+  const fd = await fs.open(require.resolve(`./data/${basename}`), 'r')
+  const { bytesRead: directBytesRead } = await fs.read(
+    fd,
     buf2,
     0,
     length,
@@ -26,6 +22,10 @@ async function testRead(basename, length, position) {
   expect(Array.from(buf1.slice(0, bytesRead))).toEqual(
     Array.from(buf2.slice(0, bytesRead)),
   )
+
+  const directStat = await fs.fstat(fd)
+  const myStat = await f.stat()
+  expect(myStat.size).toEqual(directStat.size)
 }
 
 describe('indexed BGZF file', () => {

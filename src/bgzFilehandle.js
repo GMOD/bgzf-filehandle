@@ -33,14 +33,15 @@ const GziIndex = require('./gziIndex')
 //       .buffer('data', { length: 'length' }),
 //   })
 
-class GziIndexedBlockGzippedFile {
+class BgzFilehandle {
   constructor({ filehandle, path, gziFilehandle, gziPath }) {
     if (filehandle) this.filehandle = filehandle
     else if (path) this.filehandle = new LocalFile(path)
     else throw new TypeError('either filehandle or path must be defined')
 
-    if (!gziFilehandle && !gziPath)
+    if (!gziFilehandle && !gziPath && !path)
       throw new TypeError('either gziFilehandle or gziPath must be defined')
+    if (!gziFilehandle && !gziPath && path) gziPath = `${path}.gzi`
 
     this.gzi = new GziIndex({ filehandle: gziFilehandle, path: gziPath })
   }
@@ -51,6 +52,22 @@ class GziIndexedBlockGzippedFile {
       size: await this.getUncompressedFileSize(),
       mtime: compressedStat.mtime,
     }
+  }
+
+  async getUncompressedFileSize() {
+    // read the last block's ISIZE (see gzip RFC),
+    // and add it to its uncompressedPosition
+    const [, uncompressedPosition] = await this.gzi.getLastBlock()
+
+    const { size } = await this.filehandle.stat()
+
+    const buf = Buffer.allocUnsafe(4)
+    // note: there should be a 28-byte EOF marker (an empty block) at
+    // the end of the file, so we skip backward past that
+    const { bytesRead } = await this.filehandle.read(buf, 0, 4, size - 28 - 4)
+    if (bytesRead !== 4) throw new Error('read error')
+    const lastBlockUncompressedSize = buf.readUInt32LE(0)
+    return uncompressedPosition + lastBlockUncompressedSize
   }
 
   // async readBlockHeader(compressedPosition) {
@@ -92,10 +109,6 @@ class GziIndexedBlockGzippedFile {
       blockBuffer.slice(0, blockCompressedLength),
     )
 
-    // const blockUncompressedLength =
-    //   nextUncompressedPosition - uncompressedPosition
-
-    // if (unzippedBuffer.length !== blockUncompressedLength) debugger
     return unzippedBuffer
   }
 
@@ -138,4 +151,4 @@ class GziIndexedBlockGzippedFile {
   }
 }
 
-module.exports = GziIndexedBlockGzippedFile
+module.exports = BgzFilehandle

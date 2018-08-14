@@ -1,1 +1,3 @@
-module.exports = {}
+const BgzfFilehandle = require('./bgzFilehandle')
+
+module.exports = { BgzfFilehandle }

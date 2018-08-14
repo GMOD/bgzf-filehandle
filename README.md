@@ -1,22 +1,26 @@
-# example
+# bgzf-filehandle
 
-[![NPM version](https://img.shields.io/npm/v/example.svg?style=flat-square)](https://npmjs.org/package/example)
-[![Build Status](https://img.shields.io/travis/rbuels/example/master.svg?style=flat-square)](https://travis-ci.org/rbuels/example) 
+[![NPM version](https://img.shields.io/npm/v/bgzf-filehandle.svg?style=flat-square)](https://npmjs.org/package/bgzf-filehandle)
+[![Build Status](https://img.shields.io/travis/gmod/bgzf-filehandle/master.svg?style=flat-square)](https://travis-ci.org/gmod/bgzf-filehandle) 
 
-Read htsjdk Tribble indexes (e.g. \*.vcf.idx files) using pure JavaScript. Supports only Tribble version 3 linear indexes right now.
+Transparently read block-gzipped (BGZF) files that have .gzi indexes as if they were regular uncompressed files.
 
 ## Install
 
-    $ npm install --save example
+    $ npm install --save bgzf-filehandle
 
 ## Usage
 
 ```js
-import fs from 'fs'
-import read from 'example'
-// or without ES6
-var fs = require('fs')
-var read = require('example').default.read
+const {BgzfFilehandle} = require('bgzf-filehandle')
+
+const f = new BgzfFilehandle({path: 'path/to/my_file.gz'})
+// assumes a .gzi index exists at path/to/my_file.gz.gzi
+
+// supports a subset of NodeJS v10 filehandle API. currently
+// just read() and stat()
+const buf = 
+f.read()
 
 fs.readFile('path/to/data.vcf.idx', (err, buffer) => {
   const index = read(buffer);
