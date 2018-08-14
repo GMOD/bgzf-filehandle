@@ -1,5 +1,5 @@
 const fs = require('fs-extra')
-const GziIndexedBlockGzippedFile = require('../src/indexedBgzipFile')
+const GziIndexedBlockGzippedFile = require('../src/bgzFileWithGzi')
 
 async function directRead(path, buffer, offset, length, position) {
   const fd = await fs.open(path, 'r')
