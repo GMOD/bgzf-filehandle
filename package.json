@@ -1,9 +1,9 @@
 {
-  "name": "example",
+  "name": "@gmod/bgzf-filehandle",
   "version": "0.0.1-alpha.0",
-  "description": "package template",
+  "description": "read from a compressed bgzip file (with .gzi) as if it were uncompressed",
   "license": "MIT",
-  "repository": "rbuels/example",
+  "repository": "gmod/bgzf-filehandle",
   "main": "dist/index.js",
   "author": {
     "name": "Robert Buels",
