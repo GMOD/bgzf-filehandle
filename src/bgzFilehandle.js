@@ -48,10 +48,11 @@ class BgzFilehandle {
 
   async stat() {
     const compressedStat = await this.filehandle.stat()
-    return {
+    return Object.assign(compressedStat, {
       size: await this.getUncompressedFileSize(),
-      mtime: compressedStat.mtime,
-    }
+      blocks: undefined,
+      blksize: undefined,
+    })
   }
 
   async getUncompressedFileSize() {
