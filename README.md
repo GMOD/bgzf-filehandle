@@ -3,7 +3,7 @@
 [![NPM version](https://img.shields.io/npm/v/@gmod/bgzf-filehandle.svg?style=flat-square)](https://npmjs.org/package/@gmod/bgzf-filehandle)
 [![Build Status](https://img.shields.io/travis/GMOD/bgzf-filehandle/master.svg?style=flat-square)](https://travis-ci.org/GMOD/bgzf-filehandle) 
 
-Read indexed block-gzipped (BGZF) files, such as those created by bgzip, using uncompressed file offsets 
+Transparently read [indexed block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such as those created by bgzip, using coordinates from the uncompressed file.
 
 ## Install
 
