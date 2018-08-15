@@ -7,15 +7,17 @@ Read indexed block-gzipped (BGZF) files, such as those created by bgzip, using u
 
 ## Install
 
-    $ npm install --save bgzf-filehandle
+    $ npm install --save @gmod/bgzf-filehandle
 
 ## Usage
 
 ```js
-const { BgzfFilehandle } = require('bgzf-filehandle')
+const { BgzfFilehandle } = require('@gmod/bgzf-filehandle')
 
 const f = new BgzfFilehandle({path: 'path/to/my_file.gz'})
-// assumes a .gzi index exists at path/to/my_file.gz.gzi
+// assumes a .gzi index exists at path/to/my_file.gz.gzi. can also
+// pass `gziPath` to set it explicitly. Can also pass filehandles
+// for the files: `filehandle` and `gziFilehandle`
 
 // supports a subset of the NodeJS v10 filehandle API. currently
 // just read() and stat()
