@@ -75,7 +75,7 @@ class GziIndex {
    * @returns {Promise} for an array of block records, the
    * last of which should *not* be included in the read
    */
-  async getRelevantBlocksForRead(position, length) {
+  async getRelevantBlocksForRead(length, position) {
     const endPosition = position + length
     if (length === 0) return []
     const entries = await this._getIndex()
@@ -142,7 +142,7 @@ class GziIndex {
   //  * @returns {object} as `{compressedPosition, uncompressedPosition, compressedSize}`. If
   //  * compressedSize is undefined, the read should end at the end of the file.
   //  */
-  // async calculateMultiBlockRead(position, length) {
+  // async calculateMultiBlockRead(length, position) {
   //   const entries = await this._getIndex()
   //   const endPosition = position + length
   //   let readStart

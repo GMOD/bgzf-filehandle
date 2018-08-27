@@ -22,20 +22,20 @@ describe('gzi objects', () => {
       [453884, 456960],
     ])
 
-    expect(await idx.getRelevantBlocksForRead(0, 100000)).toEqual([
+    expect(await idx.getRelevantBlocksForRead(100000, 0)).toEqual([
       [0, 0],
       [64791, 65280],
       [129553, 130560],
     ])
 
-    expect(await idx.getRelevantBlocksForRead(100000, 1)).toEqual([
+    expect(await idx.getRelevantBlocksForRead(1, 100000)).toEqual([
       [64791, 65280],
       [129553, 130560],
     ])
 
-    expect(await idx.getRelevantBlocksForRead(100000, 0)).toEqual([])
+    expect(await idx.getRelevantBlocksForRead(0, 100000)).toEqual([])
 
-    expect(await idx.getRelevantBlocksForRead(300000, 500000)).toEqual([
+    expect(await idx.getRelevantBlocksForRead(500000, 300000)).toEqual([
       [259166, 261120],
       [324086, 326400],
       [389021, 391680],
