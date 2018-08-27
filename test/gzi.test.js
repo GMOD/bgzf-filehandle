@@ -43,6 +43,11 @@ describe('gzi objects', () => {
       [],
     ])
 
+    expect(await idx.getRelevantBlocksForRead(10, 500000)).toEqual([
+      [453884, 456960],
+      [],
+    ])
+
     expect(await idx.getLastBlock()).toEqual([453884, 456960])
   })
 })
