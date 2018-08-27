@@ -75,31 +75,61 @@ class GziIndex {
    * @returns {Promise} for an array of block records, the
    * last of which should *not* be included in the read
    */
-  async getRelevantBlocksForRead(position, length) {
+  async getRelevantBlocksForRead(length, position) {
     const endPosition = position + length
     if (length === 0) return []
     const entries = await this._getIndex()
     const relevant = []
-    let i = 0
-    for (; i < entries.length; i += 1) {
-      const [, uncompressedPosition] = entries[i]
-      const nextEntry = entries[i + 1]
-      const uncompressedLength = nextEntry
-        ? nextEntry[UNCOMPRESSED_POSITION] - uncompressedPosition
-        : Infinity
-      if (
-        (uncompressedPosition <= position &&
-          uncompressedPosition + uncompressedLength > position) ||
-        relevant.length
-      )
-        relevant.push(entries[i])
 
-      if (uncompressedPosition >= endPosition) break
+    // binary search to find the block that the
+    // read starts in and extend forward from that
+    const compare = (entry, nextEntry) => {
+      const uncompressedPosition = entry[UNCOMPRESSED_POSITION]
+      const nextUncompressedPosition = nextEntry
+        ? nextEntry[UNCOMPRESSED_POSITION]
+        : Infinity
+      // block overlaps read start
+      if (
+        uncompressedPosition <= position &&
+        nextUncompressedPosition > position
+      ) {
+        return 0
+        // block is before read start
+      } else if (uncompressedPosition < position) {
+        return -1
+      }
+      // block is after read start
+      return 1
+    }
+
+    let lowerBound = 0
+    let upperBound = entries.length - 1
+    let searchPosition = Math.floor(entries.length / 2)
+
+    let comparison = compare(
+      entries[searchPosition],
+      entries[searchPosition + 1],
+    )
+    while (comparison !== 0) {
+      if (comparison > 0) {
+        upperBound = searchPosition - 1
+      } else if (comparison < 0) {
+        lowerBound = searchPosition + 1
+      }
+      searchPosition = Math.ceil((upperBound - lowerBound) / 2) + lowerBound
+      comparison = compare(entries[searchPosition], entries[searchPosition + 1])
+    }
+
+    // here's where we read forward
+    relevant.push(entries[searchPosition])
+    let i = searchPosition + 1
+    for (; i < entries.length; i += 1) {
+      relevant.push(entries[i])
+      if (entries[i][UNCOMPRESSED_POSITION] >= endPosition) break
     }
     if (relevant[relevant.length - 1][UNCOMPRESSED_POSITION] < endPosition) {
       relevant.push([])
     }
-
     return relevant
   }
 
@@ -112,7 +142,7 @@ class GziIndex {
   //  * @returns {object} as `{compressedPosition, uncompressedPosition, compressedSize}`. If
   //  * compressedSize is undefined, the read should end at the end of the file.
   //  */
-  // async calculateMultiBlockRead(position, length) {
+  // async calculateMultiBlockRead(length, position) {
   //   const entries = await this._getIndex()
   //   const endPosition = position + length
   //   let readStart

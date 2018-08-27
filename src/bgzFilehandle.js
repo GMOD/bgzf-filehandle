@@ -116,8 +116,8 @@ class BgzFilehandle {
   async read(buf, offset, length, position) {
     // get the block positions for this read
     const blockPositions = await this.gzi.getRelevantBlocksForRead(
-      position,
       length,
+      position,
     )
     const blockBuffer = Buffer.allocUnsafe(32768 * 2)
     // uncompress the blocks and read from them one at a time to keep memory usage down
