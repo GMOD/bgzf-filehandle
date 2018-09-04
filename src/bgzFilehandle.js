@@ -5,34 +5,6 @@ const unzip = require('util.promisify')(zlib.unzip)
 const LocalFile = require('./localFile')
 const GziIndex = require('./gziIndex')
 
-// const subfieldParser = new Parser().array(null, {
-//   readUntil: 'eof',
-//   type: new Parser()
-//     .endianess('little')
-//     .uint16('identifier')
-//     .uint16('length')
-//     .buffer('data', { length: 'length' }),
-// })
-
-// const headerParser = new Parser()
-//   .endianess('little')
-//   .uint16('magic', { assert: magic => magic === 35615 })
-//   .uint8('compressionMethod')
-//   .uint8('flags', { assert: flags => flags & 0x4 }) // flags.FEXTRA must be set
-//   .uint32('mtime')
-//   .uint8('extraFlags')
-//   .uint8('operatingSystem')
-//   .uint16('extraLength')
-//   // .buffer('subfieldData', { length: 'extraLength' })
-//   .array('subfields', {
-//     lengthInBytes: 'extraLength',
-//     type: new Parser()
-//       .endianess('little')
-//       .uint16('identifier')
-//       .uint16('length')
-//       .buffer('data', { length: 'length' }),
-//   })
-
 class BgzFilehandle {
   constructor({ filehandle, path, gziFilehandle, gziPath }) {
     if (filehandle) this.filehandle = filehandle
@@ -70,21 +42,6 @@ class BgzFilehandle {
     const lastBlockUncompressedSize = buf.readUInt32LE(0)
     return uncompressedPosition + lastBlockUncompressedSize
   }
-
-  // async readBlockHeader(compressedPosition) {
-  //   const buf = Buffer.allocUnsafe(8192)
-
-  //   await this.filehandle.read(
-  //     buf,
-  //     0,
-  //     8192, // block header should fit in much less than 16KB, one would hope
-  //     // compressedStat.size - lastBlock.compressedPosition - 1,
-  //     compressedPosition,
-  //   )
-
-  //   const headerData = headerParser.parse(buf)
-  //   return headerData
-  // }
 
   async _readAndUncompressBlock(
     blockBuffer,
