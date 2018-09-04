@@ -1,7 +1,4 @@
-const zlib = require('zlib')
-const unzip = require('util.promisify')(zlib.unzip)
-// const { Parser } = require('binary-parser')
-
+const unzip = require('./unzip')
 const LocalFile = require('./localFile')
 const GziIndex = require('./gziIndex')
 

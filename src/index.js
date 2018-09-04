@@ -1,3 +1,4 @@
 const BgzfFilehandle = require('./bgzFilehandle')
+const unzip = require('./unzip')
 
-module.exports = { BgzfFilehandle }
+module.exports = { BgzfFilehandle, unzip }
