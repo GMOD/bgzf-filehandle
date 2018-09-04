@@ -1,4 +1,4 @@
-const unzip = require('./unzip')
+const { unzip } = require('./unzip')
 const LocalFile = require('./localFile')
 const GziIndex = require('./gziIndex')
 
