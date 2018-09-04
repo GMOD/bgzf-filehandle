@@ -21,7 +21,7 @@ async function pakoUnzip(inputData) {
     if (inflator.err) throw new Error(inflator.msg)
 
     pos += strm.next_in
-    chunks[i] = inflator.result
+    chunks[i] = Buffer.from(inflator.result)
     i += 1
   } while (strm.avail_in)
 
