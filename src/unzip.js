@@ -19,7 +19,11 @@ async function pakoUnzip(inputData) {
     strm = inflator.strm
     inflator.push(remainingInput, Z_SYNC_FLUSH)
     if (inflator.err) {
-      if (chunks.length) {
+      if (
+        chunks.length &&
+        (inflator.err === -3 /* Z_DATA_ERROR */ ||
+          inflator.err === -5) /* Z_BUF_ERROR */
+      ) {
         break
       } else {
         throw new Error(inflator.msg)
