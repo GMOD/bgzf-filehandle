@@ -1,5 +1,6 @@
 const zlib = require('zlib')
-const {promisify} = require('es6-promisify')
+const { promisify } = require('es6-promisify')
+
 const gunzip = promisify(zlib.gunzip)
 
 const { Z_SYNC_FLUSH, Inflate } = require('pako')
