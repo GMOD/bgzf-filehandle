@@ -8,6 +8,7 @@ script:
   - set -e
   - npm run build
   - npm run test
+  - npm run lint
   # - if [ "x$BACKCOMPAT" = "x" ]; then npm run test; fi
   # - rm -rf src
   # - mv dist src
