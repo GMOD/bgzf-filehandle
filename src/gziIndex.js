@@ -95,7 +95,8 @@ class GziIndex {
       ) {
         return 0
         // block is before read start
-      } else if (uncompressedPosition < position) {
+      }
+      if (uncompressedPosition < position) {
         return -1
       }
       // block is after read start
