@@ -7,7 +7,7 @@
 
 Transparently read [indexed block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such as those created by bgzip, using coordinates from the uncompressed file.
 
-Also provides a `unzip` utility function that properly decompresses BGZF chunks in both node and the browser. Uses `pako` when running in the browser, native `zlib` when running in node.
+Also provides a `unzip` utility function that properly decompresses BGZF chunks in both node and the browser. Uses `pako` when running in the browser, native `zlib` when running in node. The `unzipChunk` function is another 
 
 ## Install
 
@@ -16,7 +16,7 @@ Also provides a `unzip` utility function that properly decompresses BGZF chunks 
 ## Usage
 
 ```js
-const { BgzfFilehandle, unzip } = require('@gmod/bgzf-filehandle')
+const { BgzfFilehandle, unzip, unzipChunk } = require('@gmod/bgzf-filehandle')
 
 const f = new BgzfFilehandle({path: 'path/to/my_file.gz'})
 // assumes a .gzi index exists at path/to/my_file.gz.gzi. can also
@@ -34,6 +34,13 @@ const { size } = f.stat() // stat gives the size as if the file were uncompresse
 // unzip takes a buffer and returns a promise for a new buffer
 const chunkDataBuffer = readDirectlyFromFile(someFile, 123, 456)
 const unzippedBuffer = await unzip(chunkDataBuffer)
+
+
+// unzipChunk takes a buffer and returns a decompressed buffer plus the offsets
+// of the block boundaries in the bgzip file in compressed (cpositions) and
+// decompressed (dpositions) coordinates
+const {buffer, dpositions, cpositions} = await unzipChunk(chunkDataBuffer)
+
 ```
 
 ## Academic Use
