@@ -31,10 +31,10 @@ async function pakoUnzip(inputData) {
   return result
 }
 
-// similar to pakounzip, except it does extra counting 
+// similar to pakounzip, except it does extra counting
 // to return the positions of compressed and decompressed
 // data offsets
-export function unzipChunk(inputData) {
+function unzipChunk(inputData) {
   let strm
   let cpos = 0
   let dpos = 0
@@ -44,19 +44,19 @@ export function unzipChunk(inputData) {
   do {
     const remainingInput = inputData.slice(cpos)
     const inflator = new Inflate()
-      //@ts-ignore
+    // @ts-ignore
     ;({ strm } = inflator)
-    //@ts-ignore
+    // @ts-ignore
     inflator.push(remainingInput, Z_SYNC_FLUSH)
     if (inflator.err) throw new Error(inflator.msg)
 
-    //@ts-ignore
+    // @ts-ignore
     const buffer = Buffer.from(inflator.result)
     blocks.push(buffer)
 
     cpositions.push(cpos)
     dpositions.push(dpos)
-    
+
     cpos += strm.next_in
     dpos += buffer.length
   } while (strm.avail_in)
