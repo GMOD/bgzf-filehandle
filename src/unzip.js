@@ -34,7 +34,7 @@ async function pakoUnzip(inputData) {
 // similar to pakounzip, except it does extra counting
 // to return the positions of compressed and decompressed
 // data offsets
-function unzipChunk(inputData) {
+async function unzipChunk(inputData) {
   let strm
   let cpos = 0
   let dpos = 0
