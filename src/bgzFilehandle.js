@@ -10,9 +10,11 @@ class BgzFilehandle {
 
     if (!gziFilehandle && !gziPath && !path)
       throw new TypeError('either gziFilehandle or gziPath must be defined')
-    if (!gziFilehandle && !gziPath && path) gziPath = `${path}.gzi`
 
-    this.gzi = new GziIndex({ filehandle: gziFilehandle, path: gziPath })
+    this.gzi = new GziIndex({
+      filehandle: gziFilehandle,
+      path: !gziFilehandle && !gziPath && path ? gziPath : `${path}.gzi`,
+    })
   }
 
   async stat() {
@@ -45,12 +47,13 @@ class BgzFilehandle {
     [compressedPosition],
     [nextCompressedPosition],
   ) {
-    if (!nextCompressedPosition) {
-      nextCompressedPosition = (await this.filehandle.stat()).size
+    let next = nextCompressedPosition
+    if (!next) {
+      next = (await this.filehandle.stat()).size
     }
 
     // read the compressed data into the block buffer
-    const blockCompressedLength = nextCompressedPosition - compressedPosition
+    const blockCompressedLength = next - compressedPosition
 
     await this.filehandle.read(
       blockBuffer,
@@ -82,6 +85,7 @@ class BgzFilehandle {
       blockNum < blockPositions.length - 1;
       blockNum += 1
     ) {
+      // eslint-disable-next-line no-await-in-loop
       const uncompressedBuffer = await this._readAndUncompressBlock(
         blockBuffer,
         blockPositions[blockNum],
