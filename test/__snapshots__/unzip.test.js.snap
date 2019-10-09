@@ -1,0 +1,25 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`unzip can unzip bgzip-1.txt.gz 1`] = `
+Array [
+  0,
+  22579,
+  87646,
+  152675,
+  217701,
+  282681,
+  287762,
+]
+`;
+
+exports[`unzip can unzip bgzip-1.txt.gz 2`] = `
+Array [
+  0,
+  4682,
+  24403,
+  43638,
+  62447,
+  82222,
+  84033,
+]
+`;
