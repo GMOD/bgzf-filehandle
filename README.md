@@ -1,4 +1,3 @@
-# bgzf-filehandle
 
 [![NPM version](https://img.shields.io/npm/v/@gmod/bgzf-filehandle.svg?style=flat-square)](https://npmjs.org/package/@gmod/bgzf-filehandle)
 [![Build Status](https://img.shields.io/travis/GMOD/bgzf-filehandle/master.svg?style=flat-square)](https://travis-ci.org/GMOD/bgzf-filehandle) [![Greenkeeper badge](https://badges.greenkeeper.io/GMOD/bgzf-filehandle.svg)](https://greenkeeper.io/) 
@@ -39,8 +38,14 @@ const unzippedBuffer = await unzip(chunkDataBuffer)
 // unzipChunk takes a buffer and returns a decompressed buffer plus the offsets
 // of the block boundaries in the bgzip file in compressed (cpositions) and
 // decompressed (dpositions) coordinates
+// you can ignore dpositions/cpositions if your code doesn't care about stable feature IDs
 const {buffer, dpositions, cpositions} = await unzipChunk(chunkDataBuffer)
 
+// similar to the above unzipChunk but takes extra chunk argument and trims
+// off (0,chunk.minv.dataPosition) and (chunk.maxv.dataPosition)
+// used especially for generating stable feature IDs across chunk boundaries
+// normal unzip or unzipChunk can be used if this is not important
+const {buffer, dpositions, cpositions} = await unzipChunkSlice(chunkDataBuffer, chunk)
 ```
 
 ## Academic Use
