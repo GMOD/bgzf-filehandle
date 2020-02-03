@@ -54,13 +54,22 @@ async function unzipChunk(inputData, chunk) {
     const buffer = Buffer.from(inflator.result)
     decompressedBlocks.push(buffer)
 
+    const origCpos = cpos
+
     if (decompressedBlocks.length === 1 && chunk.minv.dataPosition) {
       // this is the first chunk, trim it
       decompressedBlocks[0] = decompressedBlocks[0].slice(
         chunk.minv.dataPosition,
       )
+      dpos -= chunk.minv.dataPosition
+      console.log('here', chunk.minv.dataPosition)
     }
-    if (chunk.minv.blockPosition + cpos >= chunk.maxv.blockPosition) {
+
+    cpositions.push(cpos)
+    dpositions.push(dpos)
+    cpos += strm.next_in
+    dpos += buffer.length
+    if (chunk.minv.blockPosition + origCpos >= chunk.maxv.blockPosition) {
       // this is the last chunk, trim it and stop decompressing
       // note if it is the same block is minv it subtracts that already
       // trimmed part of the slice length
@@ -73,14 +82,9 @@ async function unzipChunk(inputData, chunk) {
           ? chunk.maxv.dataPosition - chunk.minv.dataPosition + 1
           : chunk.maxv.dataPosition + 1,
       )
+
       break
     }
-
-    cpositions.push(cpos)
-    dpositions.push(dpos)
-
-    cpos += strm.next_in
-    dpos += buffer.length
   } while (strm.avail_in)
 
   const buffer = Buffer.concat(decompressedBlocks)
