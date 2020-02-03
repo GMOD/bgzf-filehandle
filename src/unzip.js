@@ -65,6 +65,60 @@ async function unzipChunk(inputData) {
   return { buffer, cpositions, dpositions }
 }
 
+// similar to unzipChunk above but slices (0,minv.dataPosition) and (maxv.dataPosition,end) off
+async function unzipChunkSlice(inputData, chunk) {
+  let strm
+  let cpos = 0
+  let dpos = 0
+  const decompressedBlocks = []
+  const cpositions = []
+  const dpositions = []
+  do {
+    const remainingInput = inputData.slice(cpos)
+    const inflator = new Inflate()
+    // @ts-ignore
+    ;({ strm } = inflator)
+    // @ts-ignore
+    inflator.push(remainingInput, Z_SYNC_FLUSH)
+    if (inflator.err) throw new Error(inflator.msg)
+
+    // @ts-ignore
+    const buffer = Buffer.from(inflator.result)
+    decompressedBlocks.push(buffer)
+
+    if (decompressedBlocks.length === 1 && chunk.minv.dataPosition) {
+      // this is the first chunk, trim it
+      decompressedBlocks[0] = decompressedBlocks[0].slice(
+        chunk.minv.dataPosition,
+      )
+    }
+    const origCpos = cpos
+    cpos += strm.next_in
+    dpos += buffer.length
+    cpositions.push(cpos)
+    dpositions.push(dpos)
+    if (chunk.minv.blockPosition + origCpos >= chunk.maxv.blockPosition) {
+      // this is the last chunk, trim it and stop decompressing
+      // note if it is the same block is minv it subtracts that already
+      // trimmed part of the slice length
+
+      decompressedBlocks[decompressedBlocks.length - 1] = decompressedBlocks[
+        decompressedBlocks.length - 1
+      ].slice(
+        0,
+        chunk.maxv.blockPosition === chunk.minv.blockPosition
+          ? chunk.maxv.dataPosition - chunk.minv.dataPosition + 1
+          : chunk.maxv.dataPosition + 1,
+      )
+
+      break
+    }
+  } while (strm.avail_in)
+
+  const buffer = Buffer.concat(decompressedBlocks)
+  return { buffer, cpositions, dpositions }
+}
+
 // in node, just use the native unzipping with Z_SYNC_FLUSH
 function nodeUnzip(input) {
   return gunzip(input, {
@@ -75,6 +129,7 @@ function nodeUnzip(input) {
 module.exports = {
   unzip: typeof __webpack_require__ === 'function' ? pakoUnzip : nodeUnzip, // eslint-disable-line
   unzipChunk,
+  unzipChunkSlice,
   nodeUnzip,
   pakoUnzip,
 }
