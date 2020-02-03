@@ -129,6 +129,7 @@ function nodeUnzip(input) {
 module.exports = {
   unzip: typeof __webpack_require__ === 'function' ? pakoUnzip : nodeUnzip, // eslint-disable-line
   unzipChunk,
+  unzipChunkSlice,
   nodeUnzip,
   pakoUnzip,
 }
