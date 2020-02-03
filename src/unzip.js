@@ -71,8 +71,8 @@ async function unzipChunkSlice(inputData, chunk) {
   let cpos = 0
   let dpos = 0
   const decompressedBlocks = []
-  const cpositions = []
-  const dpositions = []
+  const cpositions = [0]
+  const dpositions = [0]
   do {
     const remainingInput = inputData.slice(cpos)
     const inflator = new Inflate()

@@ -26,18 +26,21 @@ Array [
 
 exports[`unzipChunkSlice can unzip bgzip-1.txt.gz 1`] = `
 Array [
+  0,
   22579,
 ]
 `;
 
 exports[`unzipChunkSlice can unzip bgzip-1.txt.gz 2`] = `
 Array [
+  0,
   4682,
 ]
 `;
 
 exports[`unzipChunkSlice can unzip bgzip-1.txt.gz positive maxv.blockPosition 1`] = `
 Array [
+  0,
   22579,
   87646,
 ]
@@ -45,6 +48,7 @@ Array [
 
 exports[`unzipChunkSlice can unzip bgzip-1.txt.gz positive maxv.blockPosition 2`] = `
 Array [
+  0,
   4682,
   24403,
 ]
@@ -52,12 +56,14 @@ Array [
 
 exports[`unzipChunkSlice can unzip bgzip-1.txt.gz positive minv.dataPosition 1`] = `
 Array [
+  0,
   22579,
 ]
 `;
 
 exports[`unzipChunkSlice can unzip bgzip-1.txt.gz positive minv.dataPosition 2`] = `
 Array [
+  0,
   4682,
 ]
 `;
