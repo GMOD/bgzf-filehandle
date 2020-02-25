@@ -54,4 +54,18 @@ describe('unzipChunkSlice', () => {
     expect(dpositions).toMatchSnapshot()
     expect(cpositions).toMatchSnapshot()
   })
+
+  it('test error message modification', async () => {
+    const testData = fs.readFileSync(require.resolve('./data/paired.bam'))
+    try {
+      await unzipChunkSlice(testData, {
+        minv: { dataPosition: 40, blockPosition: 0 },
+        maxv: { dataPosition: 100, blockPosition: 0 },
+      })
+    } catch (e) {
+      expect(e).toEqual({
+        error: 'Error decompressing block: incorrect gzip header check',
+      })
+    }
+  })
 })
