@@ -1,3 +1,4 @@
+/* eslint-disable consistent-return */
 const zlib = require('zlib')
 const { promisify } = require('es6-promisify')
 
@@ -37,7 +38,6 @@ async function pakoUnzip(inputData) {
       )
     }
   }
-  return undefined
 }
 
 // similar to pakounzip, except it does extra counting
@@ -80,7 +80,6 @@ async function unzipChunk(inputData) {
       )
     }
   }
-  return undefined
 }
 
 // similar to unzipChunk above but slices (0,minv.dataPosition) and (maxv.dataPosition,end) off
@@ -148,7 +147,6 @@ async function unzipChunkSlice(inputData, chunk) {
       )
     }
   }
-  return undefined
 }
 
 // in node, just use the native unzipping with Z_SYNC_FLUSH
