@@ -35,6 +35,7 @@ async function pakoUnzip(inputData) {
       throw new Error('Error decompressing block: incorrect gzip header check')
     }
   }
+  return undefined
 }
 
 // similar to pakounzip, except it does extra counting
@@ -72,11 +73,10 @@ async function unzipChunk(inputData) {
     return { buffer, cpositions, dpositions }
   } catch (e) {
     if (e.match(/incorrect header check/)) {
-      throw new Error(
-        'Error decompressing block: incorrect gzip header check',
-      )
+      throw new Error('Error decompressing block: incorrect gzip header check')
     }
   }
+  return undefined
 }
 
 // similar to unzipChunk above but slices (0,minv.dataPosition) and (maxv.dataPosition,end) off
@@ -139,11 +139,10 @@ async function unzipChunkSlice(inputData, chunk) {
     return { buffer, cpositions, dpositions }
   } catch (e) {
     if (e.match(/incorrect header check/)) {
-      throw new Error(
-        'Error decompressing block: incorrect gzip header check',
-      )
+      throw new Error('Error decompressing block: incorrect gzip header check')
     }
   }
+  return undefined
 }
 
 // in node, just use the native unzipping with Z_SYNC_FLUSH
