@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`unzip can unzip bgzip-1.txt.gz 1`] = `
+exports[`unzipChunk can unzip bgzip-1.txt.gz 1`] = `
 Array [
   0,
   22579,
@@ -12,7 +12,7 @@ Array [
 ]
 `;
 
-exports[`unzip can unzip bgzip-1.txt.gz 2`] = `
+exports[`unzipChunk can unzip bgzip-1.txt.gz 2`] = `
 Array [
   0,
   4682,
