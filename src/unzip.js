@@ -1,9 +1,4 @@
 /* eslint-disable consistent-return */
-const zlib = require('zlib')
-const { promisify } = require('es6-promisify')
-
-const gunzip = promisify(zlib.gunzip)
-
 const { Z_SYNC_FLUSH, Inflate } = require('pako')
 
 // browserify-zlib, which is the zlib shim used by default in webpacked code,
@@ -149,17 +144,9 @@ async function unzipChunkSlice(inputData, chunk) {
   }
 }
 
-// in node, just use the native unzipping with Z_SYNC_FLUSH
-function nodeUnzip(input) {
-  return gunzip(input, {
-    finishFlush: (zlib.constants || zlib).Z_SYNC_FLUSH,
-  })
-}
-
 module.exports = {
-  unzip: typeof __webpack_require__ === 'function' ? pakoUnzip : nodeUnzip, // eslint-disable-line
+  unzip: pakoUnzip, // eslint-disable-line
   unzipChunk,
   unzipChunkSlice,
-  nodeUnzip,
   pakoUnzip,
 }
