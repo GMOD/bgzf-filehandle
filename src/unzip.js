@@ -146,6 +146,7 @@ async function unzipChunkSlice(inputData, chunk) {
         'problem decompressing block: incorrect gzip header check',
       )
     }
+    throw e
   }
 }
 
