@@ -1,4 +1,12 @@
-const fs = require('fs-extra')
+const promisify = require('es6-promisify').promisify
+const fs =
+  // eslint-disable-next-line camelcase
+  typeof __webpack_require__ !== 'function' ? require('fs') : undefined
+
+const fsOpen = fs && fs.open && promisify(fs.open)
+const fsRead = fs && fs.read && promisify(fs.read)
+const fsFStat = fs && fs.fstat && promisify(fs.fstat)
+
 const { BgzfFilehandle } = require('../src')
 
 async function testRead(basename, length, position) {
@@ -9,21 +17,15 @@ async function testRead(basename, length, position) {
 
   const buf1 = Buffer.allocUnsafe(length)
   const buf2 = Buffer.allocUnsafe(length)
-  const { bytesRead } = await f.read(buf1, 0, length, position)
-  const fd = await fs.open(require.resolve(`./data/${basename}`), 'r')
-  const { bytesRead: directBytesRead } = await fs.read(
-    fd,
-    buf2,
-    0,
-    length,
-    position,
-  )
-  expect(bytesRead).toEqual(directBytesRead)
+  const bytesRead = await f.read(buf1, 0, length, position)
+  const fd = await fsOpen(require.resolve(`./data/${basename}`), 'r')
+  const directBytesRead = await fsRead(fd, buf2, 0, length, position)
+  expect(bytesRead.bytesRead).toEqual(directBytesRead)
   expect(Array.from(buf1.slice(0, bytesRead))).toEqual(
     Array.from(buf2.slice(0, bytesRead)),
   )
 
-  const directStat = await fs.fstat(fd)
+  const directStat = await fsFStat(fd)
   const myStat = await f.stat()
   expect(myStat.size).toEqual(directStat.size)
 }
