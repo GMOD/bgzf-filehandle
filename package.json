@@ -56,5 +56,8 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "browser": {
+    "./dist/unzip.js": "./dist/unzip-pako.js"
   }
 }
