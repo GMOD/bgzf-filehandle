@@ -1,3 +1,4 @@
+/* eslint-disable consistent-return */
 const { Z_SYNC_FLUSH, Inflate } = require('pako')
 
 // browserify-zlib, which is the zlib shim used by default in webpacked code,
@@ -148,4 +149,8 @@ module.exports = {
   unzip,
   unzipChunk,
   unzipChunkSlice,
+  pakoUnzip: unzip,
+  nodeUnzip: () => {
+    throw new Error('nodeUnzip not implemented.')
+  },
 }

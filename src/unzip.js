@@ -1,6 +1,6 @@
 const zlib = require('zlib')
 const { promisify } = require('es6-promisify')
-const { unzip: pakoUnzip, unzipChunk, unzipChunkSlice } = require('./unzip-pako')
+const { pakoUnzip, unzipChunk, unzipChunkSlice } = require('./unzip-pako')
 
 const gunzip = promisify(zlib.gunzip)
 
