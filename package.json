@@ -58,6 +58,7 @@
     "access": "public"
   },
   "browser": {
-    "./dist/unzip.js": "./dist/unzip-pako.js"
+    "./dist/unzip.js": "./dist/unzip-pako.js",
+    "fs-extra": false
   }
 }
