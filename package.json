@@ -23,7 +23,7 @@
     "prebuild": "npm run clean",
     "build": "babel src -d dist",
     "prepublishOnly": "npm run lint && npm test && npm run build",
-    "postpublish": "git push origin master --follow-tags"
+    "postversion": "git push --follow-tags"
   },
   "jest": {
     "testEnvironment": "node"
