@@ -1,6 +1,4 @@
-const fs =
-  // eslint-disable-next-line camelcase
-  typeof __webpack_require__ !== 'function' ? require('fs-extra') : undefined
+const fs = require('fs-extra')
 
 // LocalFile is pretty much just an implementation of the node 10+ fs.promises filehandle,
 // we can switch to that when the API is stable
