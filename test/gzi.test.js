@@ -1,4 +1,4 @@
-const GziIndex = require('../src/gziIndex')
+import GziIndex from '../src/gziIndex'
 
 describe('gzi objects', () => {
   it('can read empty gff3_with_syncs.gff3.gz.gzi', async () => {

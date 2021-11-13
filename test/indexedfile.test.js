@@ -1,5 +1,5 @@
-const fs = require('fs-extra')
-const { BgzfFilehandle } = require('../src')
+import fs from 'fs'
+import { BgzfFilehandle } from '../src'
 
 async function testRead(basename, length, position) {
   const f = new BgzfFilehandle({
@@ -9,9 +9,9 @@ async function testRead(basename, length, position) {
 
   const buf1 = Buffer.allocUnsafe(length)
   const buf2 = Buffer.allocUnsafe(length)
-  const { bytesRead } = await f.read(buf1, 0, length, position)
-  const fd = await fs.open(require.resolve(`./data/${basename}`), 'r')
-  const { bytesRead: directBytesRead } = await fs.read(
+  const { bytesRead } = fs.readSync(buf1, 0, length, position)
+  const fd = fs.openSync(require.resolve(`./data/${basename}`), 'r')
+  const { bytesRead: directBytesRead } = fs.readSync(
     fd,
     buf2,
     0,

@@ -1,10 +1,5 @@
-const fs = require('fs')
-const {
-  pakoUnzip,
-  nodeUnzip,
-  unzipChunk,
-  unzipChunkSlice,
-} = require('../src/unzip')
+import fs from 'fs'
+import { pakoUnzip, nodeUnzip, unzipChunk, unzipChunkSlice } from '../src/unzip'
 
 describe('unzip', () => {
   it('can unzip bgzip-1.txt.gz', async () => {
