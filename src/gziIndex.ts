@@ -1,17 +1,28 @@
-const Long = require('long')
-const LocalFile = require('./localFile')
+import Long from 'long'
+import { LocalFile, GenericFilehandle } from 'generic-filehandle'
 
 // const COMPRESSED_POSITION = 0
 const UNCOMPRESSED_POSITION = 1
 
-class GziIndex {
-  constructor({ filehandle, path }) {
+export default class GziIndex {
+  filehandle: GenericFilehandle
+
+  index?: any
+
+  constructor({
+    filehandle,
+    path,
+  }: {
+    filehandle?: GenericFilehandle
+    path?: string
+  }) {
     if (filehandle) this.filehandle = filehandle
     else if (path) this.filehandle = new LocalFile(path)
     else throw new TypeError('either filehandle or path must be defined')
   }
 
-  _readLongWithOverflow(buf, offset = 0, unsigned = true) {
+  _readLongWithOverflow(buf: Buffer, offset = 0, unsigned = true) {
+    //@ts-ignore
     const long = Long.fromBytesLE(buf.slice(offset, offset + 8), unsigned)
     if (
       long.greaterThan(Number.MAX_SAFE_INTEGER) ||
@@ -57,25 +68,13 @@ class GziIndex {
     return entries
   }
 
-  /**
-   * @returns {object} the entry for the last block in the index
-   */
   async getLastBlock() {
     const entries = await this._getIndex()
     if (!entries.length) return undefined
     return entries[entries.length - 1]
   }
 
-  /**
-   * get an array of block records that must be read to execute
-   * the given virtual read operation
-   *
-   * @param {number} position uncompressed read position
-   * @param {number} length uncompressed read length
-   * @returns {Promise} for an array of block records, the
-   * last of which should *not* be included in the read
-   */
-  async getRelevantBlocksForRead(length, position) {
+  async getRelevantBlocksForRead(length: number, position: number) {
     const endPosition = position + length
     if (length === 0) return []
     const entries = await this._getIndex()
@@ -83,7 +82,7 @@ class GziIndex {
 
     // binary search to find the block that the
     // read starts in and extend forward from that
-    const compare = (entry, nextEntry) => {
+    const compare = (entry: any, nextEntry: any) => {
       const uncompressedPosition = entry[UNCOMPRESSED_POSITION]
       const nextUncompressedPosition = nextEntry
         ? nextEntry[UNCOMPRESSED_POSITION]
@@ -133,42 +132,4 @@ class GziIndex {
     }
     return relevant
   }
-
-  // /**
-  //  * get a virtual block record giving the position and length of a BGZF region that
-  //  * must be read to execute the given virtual read operation
-  //  *
-  //  * @param {number} position uncompressed file position we would like to start reading at
-  //  * @param {number} length number of uncompressed bytes we would like to read
-  //  * @returns {object} as `{compressedPosition, uncompressedPosition, compressedSize}`. If
-  //  * compressedSize is undefined, the read should end at the end of the file.
-  //  */
-  // async calculateMultiBlockRead(length, position) {
-  //   const entries = await this._getIndex()
-  //   const endPosition = position + length
-  //   let readStart
-  //   let readLength
-  //   let readUncompressedStart
-  //   for (let i = 0; i < entries.length; i += 1) {
-  //     const entry = entries[i]
-  //     if (readStart === undefined && entry.uncompressedPosition <= position) {
-  //       readStart = entry.compressedPosition
-  //       readUncompressedStart = entry.uncompressedPosition
-  //     }
-  //     if (
-  //       readLength === undefined &&
-  //       entry.uncompressedPosition >= endPosition
-  //     ) {
-  //       readLength = entry.compressedPosition - readStart
-  //     }
-  //   }
-
-  //   return {
-  //     compressedPosition: readStart,
-  //     uncompressedPosition: readUncompressedStart,
-  //     compressedSize: readLength,
-  //   }
-  // }
 }
-
-module.exports = GziIndex

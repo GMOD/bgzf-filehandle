@@ -1,4 +1,4 @@
-const BgzfFilehandle = require('./bgzFilehandle')
-const { unzip, unzipChunk, unzipChunkSlice } = require('./unzip')
+import BgzfFilehandle from './bgzFilehandle'
+import { unzip, unzipChunk, unzipChunkSlice } from './unzip'
 
-module.exports = { BgzfFilehandle, unzip, unzipChunk, unzipChunkSlice }
+export { BgzfFilehandle, unzip, unzipChunk, unzipChunkSlice }

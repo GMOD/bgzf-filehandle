@@ -1,20 +1,15 @@
-const zlib = require('zlib')
-const { promisify } = require('es6-promisify')
-const { pakoUnzip, unzipChunk, unzipChunkSlice } = require('./unzip-pako')
+import zlib from 'zlib'
+import { promisify } from 'es6-promisify'
+import { pakoUnzip, unzipChunk, unzipChunkSlice } from './unzip-pako'
 
 const gunzip = promisify(zlib.gunzip)
 
 // in node, just use the native unzipping with Z_SYNC_FLUSH
-function nodeUnzip(input) {
+function nodeUnzip(input: Buffer) {
+  //@ts-ignore
   return gunzip(input, {
     finishFlush: (zlib.constants || zlib).Z_SYNC_FLUSH,
   })
 }
 
-module.exports = {
-  unzip: nodeUnzip,
-  unzipChunk,
-  unzipChunkSlice,
-  nodeUnzip,
-  pakoUnzip,
-}
+export { nodeUnzip as unzip, unzipChunk, unzipChunkSlice, nodeUnzip, pakoUnzip }

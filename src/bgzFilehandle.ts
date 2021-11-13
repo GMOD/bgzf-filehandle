@@ -1,9 +1,22 @@
-const { unzip } = require('./unzip')
-const LocalFile = require('./localFile')
-const GziIndex = require('./gziIndex')
+import { unzip } from './unzip'
+import GziIndex from './gziIndex'
+import { LocalFile, GenericFilehandle } from 'generic-filehandle'
 
-class BgzFilehandle {
-  constructor({ filehandle, path, gziFilehandle, gziPath }) {
+export default class BgzFilehandle {
+  filehandle: GenericFilehandle
+  gzi: GziIndex
+
+  constructor({
+    filehandle,
+    path,
+    gziFilehandle,
+    gziPath,
+  }: {
+    filehandle: GenericFilehandle
+    path: string
+    gziFilehandle: GenericFilehandle
+    gziPath: string
+  }) {
     if (filehandle) this.filehandle = filehandle
     else if (path) this.filehandle = new LocalFile(path)
     else throw new TypeError('either filehandle or path must be defined')
@@ -43,9 +56,9 @@ class BgzFilehandle {
   }
 
   async _readAndUncompressBlock(
-    blockBuffer,
-    [compressedPosition],
-    [nextCompressedPosition],
+    blockBuffer: Buffer,
+    [compressedPosition]: [number],
+    [nextCompressedPosition]: [number],
   ) {
     let next = nextCompressedPosition
     if (!next) {
@@ -67,10 +80,10 @@ class BgzFilehandle {
       blockBuffer.slice(0, blockCompressedLength),
     )
 
-    return unzippedBuffer
+    return unzippedBuffer as Buffer
   }
 
-  async read(buf, offset, length, position) {
+  async read(buf: Buffer, offset: number, length: number, position: number) {
     // get the block positions for this read
     const blockPositions = await this.gzi.getRelevantBlocksForRead(
       length,
@@ -109,5 +122,3 @@ class BgzFilehandle {
     return { bytesRead, buffer: buf }
   }
 }
-
-module.exports = BgzFilehandle
