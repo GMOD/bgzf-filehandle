@@ -12,10 +12,10 @@ export default class BgzFilehandle {
     gziFilehandle,
     gziPath,
   }: {
-    filehandle: GenericFilehandle
-    path: string
-    gziFilehandle: GenericFilehandle
-    gziPath: string
+    filehandle?: GenericFilehandle
+    path?: string
+    gziFilehandle?: GenericFilehandle
+    gziPath?: string
   }) {
     if (filehandle) this.filehandle = filehandle
     else if (path) this.filehandle = new LocalFile(path)

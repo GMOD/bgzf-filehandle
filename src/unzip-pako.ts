@@ -39,11 +39,13 @@ async function unzip(inputData: Buffer) {
     const result = Buffer.concat(chunks)
     return result
   } catch (e) {
+    //cleanup error message
     if (`${e}`.match(/incorrect header check/)) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
       )
     }
+    throw e
   }
 }
 
@@ -81,11 +83,13 @@ async function unzipChunk(inputData: Buffer) {
     const buffer = Buffer.concat(blocks)
     return { buffer, cpositions, dpositions }
   } catch (e) {
+    //cleanup error message
     if (`${e}`.match(/incorrect header check/)) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
       )
     }
+    throw e
   }
 }
 
@@ -148,6 +152,7 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
     const buffer = Buffer.concat(decompressedBlocks)
     return { buffer, cpositions, dpositions }
   } catch (e) {
+    //cleanup error message
     if (`${e}`.match(/incorrect header check/)) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
