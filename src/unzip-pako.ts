@@ -63,7 +63,7 @@ async function unzipChunk(inputData: Buffer) {
     do {
       const remainingInput = inputData.slice(cpos)
       const inflator = new Inflate()
-        // @ts-ignore
+      // @ts-ignore
       ;({ strm } = inflator)
       // @ts-ignore
       inflator.push(remainingInput, Z_SYNC_FLUSH)
@@ -97,15 +97,16 @@ async function unzipChunk(inputData: Buffer) {
 async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
   try {
     let strm
-    let cpos = chunk.minv.blockPosition
-    let dpos = chunk.minv.dataPosition
+    const { minv, maxv } = chunk
+    let cpos = minv.blockPosition
+    let dpos = minv.dataPosition
     const decompressedBlocks = []
     const cpositions = []
     const dpositions = []
     do {
-      const remainingInput = inputData.slice(cpos - chunk.minv.blockPosition)
+      const remainingInput = inputData.slice(cpos - minv.blockPosition)
       const inflator = new Inflate()
-        // @ts-ignore
+      // @ts-ignore
       ;({ strm } = inflator)
       // @ts-ignore
       inflator.push(remainingInput, Z_SYNC_FLUSH)
@@ -118,18 +119,16 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
 
       cpositions.push(cpos)
       dpositions.push(dpos)
-      if (decompressedBlocks.length === 1 && chunk.minv.dataPosition) {
+      if (decompressedBlocks.length === 1 && minv.dataPosition) {
         // this is the first chunk, trim it
-        decompressedBlocks[0] = decompressedBlocks[0].slice(
-          chunk.minv.dataPosition,
-        )
+        decompressedBlocks[0] = decompressedBlocks[0].slice(minv.dataPosition)
         len = decompressedBlocks[0].length
       }
       const origCpos = cpos
       cpos += strm.next_in
       dpos += len
 
-      if (origCpos >= chunk.maxv.blockPosition) {
+      if (origCpos >= maxv.blockPosition) {
         // this is the last chunk, trim it and stop decompressing
         // note if it is the same block is minv it subtracts that already
         // trimmed part of the slice length
@@ -138,9 +137,9 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
           decompressedBlocks.length - 1
         ].slice(
           0,
-          chunk.maxv.blockPosition === chunk.minv.blockPosition
-            ? chunk.maxv.dataPosition - chunk.minv.dataPosition + 1
-            : chunk.maxv.dataPosition + 1,
+          maxv.blockPosition === minv.blockPosition
+            ? maxv.dataPosition - minv.dataPosition + 1
+            : maxv.dataPosition + 1,
         )
 
         cpositions.push(cpos)

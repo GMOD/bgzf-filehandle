@@ -3,6 +3,7 @@
   "compilerOptions": {
     "types": ["node", "jest"],
     "lib": ["dom", "esnext"],
+    "outDir": "esm",
     "declaration": true,
     "moduleResolution": "node",
     "sourceMap": true,

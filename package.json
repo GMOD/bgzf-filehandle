@@ -33,25 +33,25 @@
   "dependencies": {
     "es6-promisify": "^7.0.0",
     "generic-filehandle": "^2.2.1",
-    "long": "^4.0.0",
-    "pako": "^1.0.10"
+    "long": "^5.1.0",
+    "pako": "^1.0.11"
   },
   "devDependencies": {
     "@types/es6-promisify": "^6.0.0",
-    "@types/jest": "^27.0.2",
+    "@types/jest": "^27.0.3",
     "@types/long": "^4.0.1",
-    "@types/node": "^16.11.7",
+    "@types/node": "^16.11.10",
     "@types/pako": "^1.0.2",
     "jest": "^27.3.1",
-    "prettier": "^1.11.1",
-    "rimraf": "^2.6.2",
+    "prettier": "^2.5.0",
+    "rimraf": "^3.0.2",
     "ts-jest": "^27.0.7",
-    "typescript": "^4.4.4"
+    "typescript": "^4.5.2"
   },
   "publishConfig": {
     "access": "public"
   },
   "browser": {
-    "./dist/unzip.js": "./dist/unzip-pako.js"
+    "./esm/unzip.js": "./esm/unzip-pako.js"
   }
 }
