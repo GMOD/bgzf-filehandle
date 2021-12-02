@@ -20,7 +20,7 @@
   ],
   "scripts": {
     "test": "jest",
-    "clean": "rimraf dist",
+    "clean": "rimraf dist esm",
     "prebuild": "npm run clean",
     "build": "tsc --target es2018 --outDir esm && tsc --target es5 --outDir dist",
     "prepublishOnly": "npm test && npm run build",
