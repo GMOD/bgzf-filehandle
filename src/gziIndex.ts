@@ -16,9 +16,13 @@ export default class GziIndex {
     filehandle?: GenericFilehandle
     path?: string
   }) {
-    if (filehandle) this.filehandle = filehandle
-    else if (path) this.filehandle = new LocalFile(path)
-    else throw new TypeError('either filehandle or path must be defined')
+    if (filehandle) {
+      this.filehandle = filehandle
+    } else if (path) {
+      this.filehandle = new LocalFile(path)
+    } else {
+      throw new TypeError('either filehandle or path must be defined')
+    }
   }
 
   _readLongWithOverflow(buf: Buffer, offset = 0, unsigned = true) {
@@ -27,14 +31,17 @@ export default class GziIndex {
     if (
       long.greaterThan(Number.MAX_SAFE_INTEGER) ||
       long.lessThan(Number.MIN_SAFE_INTEGER)
-    )
+    ) {
       throw new TypeError('integer overflow')
+    }
 
     return long.toNumber()
   }
 
   _getIndex() {
-    if (!this.index) this.index = this._readIndex()
+    if (!this.index) {
+      this.index = this._readIndex()
+    }
     return this.index
   }
 
@@ -42,15 +49,18 @@ export default class GziIndex {
     let buf = Buffer.allocUnsafe(8)
     await this.filehandle.read(buf, 0, 8, 0)
     const numEntries = this._readLongWithOverflow(buf, 0, true)
-    if (!numEntries) return [[0, 0]]
+    if (!numEntries) {
+      return [[0, 0]]
+    }
 
     const entries = new Array(numEntries + 1)
     entries[0] = [0, 0]
 
     // TODO rewrite this to make an index-index that stays in memory
     const bufSize = 8 * 2 * numEntries
-    if (bufSize > Number.MAX_SAFE_INTEGER)
+    if (bufSize > Number.MAX_SAFE_INTEGER) {
       throw new TypeError('integer overflow')
+    }
     buf = Buffer.allocUnsafe(bufSize)
     await this.filehandle.read(buf, 0, bufSize, 8)
     for (let entryNumber = 0; entryNumber < numEntries; entryNumber += 1) {
@@ -70,13 +80,17 @@ export default class GziIndex {
 
   async getLastBlock() {
     const entries = await this._getIndex()
-    if (!entries.length) return undefined
+    if (!entries.length) {
+      return undefined
+    }
     return entries[entries.length - 1]
   }
 
   async getRelevantBlocksForRead(length: number, position: number) {
     const endPosition = position + length
-    if (length === 0) return []
+    if (length === 0) {
+      return []
+    }
     const entries = await this._getIndex()
     const relevant = []
 
@@ -125,7 +139,9 @@ export default class GziIndex {
     let i = searchPosition + 1
     for (; i < entries.length; i += 1) {
       relevant.push(entries[i])
-      if (entries[i][UNCOMPRESSED_POSITION] >= endPosition) break
+      if (entries[i][UNCOMPRESSED_POSITION] >= endPosition) {
+        break
+      }
     }
     if (relevant[relevant.length - 1][UNCOMPRESSED_POSITION] < endPosition) {
       relevant.push([])

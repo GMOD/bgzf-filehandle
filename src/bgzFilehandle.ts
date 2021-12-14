@@ -17,12 +17,17 @@ export default class BgzFilehandle {
     gziFilehandle?: GenericFilehandle
     gziPath?: string
   }) {
-    if (filehandle) this.filehandle = filehandle
-    else if (path) this.filehandle = new LocalFile(path)
-    else throw new TypeError('either filehandle or path must be defined')
+    if (filehandle) {
+      this.filehandle = filehandle
+    } else if (path) {
+      this.filehandle = new LocalFile(path)
+    } else {
+      throw new TypeError('either filehandle or path must be defined')
+    }
 
-    if (!gziFilehandle && !gziPath && !path)
+    if (!gziFilehandle && !gziPath && !path) {
       throw new TypeError('either gziFilehandle or gziPath must be defined')
+    }
 
     this.gzi = new GziIndex({
       filehandle: gziFilehandle,
@@ -50,7 +55,9 @@ export default class BgzFilehandle {
     // note: there should be a 28-byte EOF marker (an empty block) at
     // the end of the file, so we skip backward past that
     const { bytesRead } = await this.filehandle.read(buf, 0, 4, size - 28 - 4)
-    if (bytesRead !== 4) throw new Error('read error')
+    if (bytesRead !== 4) {
+      throw new Error('read error')
+    }
     const lastBlockUncompressedSize = buf.readUInt32LE(0)
     return uncompressedPosition + lastBlockUncompressedSize
   }

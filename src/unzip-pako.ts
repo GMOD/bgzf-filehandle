@@ -29,7 +29,9 @@ async function unzip(inputData: Buffer) {
       //@ts-ignore
       ;({ strm } = inflator)
       inflator.push(remainingInput, Z_SYNC_FLUSH)
-      if (inflator.err) throw new Error(inflator.msg)
+      if (inflator.err) {
+        throw new Error(inflator.msg)
+      }
 
       pos += strm.next_in
       chunks[i] = Buffer.from(inflator.result)
@@ -67,7 +69,9 @@ async function unzipChunk(inputData: Buffer) {
       ;({ strm } = inflator)
       // @ts-ignore
       inflator.push(remainingInput, Z_SYNC_FLUSH)
-      if (inflator.err) throw new Error(inflator.msg)
+      if (inflator.err) {
+        throw new Error(inflator.msg)
+      }
 
       // @ts-ignore
       const buffer = Buffer.from(inflator.result)
@@ -110,7 +114,9 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
       ;({ strm } = inflator)
       // @ts-ignore
       inflator.push(remainingInput, Z_SYNC_FLUSH)
-      if (inflator.err) throw new Error(inflator.msg)
+      if (inflator.err) {
+        throw new Error(inflator.msg)
+      }
 
       // @ts-ignore
       const buffer = Buffer.from(inflator.result)
