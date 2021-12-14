@@ -1,12 +1,10 @@
-
 [![NPM version](https://img.shields.io/npm/v/@gmod/bgzf-filehandle.svg?style=flat-square)](https://npmjs.org/package/@gmod/bgzf-filehandle)
-[![Build Status](https://img.shields.io/travis/GMOD/bgzf-filehandle/master.svg?style=flat-square)](https://travis-ci.org/GMOD/bgzf-filehandle) [![Greenkeeper badge](https://badges.greenkeeper.io/GMOD/bgzf-filehandle.svg)](https://greenkeeper.io/) 
-[![codecov](https://codecov.io/gh/GMOD/bgzf-filehandle/branch/master/graph/badge.svg)](https://codecov.io/gh/GMOD/bgzf-filehandle)
-
+[![Coverage Status](https://img.shields.io/codecov/c/github/GMOD/bgzf-filehandle/master.svg?style=flat-square)](https://codecov.io/gh/GMOD/bgzf-filehandle/branch/master)
+[![Build Status](https://img.shields.io/github/workflow/status/GMOD/bgzf-filehandle/Push/master?logo=github&style=flat-query)](https://github.com/GMOD/bgzf-filehandle/actions?query=branch%3Amaster+workflow%3APush+)
 
 Transparently read [indexed block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such as those created by bgzip, using coordinates from the uncompressed file.
 
-Also provides a `unzip` utility function that properly decompresses BGZF chunks in both node and the browser. Uses `pako` when running in the browser, native `zlib` when running in node. The `unzipChunk` function is another 
+Also provides a `unzip` utility function that properly decompresses BGZF chunks in both node and the browser. Uses `pako` when running in the browser, native `zlib` when running in node. The `unzipChunk` function is another
 
 ## Install
 
@@ -17,7 +15,7 @@ Also provides a `unzip` utility function that properly decompresses BGZF chunks 
 ```js
 const { BgzfFilehandle, unzip, unzipChunk } = require('@gmod/bgzf-filehandle')
 
-const f = new BgzfFilehandle({path: 'path/to/my_file.gz'})
+const f = new BgzfFilehandle({ path: 'path/to/my_file.gz' })
 // assumes a .gzi index exists at path/to/my_file.gz.gzi. can also
 // pass `gziPath` to set it explicitly. Can also pass filehandles
 // for the files: `filehandle` and `gziFilehandle`
@@ -34,18 +32,20 @@ const { size } = f.stat() // stat gives the size as if the file were uncompresse
 const chunkDataBuffer = readDirectlyFromFile(someFile, 123, 456)
 const unzippedBuffer = await unzip(chunkDataBuffer)
 
-
 // unzipChunk takes a buffer and returns a decompressed buffer plus the offsets
 // of the block boundaries in the bgzip file in compressed (cpositions) and
 // decompressed (dpositions) coordinates
 // you can ignore dpositions/cpositions if your code doesn't care about stable feature IDs
-const {buffer, dpositions, cpositions} = await unzipChunk(chunkDataBuffer)
+const { buffer, dpositions, cpositions } = await unzipChunk(chunkDataBuffer)
 
 // similar to the above unzipChunk but takes extra chunk argument and trims
 // off (0,chunk.minv.dataPosition) and (chunk.maxv.dataPosition)
 // used especially for generating stable feature IDs across chunk boundaries
 // normal unzip or unzipChunk can be used if this is not important
-const {buffer, dpositions, cpositions} = await unzipChunkSlice(chunkDataBuffer, chunk)
+const { buffer, dpositions, cpositions } = await unzipChunkSlice(
+  chunkDataBuffer,
+  chunk,
+)
 ```
 
 ## Academic Use
