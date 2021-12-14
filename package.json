@@ -22,7 +22,9 @@
     "test": "jest",
     "clean": "rimraf dist esm",
     "prebuild": "npm run clean",
-    "build": "tsc --target es2018 --outDir esm && tsc --target es5 --outDir dist",
+    "build:esm": "tsc --target es2018 --outDir esm",
+    "build:es5": "tsc --target es5 --outDir dist",
+    "build": "npm run build:esm && npm run build:es5",
     "prepublishOnly": "npm test && npm run build",
     "postversion": "git push --follow-tags"
   },
