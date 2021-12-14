@@ -1,16 +1,11 @@
-const fs = require('fs')
-const {
-  pakoUnzip,
-  nodeUnzip,
-  unzipChunk,
-  unzipChunkSlice,
-} = require('../src/unzip')
+import fs from 'fs'
+import { pakoUnzip, nodeUnzip, unzipChunk, unzipChunkSlice } from '../src/unzip'
 
 describe('unzip', () => {
   it('can unzip bgzip-1.txt.gz', async () => {
     const testData = fs.readFileSync(require.resolve('./data/bgzip-1.txt.gz'))
     const fromPako = await pakoUnzip(testData)
-    const fromNode = await nodeUnzip(testData)
+    const fromNode = (await nodeUnzip(testData)) as Buffer
     expect(fromNode).toEqual(fromPako)
     expect(fromNode.length).toEqual(65569)
     expect(fromPako.length).toEqual(65569)
