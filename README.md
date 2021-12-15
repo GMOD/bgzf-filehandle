@@ -2,9 +2,13 @@
 [![Coverage Status](https://img.shields.io/codecov/c/github/GMOD/bgzf-filehandle/master.svg?style=flat-square)](https://codecov.io/gh/GMOD/bgzf-filehandle/branch/master)
 [![Build Status](https://img.shields.io/github/workflow/status/GMOD/bgzf-filehandle/Push/master?logo=github&style=flat-query)](https://github.com/GMOD/bgzf-filehandle/actions?query=branch%3Amaster+workflow%3APush+)
 
-Transparently read [indexed block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such as those created by bgzip, using coordinates from the uncompressed file.
+Transparently read [indexed block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such as those created by bgzip, using coordinates from the uncompressed file. The module is used in @gmod/indexedfasta to read bgzip-indexed fasta files (with gzi index, fai index, and fa). 
 
-Also provides a `unzip` utility function that properly decompresses BGZF chunks in both node and the browser. Uses `pako` when running in the browser, native `zlib` when running in node. The `unzipChunk` function is another
+Users can also use the `unzip` function to unzip bgzip files whole (which pako has trouble with natively)
+
+You can also use the unzipChunk or unzipChunkSlice functions to unzip ranges given by BAI or TBI files for BAM or tabix file formats (which are bgzip based).
+
+The `unzip` utility function properly decompresses BGZF chunks in both node and the browser, using `pako` when running in the browser and native `zlib` when running in node.
 
 ## Install
 
