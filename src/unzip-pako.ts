@@ -1,5 +1,3 @@
-/* eslint-disable consistent-return */
-
 //@ts-ignore
 import { Z_SYNC_FLUSH, Inflate } from 'pako'
 
@@ -67,13 +65,11 @@ async function unzipChunk(inputData: Buffer) {
       const inflator = new Inflate()
       // @ts-ignore
       ;({ strm } = inflator)
-      // @ts-ignore
       inflator.push(remainingInput, Z_SYNC_FLUSH)
       if (inflator.err) {
         throw new Error(inflator.msg)
       }
 
-      // @ts-ignore
       const buffer = Buffer.from(inflator.result)
       blocks.push(buffer)
 
@@ -112,13 +108,11 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
       const inflator = new Inflate()
       // @ts-ignore
       ;({ strm } = inflator)
-      // @ts-ignore
       inflator.push(remainingInput, Z_SYNC_FLUSH)
       if (inflator.err) {
         throw new Error(inflator.msg)
       }
 
-      // @ts-ignore
       const buffer = Buffer.from(inflator.result)
       decompressedBlocks.push(buffer)
       let len = buffer.length
