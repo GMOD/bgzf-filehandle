@@ -8,14 +8,18 @@ export default class GziIndex {
   filehandle: GenericFilehandle
 
   index?: any
+  safe: boolean
 
   constructor({
     filehandle,
     path,
+    safe = false,
   }: {
     filehandle?: GenericFilehandle
     path?: string
+    safe?: boolean
   }) {
+    this.safe = safe
     if (filehandle) {
       this.filehandle = filehandle
     } else if (path) {
@@ -29,8 +33,9 @@ export default class GziIndex {
     //@ts-ignore
     const long = Long.fromBytesLE(buf.slice(offset, offset + 8), unsigned)
     if (
-      long.greaterThan(Number.MAX_SAFE_INTEGER) ||
-      long.lessThan(Number.MIN_SAFE_INTEGER)
+      this.safe &&
+      (long.greaterThan(Number.MAX_SAFE_INTEGER) ||
+        long.lessThan(Number.MIN_SAFE_INTEGER))
     ) {
       throw new TypeError('integer overflow')
     }
