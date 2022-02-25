@@ -84,7 +84,7 @@ export default class BgzFilehandle {
 
     // uncompress it
     const unzippedBuffer = await unzip(
-      blockBuffer.slice(0, blockCompressedLength),
+      blockBuffer.subarray(0, blockCompressedLength),
     )
 
     return unzippedBuffer as Buffer

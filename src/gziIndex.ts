@@ -31,7 +31,7 @@ export default class GziIndex {
 
   _readLongWithOverflow(buf: Buffer, offset = 0, unsigned = true) {
     //@ts-ignore
-    const long = Long.fromBytesLE(buf.slice(offset, offset + 8), unsigned)
+    const long = Long.fromBytesLE(buf.subarray(offset, offset + 8), unsigned)
     if (
       this.safe &&
       (long.greaterThan(Number.MAX_SAFE_INTEGER) ||

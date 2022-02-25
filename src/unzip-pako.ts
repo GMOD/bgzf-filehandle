@@ -22,7 +22,7 @@ async function unzip(inputData: Buffer) {
     const chunks = []
     let inflator
     do {
-      const remainingInput = inputData.slice(pos)
+      const remainingInput = inputData.subarray(pos)
       inflator = new Inflate()
       //@ts-ignore
       ;({ strm } = inflator)
@@ -61,7 +61,7 @@ async function unzipChunk(inputData: Buffer) {
     const cpositions = []
     const dpositions = []
     do {
-      const remainingInput = inputData.slice(cpos)
+      const remainingInput = inputData.subarray(cpos)
       const inflator = new Inflate()
       // @ts-ignore
       ;({ strm } = inflator)
@@ -93,7 +93,7 @@ async function unzipChunk(inputData: Buffer) {
   }
 }
 
-// similar to unzipChunk above but slices (0,minv.dataPosition) and (maxv.dataPosition,end) off
+// similar to unzipChunk above but subarrays (0,minv.dataPosition) and (maxv.dataPosition,end) off
 async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
   try {
     let strm
@@ -104,7 +104,7 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
     const cpositions = []
     const dpositions = []
     do {
-      const remainingInput = inputData.slice(cpos - minv.blockPosition)
+      const remainingInput = inputData.subarray(cpos - minv.blockPosition)
       const inflator = new Inflate()
       // @ts-ignore
       ;({ strm } = inflator)
@@ -121,7 +121,9 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
       dpositions.push(dpos)
       if (decompressedBlocks.length === 1 && minv.dataPosition) {
         // this is the first chunk, trim it
-        decompressedBlocks[0] = decompressedBlocks[0].slice(minv.dataPosition)
+        decompressedBlocks[0] = decompressedBlocks[0].subarray(
+          minv.dataPosition,
+        )
         len = decompressedBlocks[0].length
       }
       const origCpos = cpos
@@ -131,11 +133,11 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
       if (origCpos >= maxv.blockPosition) {
         // this is the last chunk, trim it and stop decompressing
         // note if it is the same block is minv it subtracts that already
-        // trimmed part of the slice length
+        // trimmed part of the subarray length
 
         decompressedBlocks[decompressedBlocks.length - 1] = decompressedBlocks[
           decompressedBlocks.length - 1
-        ].slice(
+        ].subarray(
           0,
           maxv.blockPosition === minv.blockPosition
             ? maxv.dataPosition - minv.dataPosition + 1
