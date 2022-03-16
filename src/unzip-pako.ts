@@ -20,9 +20,10 @@ async function unzip(inputData: Buffer) {
     let pos = 0
     let i = 0
     const chunks = []
+    let totalSize = 0
     let inflator
     do {
-      const remainingInput = inputData.slice(pos)
+      const remainingInput = inputData.subarray(pos)
       inflator = new Inflate()
       //@ts-ignore
       ;({ strm } = inflator)
@@ -32,12 +33,17 @@ async function unzip(inputData: Buffer) {
       }
 
       pos += strm.next_in
-      chunks[i] = Buffer.from(inflator.result)
+      chunks[i] = inflator.result as Uint8Array
+      totalSize += chunks[i].length
       i += 1
     } while (strm.avail_in)
 
-    const result = Buffer.concat(chunks)
-    return result
+    const result = new Uint8Array(totalSize)
+    for (let i = 0, offset = 0; i < chunks.length; i++) {
+      result.set(chunks[i], offset)
+      offset += chunks[i].length
+    }
+    return Buffer.from(result)
   } catch (e) {
     //cleanup error message
     if (`${e}`.match(/incorrect header check/)) {
@@ -93,18 +99,22 @@ async function unzipChunk(inputData: Buffer) {
   }
 }
 
-// similar to unzipChunk above but slices (0,minv.dataPosition) and (maxv.dataPosition,end) off
+// similar to unzipChunk above but slices (0,minv.dataPosition) and
+// (maxv.dataPosition,end) off
 async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
   try {
     let strm
     const { minv, maxv } = chunk
     let cpos = minv.blockPosition
     let dpos = minv.dataPosition
-    const decompressedBlocks = []
+    const chunks = []
     const cpositions = []
     const dpositions = []
+
+    let totalSize = 0
+    let i = 0
     do {
-      const remainingInput = inputData.slice(cpos - minv.blockPosition)
+      const remainingInput = inputData.subarray(cpos - minv.blockPosition)
       const inflator = new Inflate()
       // @ts-ignore
       ;({ strm } = inflator)
@@ -113,16 +123,16 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
         throw new Error(inflator.msg)
       }
 
-      const buffer = Buffer.from(inflator.result)
-      decompressedBlocks.push(buffer)
+      const buffer = inflator.result
+      chunks.push(buffer as Uint8Array)
       let len = buffer.length
 
       cpositions.push(cpos)
       dpositions.push(dpos)
-      if (decompressedBlocks.length === 1 && minv.dataPosition) {
+      if (chunks.length === 1 && minv.dataPosition) {
         // this is the first chunk, trim it
-        decompressedBlocks[0] = decompressedBlocks[0].slice(minv.dataPosition)
-        len = decompressedBlocks[0].length
+        chunks[0] = chunks[0].subarray(minv.dataPosition)
+        len = chunks[0].length
       }
       const origCpos = cpos
       cpos += strm.next_in
@@ -133,9 +143,7 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
         // note if it is the same block is minv it subtracts that already
         // trimmed part of the slice length
 
-        decompressedBlocks[decompressedBlocks.length - 1] = decompressedBlocks[
-          decompressedBlocks.length - 1
-        ].slice(
+        chunks[i] = chunks[i].subarray(
           0,
           maxv.blockPosition === minv.blockPosition
             ? maxv.dataPosition - minv.dataPosition + 1
@@ -144,11 +152,20 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
 
         cpositions.push(cpos)
         dpositions.push(dpos)
+        totalSize += chunks[i].length
         break
       }
+      totalSize += chunks[i].length
+      i++
     } while (strm.avail_in)
 
-    const buffer = Buffer.concat(decompressedBlocks)
+    const result = new Uint8Array(totalSize)
+    for (let i = 0, offset = 0; i < chunks.length; i++) {
+      result.set(chunks[i], offset)
+      offset += chunks[i].length
+    }
+    const buffer = Buffer.from(result)
+
     return { buffer, cpositions, dpositions }
   } catch (e) {
     //cleanup error message
