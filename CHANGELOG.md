@@ -1,3 +1,7 @@
+# v1.4.4
+
+- Publish src directory for better source maps
+
 # 1.4.3
 
 - Add optimization to avoid data copying during unzip operations
