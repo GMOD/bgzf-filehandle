@@ -1,3 +1,7 @@
+# v1.4.5
+
+- Bump generic-filehandle 2->3
+
 # v1.4.4
 
 - Publish src directory for better source maps
