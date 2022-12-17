@@ -1,6 +1,6 @@
 [![NPM version](https://img.shields.io/npm/v/@gmod/bgzf-filehandle.svg?style=flat-square)](https://npmjs.org/package/@gmod/bgzf-filehandle)
 [![Coverage Status](https://img.shields.io/codecov/c/github/GMOD/bgzf-filehandle/master.svg?style=flat-square)](https://codecov.io/gh/GMOD/bgzf-filehandle/branch/master)
-[![Build Status](https://img.shields.io/github/workflow/status/GMOD/bgzf-filehandle/Push/master?logo=github&style=flat-query)](https://github.com/GMOD/bgzf-filehandle/actions?query=branch%3Amaster+workflow%3APush+)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/GMOD/bgzf-filehandle/push.yml?branch=master)](https://github.com/GMOD/bgzf-filehandle/actions)
 
 Transparently read [indexed block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such as those created by bgzip, using coordinates from the uncompressed file. The module is used in @gmod/indexedfasta to read bgzip-indexed fasta files (with gzi index, fai index, and fa). 
 
