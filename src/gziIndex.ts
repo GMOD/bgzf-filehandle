@@ -1,4 +1,5 @@
 import Long from 'long'
+import { Buffer } from 'buffer'
 import { LocalFile, GenericFilehandle } from 'generic-filehandle'
 
 // const COMPRESSED_POSITION = 0

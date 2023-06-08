@@ -1,4 +1,5 @@
 import zlib from 'zlib'
+import { Buffer } from 'buffer'
 import { promisify } from 'es6-promisify'
 import { pakoUnzip, unzipChunk, unzipChunkSlice } from './unzip-pako'
 

@@ -1,6 +1,9 @@
+import { Buffer } from 'buffer'
+import { LocalFile, GenericFilehandle } from 'generic-filehandle'
+
+// locals
 import { unzip } from './unzip'
 import GziIndex from './gziIndex'
-import { LocalFile, GenericFilehandle } from 'generic-filehandle'
 
 export default class BgzFilehandle {
   filehandle: GenericFilehandle
