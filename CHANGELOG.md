@@ -1,4 +1,6 @@
-- Add `Buffer` polyfill
+# v1.4.6
+
+- Add explicit 'buffer' import
 
 # v1.4.5
 
