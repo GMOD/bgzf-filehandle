@@ -1,3 +1,5 @@
+- Add `Buffer` polyfill
+
 # v1.4.5
 
 - Bump generic-filehandle 2->3

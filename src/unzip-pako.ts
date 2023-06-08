@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer'
 //@ts-ignore
 import { Z_SYNC_FLUSH, Inflate } from 'pako'
 
