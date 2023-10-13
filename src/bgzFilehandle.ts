@@ -1,11 +1,15 @@
 import { Buffer } from 'buffer'
-import { LocalFile, GenericFilehandle } from 'generic-filehandle'
+import {
+  LocalFile,
+  GenericFilehandle,
+  FilehandleOptions,
+} from 'generic-filehandle'
 
 // locals
 import { unzip } from './unzip'
 import GziIndex from './gziIndex'
 
-export default class BgzFilehandle {
+export default class BgzFilehandle implements GenericFilehandle {
   filehandle: GenericFilehandle
   gzi: GziIndex
 
@@ -130,5 +134,38 @@ export default class BgzFilehandle {
     }
 
     return { bytesRead, buffer: buf }
+  }
+
+  async close(): Promise<void> {
+    return
+  }
+
+  public async readFile(): Promise<Buffer>
+  public async readFile(options: BufferEncoding): Promise<string>
+  public async readFile<T extends undefined>(
+    options:
+      | Omit<FilehandleOptions, 'encoding'>
+      | (Omit<FilehandleOptions, 'encoding'> & { encoding: T }),
+  ): Promise<Buffer>
+  public async readFile<T extends BufferEncoding>(
+    options: Omit<FilehandleOptions, 'encoding'> & { encoding: T },
+  ): Promise<string>
+  readFile<T extends BufferEncoding>(
+    options: Omit<FilehandleOptions, 'encoding'> & { encoding: T },
+  ): T extends BufferEncoding ? Promise<Buffer> : Promise<Buffer | string>
+  async readFile(options: FilehandleOptions | BufferEncoding = {}) {
+    const data = await this.filehandle.readFile()
+    const buf = await unzip(data)
+    let encoding
+    if (typeof options === 'string') {
+      encoding = options
+    } else {
+      encoding = options.encoding
+    }
+    if (encoding === 'utf8') {
+      return buf.toString('utf8')
+    } else {
+      return buf
+    }
   }
 }
