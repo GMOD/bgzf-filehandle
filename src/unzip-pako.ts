@@ -1,4 +1,4 @@
-//@ts-ignore
+//@ts-expect-error
 import { Z_SYNC_FLUSH, Inflate } from 'pako'
 import { concatUint8Arrays } from './util'
 
@@ -21,12 +21,11 @@ async function unzip(inputData: Uint8Array) {
     let pos = 0
     let i = 0
     const chunks = []
-    let totalSize = 0
     let inflator
     do {
       const remainingInput = inputData.subarray(pos)
       inflator = new Inflate()
-      //@ts-ignore
+      //@ts-expect-error
       ;({ strm } = inflator)
       inflator.push(remainingInput, Z_SYNC_FLUSH)
       if (inflator.err) {
@@ -35,16 +34,10 @@ async function unzip(inputData: Uint8Array) {
 
       pos += strm.next_in
       chunks[i] = inflator.result as Uint8Array
-      totalSize += chunks[i].length
       i += 1
     } while (strm.avail_in)
 
-    const result = new Uint8Array(totalSize)
-    for (let i = 0, offset = 0; i < chunks.length; i++) {
-      result.set(chunks[i], offset)
-      offset += chunks[i].length
-    }
-    return result
+    return concatUint8Arrays(chunks)
   } catch (e) {
     //cleanup error message
     if (`${e}`.match(/incorrect header check/)) {
@@ -70,7 +63,7 @@ async function unzipChunk(inputData: Uint8Array) {
     do {
       const remainingInput = inputData.subarray(cpos)
       const inflator = new Inflate()
-      // @ts-ignore
+      // @ts-expect-error
       ;({ strm } = inflator)
       inflator.push(remainingInput, Z_SYNC_FLUSH)
       if (inflator.err) {
@@ -117,7 +110,7 @@ async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
     do {
       const remainingInput = inputData.subarray(cpos - minv.blockPosition)
       const inflator = new Inflate()
-      // @ts-ignore
+      // @ts-expect-error
       ;({ strm } = inflator)
       inflator.push(remainingInput, Z_SYNC_FLUSH)
       if (inflator.err) {

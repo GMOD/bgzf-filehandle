@@ -59,7 +59,7 @@ export default class BgzFilehandle implements GenericFilehandle {
     // note: there should be a 28-byte EOF marker (an empty block) at
     // the end of the file, so we skip backward past that
     const buf = await this.filehandle.read(4, size - 28 - 4)
-    const dv = new DataView(buf.buffer)
+    const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
     const lastBlockUncompressedSize = dv.getUint32(0, true)
     return uncompressedPosition + lastBlockUncompressedSize
   }

@@ -8,7 +8,7 @@ const gunzip = promisify(zlib.gunzip)
 // in node, just use the native unzipping with Z_SYNC_FLUSH
 function nodeUnzip(input: Uint8Array): Promise<Uint8Array> {
   const buf = Buffer.from(input)
-  //@ts-ignore
+  //@ts-expect-error
   return gunzip(buf, {
     finishFlush: (zlib.constants || zlib).Z_SYNC_FLUSH,
   })
