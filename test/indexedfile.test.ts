@@ -1,16 +1,20 @@
 import fs from 'fs'
 import { BgzfFilehandle } from '../src'
 
+function s(str: string) {
+  return require.resolve(`./data/${str}`)
+}
+
 async function testRead(basename: string, length: number, position: number) {
   const f = new BgzfFilehandle({
-    path: require.resolve(`./data/${basename}.gz`),
-    gziPath: require.resolve(`./data/${basename}.gz.gzi`),
+    path: s(`${basename}.gz`),
+    gziPath: s(`${basename}.gz.gzi`),
   })
 
-  const buf1 = Buffer.allocUnsafe(length)
   const buf2 = Buffer.allocUnsafe(length)
-  const { bytesRead } = await f.read(buf1, 0, length, position)
-  const fd = fs.openSync(require.resolve(`./data/${basename}`), 'r')
+  const buf1 = await f.read(length, position)
+  const bytesRead = buf1.length
+  const fd = fs.openSync(s(`${basename}`), 'r')
   const directBytesRead = fs.readSync(fd, buf2, 0, length, position)
   expect(bytesRead).toEqual(directBytesRead)
   expect(Array.from(buf1.slice(0, bytesRead))).toEqual(

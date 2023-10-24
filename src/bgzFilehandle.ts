@@ -1,13 +1,33 @@
-import { Buffer } from 'buffer'
 import {
   LocalFile,
   GenericFilehandle,
   FilehandleOptions,
-} from 'generic-filehandle'
+} from 'generic-filehandle2'
 
 // locals
 import { unzip } from './unzip'
 import GziIndex from './gziIndex'
+
+export function concatUint8Arrays(arrays: Uint8Array[], totalLength?: number) {
+  if (arrays.length === 0) {
+    return new Uint8Array(0)
+  }
+
+  totalLength ??= arrays.reduce(
+    (accumulator, currentValue) => accumulator + currentValue.length,
+    0,
+  )
+
+  const returnValue = new Uint8Array(totalLength)
+
+  let offset = 0
+  for (const array of arrays) {
+    returnValue.set(array, offset)
+    offset += array.length
+  }
+
+  return returnValue
+}
 
 export default class BgzFilehandle implements GenericFilehandle {
   filehandle: GenericFilehandle
@@ -46,8 +66,6 @@ export default class BgzFilehandle implements GenericFilehandle {
     const compressedStat = await this.filehandle.stat()
     return Object.assign(compressedStat, {
       size: await this.getUncompressedFileSize(),
-      blocks: undefined,
-      blksize: undefined,
     })
   }
 
@@ -58,19 +76,15 @@ export default class BgzFilehandle implements GenericFilehandle {
 
     const { size } = await this.filehandle.stat()
 
-    const buf = Buffer.allocUnsafe(4)
     // note: there should be a 28-byte EOF marker (an empty block) at
     // the end of the file, so we skip backward past that
-    const { bytesRead } = await this.filehandle.read(buf, 0, 4, size - 28 - 4)
-    if (bytesRead !== 4) {
-      throw new Error('read error')
-    }
-    const lastBlockUncompressedSize = buf.readUInt32LE(0)
+    const buf = await this.filehandle.read(4, size - 28 - 4)
+    const dv = new DataView(buf.buffer)
+    const lastBlockUncompressedSize = dv.getUint32(0, true)
     return uncompressedPosition + lastBlockUncompressedSize
   }
 
   async _readAndUncompressBlock(
-    blockBuffer: Buffer,
     [compressedPosition]: [number],
     [nextCompressedPosition]: [number],
   ) {
@@ -82,43 +96,30 @@ export default class BgzFilehandle implements GenericFilehandle {
     // read the compressed data into the block buffer
     const blockCompressedLength = next - compressedPosition
 
-    await this.filehandle.read(
-      blockBuffer,
-      0,
+    const buf = await this.filehandle.read(
       blockCompressedLength,
       compressedPosition,
     )
 
     // uncompress it
-    const unzippedBuffer = await unzip(
-      blockBuffer.slice(0, blockCompressedLength),
-    )
-
-    return unzippedBuffer as Buffer
+    return unzip(buf.slice(0, blockCompressedLength))
   }
 
-  async read(buf: Buffer, offset: number, length: number, position: number) {
+  async read(length: number, position: number) {
+    let buf = new Uint8Array()
     // get the block positions for this read
     const blockPositions = await this.gzi.getRelevantBlocksForRead(
       length,
       position,
     )
-    const blockBuffer = Buffer.allocUnsafe(32768 * 2)
-    // uncompress the blocks and read from them one at a time to keep memory usage down
-    let destinationOffset = offset
-    let bytesRead = 0
-    for (
-      let blockNum = 0;
-      blockNum < blockPositions.length - 1;
-      blockNum += 1
-    ) {
+
+    for (let i = 0; i < blockPositions.length - 1; i += 1) {
       // eslint-disable-next-line no-await-in-loop
       const uncompressedBuffer = await this._readAndUncompressBlock(
-        blockBuffer,
-        blockPositions[blockNum],
-        blockPositions[blockNum + 1],
+        blockPositions[i],
+        blockPositions[i + 1],
       )
-      const [, uncompressedPosition] = blockPositions[blockNum]
+      const [, uncompressedPosition] = blockPositions[i]
       const sourceOffset =
         uncompressedPosition >= position ? 0 : position - uncompressedPosition
       const sourceEnd =
@@ -127,13 +128,14 @@ export default class BgzFilehandle implements GenericFilehandle {
           uncompressedPosition + uncompressedBuffer.length,
         ) - uncompressedPosition
       if (sourceOffset >= 0 && sourceOffset < uncompressedBuffer.length) {
-        uncompressedBuffer.copy(buf, destinationOffset, sourceOffset, sourceEnd)
-        destinationOffset += sourceEnd - sourceOffset
-        bytesRead += sourceEnd - sourceOffset
+        buf = concatUint8Arrays([
+          buf,
+          uncompressedBuffer.slice(sourceOffset, sourceEnd),
+        ])
       }
     }
 
-    return { bytesRead, buffer: buf }
+    return buf
   }
 
   async close(): Promise<void> {
@@ -156,14 +158,10 @@ export default class BgzFilehandle implements GenericFilehandle {
   async readFile(options: FilehandleOptions | BufferEncoding = {}) {
     const data = await this.filehandle.readFile()
     const buf = await unzip(data)
-    let encoding
-    if (typeof options === 'string') {
-      encoding = options
-    } else {
-      encoding = options.encoding
-    }
+    const encoding = typeof options === 'string' ? options : options.encoding
     if (encoding === 'utf8') {
-      return buf.toString('utf8')
+      const decoder = new TextDecoder('utf8')
+      return decoder.decode(buf)
     } else {
       return buf
     }
