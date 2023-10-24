@@ -6,7 +6,7 @@ describe('unzip', () => {
     const testData = fs.readFileSync(require.resolve('./data/bgzip-1.txt.gz'))
     const fromPako = await pakoUnzip(testData)
     const fromNode = (await nodeUnzip(testData)) as Buffer
-    expect(fromNode).toEqual(fromPako)
+    expect(fromNode).toEqual(Buffer.from(fromPako))
     expect(fromNode.length).toEqual(65569)
     expect(fromPako.length).toEqual(65569)
   })
