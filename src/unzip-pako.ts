@@ -80,8 +80,11 @@ async function unzipChunk(inputData: Uint8Array) {
       dpos += buffer.length
     } while (strm.avail_in)
 
-    const buffer = concatUint8Arrays(blocks)
-    return { buffer, cpositions, dpositions }
+    return {
+      buffer: concatUint8Arrays(blocks),
+      cpositions,
+      dpositions,
+    }
   } catch (e) {
     //cleanup error message
     if (`${e}`.match(/incorrect header check/)) {
@@ -93,7 +96,7 @@ async function unzipChunk(inputData: Uint8Array) {
   }
 }
 
-// similar to unzipChunk above but slices (0,minv.dataPosition) and
+// similar to unzipChunk above but subarrays (0,minv.dataPosition) and
 // (maxv.dataPosition,end) off
 async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
   try {
@@ -105,7 +108,6 @@ async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
     const cpositions = []
     const dpositions = []
 
-    let totalSize = 0
     let i = 0
     do {
       const remainingInput = inputData.subarray(cpos - minv.blockPosition)
@@ -135,7 +137,7 @@ async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
       if (origCpos >= maxv.blockPosition) {
         // this is the last chunk, trim it and stop decompressing
         // note if it is the same block is minv it subtracts that already
-        // trimmed part of the slice length
+        // trimmed part of the subarray length
 
         chunks[i] = chunks[i].subarray(
           0,
@@ -146,20 +148,16 @@ async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
 
         cpositions.push(cpos)
         dpositions.push(dpos)
-        totalSize += chunks[i].length
         break
       }
-      totalSize += chunks[i].length
       i++
     } while (strm.avail_in)
 
-    const result = new Uint8Array(totalSize)
-    for (let i = 0, offset = 0; i < chunks.length; i++) {
-      result.set(chunks[i], offset)
-      offset += chunks[i].length
+    return {
+      buffer: concatUint8Arrays(chunks),
+      cpositions,
+      dpositions,
     }
-
-    return { buffer: result, cpositions, dpositions }
   } catch (e) {
     //cleanup error message
     if (`${e}`.match(/incorrect header check/)) {
