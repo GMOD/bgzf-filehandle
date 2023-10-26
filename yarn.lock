@@ -1490,11 +1490,6 @@ es-to-primitive@^1.2.1:
     is-date-object "^1.0.1"
     is-symbol "^1.0.2"
 
-es6-promisify@^6.1.1:
-  version "6.1.1"
-  resolved "https://registry.yarnpkg.com/es6-promisify/-/es6-promisify-6.1.1.tgz#46837651b7b06bf6fff893d03f29393668d01621"
-  integrity sha512-HBL8I3mIki5C1Cc9QjKUenHtnG0A5/xA8Q/AllRcfiwl2CZFXGK7ddBiCoRwAix4i2KxcQfjtIVcrVbB3vbmwg==
-
 es6-promisify@^7.0.0:
   version "7.0.0"
   resolved "https://registry.yarnpkg.com/es6-promisify/-/es6-promisify-7.0.0.tgz#9a710008dd6a4ab75a89e280bad787bfb749927b"
@@ -1845,13 +1840,6 @@ functions-have-names@^1.2.3:
   version "1.2.3"
   resolved "https://registry.yarnpkg.com/functions-have-names/-/functions-have-names-1.2.3.tgz#0404fe4ee2ba2f607f0e0ec3c80bae994133b834"
   integrity sha512-xckBUXyTIqT97tq2x2AMb+g163b5JFysYk0x4qxNFwbfQkmNZoiRHb6sPzI9/QV33WeuvVYBUIiD4NzNIyqaRQ==
-
-generic-filehandle@^3.0.0:
-  version "3.1.1"
-  resolved "https://registry.yarnpkg.com/generic-filehandle/-/generic-filehandle-3.1.1.tgz#7328c1f2e490c4d90b2fd8db4c8a8c87d5e3cf66"
-  integrity sha512-8fLkHgbnKlOWhJgPmvGm+0HclUkyCPM0WGZQOAWdebNsWbHZJi7pW/RAPp26fhqlVpgT5tHqVKWunf/r+HRoEw==
-  dependencies:
-    es6-promisify "^6.1.1"
 
 gensync@^1.0.0-beta.2:
   version "1.0.0-beta.2"

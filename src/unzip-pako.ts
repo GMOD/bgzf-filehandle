@@ -77,7 +77,7 @@ async function unzipChunk(inputData: Uint8Array) {
       dpositions.push(dpos)
 
       cpos += strm.next_in
-      dpos += buffer.length
+      dpos += buffer.byteLength
     } while (strm.avail_in)
 
     return {
@@ -110,25 +110,30 @@ async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
 
     let i = 0
     do {
-      const remainingInput = inputData.subarray(cpos - minv.blockPosition)
+      const remainingInput = inputData.slice(cpos - minv.blockPosition)
+
       const inflator = new Inflate()
       // @ts-expect-error
       ;({ strm } = inflator)
       inflator.push(remainingInput, Z_SYNC_FLUSH)
       if (inflator.err) {
-        throw new Error(inflator.msg)
+        throw new Error(
+          `${inflator.msg} why ${i} ${cpos - minv.blockPosition} ${cpos} ${
+            minv.blockPosition
+          }`,
+        )
       }
 
       const buffer = inflator.result as Uint8Array
       chunks.push(buffer)
-      let len = buffer.length
+      let len = buffer.byteLength
 
       cpositions.push(cpos)
       dpositions.push(dpos)
       if (chunks.length === 1 && minv.dataPosition) {
         // this is the first chunk, trim it
         chunks[0] = chunks[0].subarray(minv.dataPosition)
-        len = chunks[0].length
+        len = chunks[0].byteLength
       }
       const origCpos = cpos
       cpos += strm.next_in

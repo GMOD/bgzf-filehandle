@@ -82,7 +82,7 @@ export default class BgzFilehandle implements GenericFilehandle {
     )
 
     // uncompress it
-    return unzip(buf.slice(0, blockCompressedLength))
+    return unzip(buf.subarray(0, blockCompressedLength))
   }
 
   async read(length: number, position: number) {
@@ -110,7 +110,7 @@ export default class BgzFilehandle implements GenericFilehandle {
       if (sourceOffset >= 0 && sourceOffset < uncompressedBuffer.length) {
         buf = concatUint8Arrays([
           buf,
-          uncompressedBuffer.slice(sourceOffset, sourceEnd),
+          uncompressedBuffer.subarray(sourceOffset, sourceEnd),
         ])
       }
     }
