@@ -25,7 +25,7 @@
     "clean": "rimraf dist esm",
     "prebuild": "npm run clean",
     "build:esm": "tsc --target es2018 --outDir esm",
-    "build:es5": "tsc --target es5 --outDir dist",
+    "build:es5": "tsc --target es2015 --module commonjs --outDir dist",
     "build": "npm run build:esm && npm run build:es5",
     "prepublishOnly": "npm test && npm run build",
     "postversion": "git push --follow-tags"
