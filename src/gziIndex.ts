@@ -1,4 +1,3 @@
-import Long from 'long'
 import { Buffer } from 'buffer'
 import { LocalFile, GenericFilehandle } from 'generic-filehandle'
 
@@ -26,17 +25,17 @@ export default class GziIndex {
     }
   }
 
-  _readLongWithOverflow(buf: Buffer, offset = 0, unsigned = true) {
-    //@ts-ignore
-    const long = Long.fromBytesLE(buf.slice(offset, offset + 8), unsigned)
-    if (
-      long.greaterThan(Number.MAX_SAFE_INTEGER) ||
-      long.lessThan(Number.MIN_SAFE_INTEGER)
-    ) {
-      throw new TypeError('integer overflow')
-    }
-
-    return long.toNumber()
+  _readLongWithOverflow(bytes: Buffer, offset = 0, _unsigned = true) {
+    return (
+      bytes[offset + 0] |
+      (bytes[offset + 1] << 8) |
+      (bytes[offset + 2] << 16) |
+      (bytes[offset + 3] << 24) |
+      (bytes[offset + 4] << 32) |
+      (bytes[offset + 5] << 40) |
+      (bytes[offset + 6] << 48) |
+      (bytes[offset + 7] << 54)
+    )
   }
 
   _getIndex() {
