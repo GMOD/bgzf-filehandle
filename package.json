@@ -1,6 +1,6 @@
 {
   "name": "@gmod/bgzf-filehandle",
-  "version": "1.4.6",
+  "version": "1.4.7",
   "description": "read from a compressed bgzip file (with .gzi) as if it were uncompressed",
   "license": "MIT",
   "repository": "gmod/bgzf-filehandle",
