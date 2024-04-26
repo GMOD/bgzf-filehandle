@@ -1,7 +1,6 @@
 import zlib from 'zlib'
 import { Buffer } from 'buffer'
 import { promisify } from 'es6-promisify'
-import { pakoUnzip, unzipChunk, unzipChunkSlice } from './unzip-pako'
 
 const gunzip = promisify(zlib.gunzip)
 
@@ -13,4 +12,6 @@ function nodeUnzip(input: Buffer): Promise<Buffer> {
   })
 }
 
-export { nodeUnzip as unzip, unzipChunk, unzipChunkSlice, nodeUnzip, pakoUnzip }
+export { nodeUnzip as unzip, nodeUnzip }
+
+export { pakoUnzip, unzipChunkSlice, unzipChunk } from './unzip-pako'

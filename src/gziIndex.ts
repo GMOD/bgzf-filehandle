@@ -8,7 +8,7 @@ const UNCOMPRESSED_POSITION = 1
 export default class GziIndex {
   filehandle: GenericFilehandle
 
-  index?: any
+  index?: Promise<[number, number][]>
 
   constructor({
     filehandle,
@@ -46,7 +46,7 @@ export default class GziIndex {
     return this.index
   }
 
-  async _readIndex() {
+  async _readIndex(): Promise<[number, number][]> {
     let buf = Buffer.allocUnsafe(8)
     await this.filehandle.read(buf, 0, 8, 0)
     const numEntries = this._readLongWithOverflow(buf, 0, true)
@@ -54,7 +54,7 @@ export default class GziIndex {
       return [[0, 0]]
     }
 
-    const entries = new Array(numEntries + 1)
+    const entries = new Array(numEntries + 1) as [number, number][]
     entries[0] = [0, 0]
 
     // TODO rewrite this to make an index-index that stays in memory
@@ -81,10 +81,7 @@ export default class GziIndex {
 
   async getLastBlock() {
     const entries = await this._getIndex()
-    if (!entries.length) {
-      return undefined
-    }
-    return entries[entries.length - 1]
+    return entries.at(-1)!
   }
 
   async getRelevantBlocksForRead(length: number, position: number) {
@@ -93,11 +90,11 @@ export default class GziIndex {
       return []
     }
     const entries = await this._getIndex()
-    const relevant = []
+    const relevant = [] as [number, number][]
 
     // binary search to find the block that the
     // read starts in and extend forward from that
-    const compare = (entry: any, nextEntry: any) => {
+    const compare = (entry: number[], nextEntry: number[]) => {
       const uncompressedPosition = entry[UNCOMPRESSED_POSITION]
       const nextUncompressedPosition = nextEntry
         ? nextEntry[UNCOMPRESSED_POSITION]
@@ -144,9 +141,9 @@ export default class GziIndex {
         break
       }
     }
-    if (relevant[relevant.length - 1][UNCOMPRESSED_POSITION] < endPosition) {
-      relevant.push([])
-    }
+    // if (relevant.at(-1)![UNCOMPRESSED_POSITION] < endPosition) {
+    //   relevant.push([])
+    // }
     return relevant
   }
 }
