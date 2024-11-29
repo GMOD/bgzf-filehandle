@@ -51,6 +51,7 @@ export default class BgzFilehandle {
     // read the last block's ISIZE (see gzip RFC),
     // and add it to its uncompressedPosition
     const ret = await this.gzi.getLastBlock()
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!ret) {
       throw new Error('no blocks')
     }

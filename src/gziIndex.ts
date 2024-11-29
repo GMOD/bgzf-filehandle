@@ -96,6 +96,7 @@ export default class GziIndex {
     // read starts in and extend forward from that
     const compare = (entry: number[], nextEntry: number[]) => {
       const uncompressedPosition = entry[UNCOMPRESSED_POSITION]
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       const nextUncompressedPosition = nextEntry
         ? nextEntry[UNCOMPRESSED_POSITION]
         : Infinity

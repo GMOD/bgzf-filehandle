@@ -8,6 +8,7 @@ const gunzip = promisify(zlib.gunzip)
 function nodeUnzip(input: Buffer): Promise<Buffer> {
   //@ts-ignore
   return gunzip(input, {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     finishFlush: (zlib.constants || zlib).Z_SYNC_FLUSH,
   })
 }

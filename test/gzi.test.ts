@@ -1,4 +1,5 @@
 import GziIndex from '../src/gziIndex'
+import { describe, it, expect } from 'vitest'
 
 describe('gzi objects', () => {
   it('can read empty gff3_with_syncs.gff3.gz.gzi', async () => {
@@ -40,12 +41,10 @@ describe('gzi objects', () => {
       [324086, 326400],
       [389021, 391680],
       [453884, 456960],
-      [],
     ])
 
     expect(await idx.getRelevantBlocksForRead(10, 500000)).toEqual([
       [453884, 456960],
-      [],
     ])
 
     expect(await idx.getLastBlock()).toEqual([453884, 456960])

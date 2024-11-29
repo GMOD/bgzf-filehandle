@@ -1,6 +1,6 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`unzipChunk can unzip bgzip-1.txt.gz 1`] = `
+exports[`unzipChunk > can unzip bgzip-1.txt.gz 1`] = `
 [
   0,
   22579,
@@ -12,7 +12,7 @@ exports[`unzipChunk can unzip bgzip-1.txt.gz 1`] = `
 ]
 `;
 
-exports[`unzipChunk can unzip bgzip-1.txt.gz 2`] = `
+exports[`unzipChunk > can unzip bgzip-1.txt.gz 2`] = `
 [
   0,
   4682,
@@ -24,21 +24,21 @@ exports[`unzipChunk can unzip bgzip-1.txt.gz 2`] = `
 ]
 `;
 
-exports[`unzipChunkSlice can unzip bgzip-1.txt.gz 1`] = `
+exports[`unzipChunkSlice > can unzip bgzip-1.txt.gz 1`] = `
 [
   0,
   22579,
 ]
 `;
 
-exports[`unzipChunkSlice can unzip bgzip-1.txt.gz 2`] = `
+exports[`unzipChunkSlice > can unzip bgzip-1.txt.gz 2`] = `
 [
   0,
   4682,
 ]
 `;
 
-exports[`unzipChunkSlice can unzip bgzip-1.txt.gz positive maxv.blockPosition 1`] = `
+exports[`unzipChunkSlice > can unzip bgzip-1.txt.gz positive maxv.blockPosition 1`] = `
 [
   50,
   22579,
@@ -46,7 +46,7 @@ exports[`unzipChunkSlice can unzip bgzip-1.txt.gz positive maxv.blockPosition 1`
 ]
 `;
 
-exports[`unzipChunkSlice can unzip bgzip-1.txt.gz positive maxv.blockPosition 2`] = `
+exports[`unzipChunkSlice > can unzip bgzip-1.txt.gz positive maxv.blockPosition 2`] = `
 [
   0,
   4682,
@@ -54,14 +54,14 @@ exports[`unzipChunkSlice can unzip bgzip-1.txt.gz positive maxv.blockPosition 2`
 ]
 `;
 
-exports[`unzipChunkSlice can unzip bgzip-1.txt.gz positive minv.dataPosition 1`] = `
+exports[`unzipChunkSlice > can unzip bgzip-1.txt.gz positive minv.dataPosition 1`] = `
 [
   50,
   22579,
 ]
 `;
 
-exports[`unzipChunkSlice can unzip bgzip-1.txt.gz positive minv.dataPosition 2`] = `
+exports[`unzipChunkSlice > can unzip bgzip-1.txt.gz positive minv.dataPosition 2`] = `
 [
   0,
   4682,

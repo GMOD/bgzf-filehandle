@@ -17,7 +17,7 @@ interface Chunk {
 // in a browser.
 //
 //
-// eslint-disable-next-line @typescript-eslint/require-await
+
 async function unzip(inputData: Buffer) {
   try {
     let strm
@@ -31,18 +31,16 @@ async function unzip(inputData: Buffer) {
       inflator = new Inflate()
       //@ts-ignore
       ;({ strm } = inflator)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+
       inflator.push(remainingInput, Z_SYNC_FLUSH)
       if (inflator.err) {
         throw new Error(inflator.msg)
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       pos += strm.next_in
       chunks[i] = inflator.result as Uint8Array
       totalSize += chunks[i].length
       i += 1
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     } while (strm.avail_in)
 
     const result = new Uint8Array(totalSize)
@@ -53,7 +51,7 @@ async function unzip(inputData: Buffer) {
     return Buffer.from(result)
   } catch (error) {
     //cleanup error message
-    if (/incorrect header check/.test(`${error}`)) {
+    if (`${error}`.includes('incorrect header check')) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
       )
@@ -65,7 +63,7 @@ async function unzip(inputData: Buffer) {
 // similar to pakounzip, except it does extra counting to return the positions
 // of compressed and decompressed data offsets
 //
-// eslint-disable-next-line @typescript-eslint/require-await
+
 async function unzipChunk(inputData: Buffer) {
   try {
     let strm
@@ -79,7 +77,7 @@ async function unzipChunk(inputData: Buffer) {
       const inflator = new Inflate()
       // @ts-ignore
       ;({ strm } = inflator)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+
       inflator.push(remainingInput, Z_SYNC_FLUSH)
       if (inflator.err) {
         throw new Error(inflator.msg)
@@ -91,17 +89,15 @@ async function unzipChunk(inputData: Buffer) {
       cpositions.push(cpos)
       dpositions.push(dpos)
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       cpos += strm.next_in
       dpos += buffer.length
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     } while (strm.avail_in)
 
     const buffer = Buffer.concat(blocks)
     return { buffer, cpositions, dpositions }
   } catch (error) {
     //cleanup error message
-    if (/incorrect header check/.test(`${error}`)) {
+    if (`${error}`.includes('incorrect header check')) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
       )
@@ -113,7 +109,7 @@ async function unzipChunk(inputData: Buffer) {
 // similar to unzipChunk above but slices (0,minv.dataPosition) and
 // (maxv.dataPosition,end) off
 //
-// eslint-disable-next-line @typescript-eslint/require-await
+
 async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
   try {
     let strm
@@ -131,7 +127,7 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
       const inflator = new Inflate()
       // @ts-ignore
       ;({ strm } = inflator)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+
       inflator.push(remainingInput, Z_SYNC_FLUSH)
       if (inflator.err) {
         throw new Error(inflator.msg)
@@ -149,7 +145,7 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
         len = chunks[0].length
       }
       const origCpos = cpos
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
       cpos += strm.next_in
       dpos += len
 
@@ -172,7 +168,6 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
       }
       totalSize += chunks[i].length
       i++
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     } while (strm.avail_in)
 
     const result = new Uint8Array(totalSize)
@@ -185,7 +180,7 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
     return { buffer, cpositions, dpositions }
   } catch (error) {
     //cleanup error message
-    if (/incorrect header check/.test(`${error}`)) {
+    if (`${error}`.includes('incorrect header check')) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
       )
