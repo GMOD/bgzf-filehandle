@@ -72,8 +72,8 @@ export default class BgzFilehandle {
 
   async _readAndUncompressBlock(
     blockBuffer: Buffer,
-    [compressedPosition]: [number],
-    [nextCompressedPosition]: [number],
+    [compressedPosition]: [number, number],
+    [nextCompressedPosition]: [number, number],
   ) {
     let next = nextCompressedPosition
     if (!next) {
