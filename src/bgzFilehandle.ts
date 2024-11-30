@@ -108,7 +108,6 @@ export default class BgzFilehandle {
       blockNum < blockPositions.length - 1;
       blockNum += 1
     ) {
-       
       const uncompressedBuffer = await this._readAndUncompressBlock(
         blockBuffer,
         blockPositions[blockNum],

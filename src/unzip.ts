@@ -16,4 +16,3 @@ function nodeUnzip(input: Buffer): Promise<Buffer> {
 export { nodeUnzip as unzip, nodeUnzip }
 
 export { pakoUnzip, unzipChunk, unzipChunkSlice } from './unzip-pako'
-

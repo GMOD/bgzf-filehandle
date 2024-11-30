@@ -2,7 +2,7 @@
 [![Coverage Status](https://img.shields.io/codecov/c/github/GMOD/bgzf-filehandle/master.svg?style=flat-square)](https://codecov.io/gh/GMOD/bgzf-filehandle/branch/master)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/GMOD/bgzf-filehandle/push.yml?branch=master)](https://github.com/GMOD/bgzf-filehandle/actions)
 
-Transparently read [indexed block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such as those created by bgzip, using coordinates from the uncompressed file. The module is used in @gmod/indexedfasta to read bgzip-indexed fasta files (with gzi index, fai index, and fa). 
+Transparently read [indexed block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such as those created by bgzip, using coordinates from the uncompressed file. The module is used in @gmod/indexedfasta to read bgzip-indexed fasta files (with gzi index, fai index, and fa).
 
 Users can also use the `unzip` function to unzip bgzip files whole (which pako has trouble with natively)
 
