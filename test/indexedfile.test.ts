@@ -1,22 +1,21 @@
 import fs from 'fs'
-import { describe, it, expect } from 'vitest'
 import { BgzfFilehandle } from '../src'
 
 async function testRead(basename: string, length: number, position: number) {
   const f = new BgzfFilehandle({
-    path: `test/data/${basename}.gz`,
-    gziPath: `test/data/${basename}.gz.gzi`,
+    path: require.resolve(`./data/${basename}.gz`),
+    gziPath: require.resolve(`./data/${basename}.gz.gzi`),
   })
 
   const buf1 = Buffer.allocUnsafe(length)
   const buf2 = Buffer.allocUnsafe(length)
   const { bytesRead } = await f.read(buf1, 0, length, position)
-  const fd = fs.openSync(`test/data/${basename}`, 'r')
-  // needed to pass tests...
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _directBytesRead = fs.readSync(fd, buf2, 0, length, position)
-  // expect(bytesRead).toEqual(directBytesRead)
-  expect(buf1.slice(0, bytesRead)).toEqual(buf2.slice(0, bytesRead))
+  const fd = fs.openSync(require.resolve(`./data/${basename}`), 'r')
+  const directBytesRead = fs.readSync(fd, buf2, 0, length, position)
+  expect(bytesRead).toEqual(directBytesRead)
+  expect(Array.from(buf1.slice(0, bytesRead))).toEqual(
+    Array.from(buf2.slice(0, bytesRead)),
+  )
 
   const directStat = fs.fstatSync(fd)
   const myStat = await f.stat()

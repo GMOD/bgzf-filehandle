@@ -1,2 +1,4 @@
-export { default as BgzfFilehandle } from './bgzFilehandle'
-export { unzip, unzipChunkSlice, unzipChunk } from './unzip'
+import BgzfFilehandle from './bgzFilehandle'
+import { unzip, unzipChunk, unzipChunkSlice } from './unzip'
+
+export { BgzfFilehandle, unzip, unzipChunk, unzipChunkSlice }

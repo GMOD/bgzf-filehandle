@@ -50,12 +50,7 @@ export default class BgzFilehandle {
   async getUncompressedFileSize() {
     // read the last block's ISIZE (see gzip RFC),
     // and add it to its uncompressedPosition
-    const ret = await this.gzi.getLastBlock()
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (!ret) {
-      throw new Error('no blocks')
-    }
-    const [, uncompressedPosition] = ret
+    const [, uncompressedPosition] = await this.gzi.getLastBlock()
 
     const { size } = await this.filehandle.stat()
 
@@ -72,13 +67,12 @@ export default class BgzFilehandle {
 
   async _readAndUncompressBlock(
     blockBuffer: Buffer,
-    [compressedPosition]: [number, number],
-    [nextCompressedPosition]: [number, number],
+    [compressedPosition]: [number],
+    [nextCompressedPosition]: [number],
   ) {
     let next = nextCompressedPosition
     if (!next) {
-      const stat = await this.filehandle.stat()
-      next = stat.size
+      next = (await this.filehandle.stat()).size
     }
 
     // read the compressed data into the block buffer
@@ -96,7 +90,7 @@ export default class BgzFilehandle {
       blockBuffer.slice(0, blockCompressedLength),
     )
 
-    return unzippedBuffer
+    return unzippedBuffer as Buffer
   }
 
   async read(buf: Buffer, offset: number, length: number, position: number) {
@@ -114,6 +108,7 @@ export default class BgzFilehandle {
       blockNum < blockPositions.length - 1;
       blockNum += 1
     ) {
+      // eslint-disable-next-line no-await-in-loop
       const uncompressedBuffer = await this._readAndUncompressBlock(
         blockBuffer,
         blockPositions[blockNum],

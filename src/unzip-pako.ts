@@ -12,12 +12,9 @@ interface Chunk {
 }
 
 // browserify-zlib, which is the zlib shim used by default in webpacked code,
-// does not properly uncompress bgzf chunks that contain more than one bgzf
-// block, so export an unzip function that uses pako directly if we are running
-// in a browser.
-//
-//
-
+// does not properly uncompress bgzf chunks that contain more than
+// one bgzf block, so export an unzip function that uses pako directly
+// if we are running in a browser.
 async function unzip(inputData: Buffer) {
   try {
     let strm
@@ -31,7 +28,6 @@ async function unzip(inputData: Buffer) {
       inflator = new Inflate()
       //@ts-ignore
       ;({ strm } = inflator)
-
       inflator.push(remainingInput, Z_SYNC_FLUSH)
       if (inflator.err) {
         throw new Error(inflator.msg)
@@ -49,21 +45,20 @@ async function unzip(inputData: Buffer) {
       offset += chunks[i].length
     }
     return Buffer.from(result)
-  } catch (error) {
+  } catch (e) {
     //cleanup error message
-    if (`${error}`.includes('incorrect header check')) {
+    if (`${e}`.match(/incorrect header check/)) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
       )
     }
-    throw error
+    throw e
   }
 }
 
-// similar to pakounzip, except it does extra counting to return the positions
-// of compressed and decompressed data offsets
-//
-
+// similar to pakounzip, except it does extra counting
+// to return the positions of compressed and decompressed
+// data offsets
 async function unzipChunk(inputData: Buffer) {
   try {
     let strm
@@ -77,7 +72,6 @@ async function unzipChunk(inputData: Buffer) {
       const inflator = new Inflate()
       // @ts-ignore
       ;({ strm } = inflator)
-
       inflator.push(remainingInput, Z_SYNC_FLUSH)
       if (inflator.err) {
         throw new Error(inflator.msg)
@@ -95,21 +89,19 @@ async function unzipChunk(inputData: Buffer) {
 
     const buffer = Buffer.concat(blocks)
     return { buffer, cpositions, dpositions }
-  } catch (error) {
+  } catch (e) {
     //cleanup error message
-    if (`${error}`.includes('incorrect header check')) {
+    if (`${e}`.match(/incorrect header check/)) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
       )
     }
-    throw error
+    throw e
   }
 }
 
 // similar to unzipChunk above but slices (0,minv.dataPosition) and
 // (maxv.dataPosition,end) off
-//
-
 async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
   try {
     let strm
@@ -127,7 +119,6 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
       const inflator = new Inflate()
       // @ts-ignore
       ;({ strm } = inflator)
-
       inflator.push(remainingInput, Z_SYNC_FLUSH)
       if (inflator.err) {
         throw new Error(inflator.msg)
@@ -145,7 +136,6 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
         len = chunks[0].length
       }
       const origCpos = cpos
-
       cpos += strm.next_in
       dpos += len
 
@@ -178,14 +168,14 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
     const buffer = Buffer.from(result)
 
     return { buffer, cpositions, dpositions }
-  } catch (error) {
+  } catch (e) {
     //cleanup error message
-    if (`${error}`.includes('incorrect header check')) {
+    if (`${e}`.match(/incorrect header check/)) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
       )
     }
-    throw error
+    throw e
   }
 }
 

@@ -1,16 +1,15 @@
 import GziIndex from '../src/gziIndex'
-import { describe, it, expect } from 'vitest'
 
 describe('gzi objects', () => {
   it('can read empty gff3_with_syncs.gff3.gz.gzi', async () => {
     const idx = new GziIndex({
-      path: 'test/data/gff3_with_syncs.gff3.gz.gzi',
+      path: require.resolve('./data/gff3_with_syncs.gff3.gz.gzi'),
     })
     expect(await idx._getIndex()).toEqual([[0, 0]])
   })
   it('can read T_ko.2bit.gz.gzi', async () => {
     const idx = new GziIndex({
-      path: 'test/data/T_ko.2bit.gz.gzi',
+      path: require.resolve('./data/T_ko.2bit.gz.gzi'),
     })
     expect(await idx._getIndex()).toEqual([
       [0, 0],
@@ -41,10 +40,12 @@ describe('gzi objects', () => {
       [324086, 326400],
       [389021, 391680],
       [453884, 456960],
+      [],
     ])
 
     expect(await idx.getRelevantBlocksForRead(10, 500000)).toEqual([
       [453884, 456960],
+      [],
     ])
 
     expect(await idx.getLastBlock()).toEqual([453884, 456960])
