@@ -46,7 +46,7 @@ export default class GziIndex {
     return this.index
   }
 
-  async _readIndex() {
+  async _readIndex(): Promise<[number, number][]> {
     let buf = Buffer.allocUnsafe(8)
     await this.filehandle.read(buf, 0, 8, 0)
     const numEntries = this._readLongWithOverflow(buf, 0, true)

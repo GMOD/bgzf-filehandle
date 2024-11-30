@@ -1,6 +1,6 @@
 {
   "name": "@gmod/bgzf-filehandle",
-  "version": "1.4.7",
+  "version": "1.5.2",
   "description": "read from a compressed bgzip file (with .gzi) as if it were uncompressed",
   "license": "MIT",
   "repository": "gmod/bgzf-filehandle",
@@ -21,11 +21,11 @@
   ],
   "scripts": {
     "test": "vitest",
-    "lint": "eslint src test",
+    "lint": "eslint --report-unused-disable-directives --max-warnings 0",
     "clean": "rimraf dist esm",
     "prebuild": "yarn clean",
     "build:esm": "tsc --target es2018 --outDir esm",
-    "build:es5": "tsc --target es5 --outDir dist",
+    "build:es5": "tsc --target es2015 --module commonjs --outDir dist",
     "build": "yarn build:esm && yarn build:es5",
     "prepublishOnly": "yarn test --run && yarn build",
     "postversion": "git push --follow-tags"
@@ -47,13 +47,14 @@
     "@types/pako": "^2.0.0",
     "@typescript-eslint/eslint-plugin": "^5.59.9",
     "@typescript-eslint/parser": "^5.59.9",
-    "eslint": "^8.42.0",
-    "eslint-config-prettier": "^8.8.0",
+    "@vitest/coverage-v8": "^2.0.5",
+    "eslint": "^9.9.0",
     "eslint-plugin-import": "^2.27.5",
-    "eslint-plugin-prettier": "^4.2.1",
+    "eslint-plugin-unicorn": "^56.0.1",
     "prettier": "^2.8.8",
     "rimraf": "^5.0.1",
     "typescript": "^5.1.3",
+    "typescript-eslint": "^8.1.0",
     "vitest": "^2.1.6"
   },
   "publishConfig": {

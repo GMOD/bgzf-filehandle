@@ -35,19 +35,19 @@ async function unzip(inputData: Buffer) {
 
       pos += strm.next_in
       chunks[i] = inflator.result as Uint8Array
-      totalSize += chunks[i].length
+      totalSize += chunks[i]!.length
       i += 1
     } while (strm.avail_in)
 
     const result = new Uint8Array(totalSize)
     for (let i = 0, offset = 0; i < chunks.length; i++) {
-      result.set(chunks[i], offset)
-      offset += chunks[i].length
+      result.set(chunks[i]!, offset)
+      offset += chunks[i]!.length
     }
     return Buffer.from(result)
   } catch (e) {
     //cleanup error message
-    if (`${e}`.match(/incorrect header check/)) {
+    if (/incorrect header check/.exec(`${e}`)) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
       )
@@ -91,7 +91,7 @@ async function unzipChunk(inputData: Buffer) {
     return { buffer, cpositions, dpositions }
   } catch (e) {
     //cleanup error message
-    if (`${e}`.match(/incorrect header check/)) {
+    if (/incorrect header check/.exec(`${e}`)) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
       )
@@ -132,7 +132,7 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
       dpositions.push(dpos)
       if (chunks.length === 1 && minv.dataPosition) {
         // this is the first chunk, trim it
-        chunks[0] = chunks[0].subarray(minv.dataPosition)
+        chunks[0] = chunks[0]!.subarray(minv.dataPosition)
         len = chunks[0].length
       }
       const origCpos = cpos
@@ -144,7 +144,7 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
         // note if it is the same block is minv it subtracts that already
         // trimmed part of the slice length
 
-        chunks[i] = chunks[i].subarray(
+        chunks[i] = chunks[i]!.subarray(
           0,
           maxv.blockPosition === minv.blockPosition
             ? maxv.dataPosition - minv.dataPosition + 1
@@ -153,24 +153,24 @@ async function unzipChunkSlice(inputData: Buffer, chunk: Chunk) {
 
         cpositions.push(cpos)
         dpositions.push(dpos)
-        totalSize += chunks[i].length
+        totalSize += chunks[i]!.length
         break
       }
-      totalSize += chunks[i].length
+      totalSize += chunks[i]!.length
       i++
     } while (strm.avail_in)
 
     const result = new Uint8Array(totalSize)
     for (let i = 0, offset = 0; i < chunks.length; i++) {
-      result.set(chunks[i], offset)
-      offset += chunks[i].length
+      result.set(chunks[i]!, offset)
+      offset += chunks[i]!.length
     }
     const buffer = Buffer.from(result)
 
     return { buffer, cpositions, dpositions }
   } catch (e) {
     //cleanup error message
-    if (`${e}`.match(/incorrect header check/)) {
+    if (/incorrect header check/.exec(`${e}`)) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
       )

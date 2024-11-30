@@ -90,7 +90,7 @@ export default class BgzFilehandle {
       blockBuffer.slice(0, blockCompressedLength),
     )
 
-    return unzippedBuffer as Buffer
+    return unzippedBuffer
   }
 
   async read(buf: Buffer, offset: number, length: number, position: number) {
@@ -108,7 +108,7 @@ export default class BgzFilehandle {
       blockNum < blockPositions.length - 1;
       blockNum += 1
     ) {
-      // eslint-disable-next-line no-await-in-loop
+       
       const uncompressedBuffer = await this._readAndUncompressBlock(
         blockBuffer,
         blockPositions[blockNum],
