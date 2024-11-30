@@ -1,3 +1,9 @@
+# v1.5.4
+
+- Remove zlib import. It was only used for unzipping entire files on node.js
+  specifically, and was unused in all contexts for e.g. block based decoding of
+  BAM, so it is largely unused
+
 # v1.4.6
 
 - Add explicit 'buffer' import

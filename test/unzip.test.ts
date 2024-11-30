@@ -1,21 +1,18 @@
 import fs from 'fs'
 import { describe, it, expect } from 'vitest'
-import { pakoUnzip, nodeUnzip, unzipChunk, unzipChunkSlice } from '../src/unzip'
+import { unzip, unzipChunk, unzipChunkSlice } from '../src/unzip'
 
 describe('unzip', () => {
   it('can unzip bgzip-1.txt.gz', async () => {
     const testData = fs.readFileSync(require.resolve('./data/bgzip-1.txt.gz'))
-    const fromPako = await pakoUnzip(testData)
-    const fromNode = await nodeUnzip(testData)
-    expect(fromNode).toEqual(fromPako)
-    expect(fromNode.length).toEqual(65569)
+    const fromPako = await unzip(testData)
     expect(fromPako.length).toEqual(65569)
   })
 
   it('test error message modification', async () => {
     const testData = fs.readFileSync(require.resolve('./data/bgzip-1.txt.gz'))
 
-    await expect(pakoUnzip(testData.slice(2))).rejects.toThrow(
+    await expect(unzip(testData.slice(2))).rejects.toThrow(
       /problem decompressing block/,
     )
   })

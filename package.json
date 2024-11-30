@@ -59,8 +59,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "browser": {
-    "./esm/unzip.js": "./esm/unzip-pako.js"
   }
 }
