@@ -1,9 +1,9 @@
-import { Buffer } from 'buffer'
 import { LocalFile, GenericFilehandle } from 'generic-filehandle'
 
 // locals
 import { unzip } from './unzip'
 import GziIndex from './gziIndex'
+import { concatUint8Array } from './util'
 
 export default class BgzFilehandle {
   filehandle: GenericFilehandle
@@ -54,19 +54,15 @@ export default class BgzFilehandle {
 
     const { size } = await this.filehandle.stat()
 
-    const buf = Buffer.allocUnsafe(4)
     // note: there should be a 28-byte EOF marker (an empty block) at
     // the end of the file, so we skip backward past that
-    const { bytesRead } = await this.filehandle.read(buf, 0, 4, size - 28 - 4)
-    if (bytesRead !== 4) {
-      throw new Error('read error')
-    }
-    const lastBlockUncompressedSize = buf.readUInt32LE(0)
+    const buf = await this.filehandle.read(4, size - 28 - 4)
+    const dataView = new DataView(buf.buffer)
+    const lastBlockUncompressedSize = dataView.getUint32(0, true)
     return uncompressedPosition + lastBlockUncompressedSize
   }
 
   async _readAndUncompressBlock(
-    blockBuffer: Buffer,
     [compressedPosition]: [number],
     [nextCompressedPosition]: [number],
   ) {
@@ -78,38 +74,27 @@ export default class BgzFilehandle {
     // read the compressed data into the block buffer
     const blockCompressedLength = next - compressedPosition
 
-    await this.filehandle.read(
-      blockBuffer,
-      0,
+    const blockBuffer = await this.filehandle.read(
       blockCompressedLength,
       compressedPosition,
     )
 
     // uncompress it
-    const unzippedBuffer = await unzip(
-      blockBuffer.slice(0, blockCompressedLength),
-    )
-
-    return unzippedBuffer
+    return unzip(blockBuffer)
   }
 
-  async read(buf: Buffer, offset: number, length: number, position: number) {
-    // get the block positions for this read
+  async read(length: number, position: number) {
     const blockPositions = await this.gzi.getRelevantBlocksForRead(
       length,
       position,
     )
-    const blockBuffer = Buffer.allocUnsafe(32768 * 2)
-    // uncompress the blocks and read from them one at a time to keep memory usage down
-    let destinationOffset = offset
-    let bytesRead = 0
+    const block = [] as Uint8Array[]
     for (
       let blockNum = 0;
       blockNum < blockPositions.length - 1;
       blockNum += 1
     ) {
       const uncompressedBuffer = await this._readAndUncompressBlock(
-        blockBuffer,
         blockPositions[blockNum],
         blockPositions[blockNum + 1],
       )
@@ -122,12 +107,11 @@ export default class BgzFilehandle {
           uncompressedPosition + uncompressedBuffer.length,
         ) - uncompressedPosition
       if (sourceOffset >= 0 && sourceOffset < uncompressedBuffer.length) {
-        uncompressedBuffer.copy(buf, destinationOffset, sourceOffset, sourceEnd)
-        destinationOffset += sourceEnd - sourceOffset
-        bytesRead += sourceEnd - sourceOffset
+        // uncompressedBuffer.copy(buf, destinationOffset, sourceOffset, sourceEnd)
+        block.push(uncompressedBuffer.subarray(sourceOffset, sourceEnd))
       }
     }
 
-    return { bytesRead, buffer: buf }
+    return concatUint8Array(block)
   }
 }
