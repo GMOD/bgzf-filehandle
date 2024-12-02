@@ -88,7 +88,7 @@ export default class BgzFilehandle {
       length,
       position,
     )
-    const block = [] as Uint8Array[]
+    const blocks = [] as Uint8Array[]
     for (
       let blockNum = 0;
       blockNum < blockPositions.length - 1;
@@ -107,11 +107,10 @@ export default class BgzFilehandle {
           uncompressedPosition + uncompressedBuffer.length,
         ) - uncompressedPosition
       if (sourceOffset >= 0 && sourceOffset < uncompressedBuffer.length) {
-        // uncompressedBuffer.copy(buf, destinationOffset, sourceOffset, sourceEnd)
-        block.push(uncompressedBuffer.subarray(sourceOffset, sourceEnd))
+        blocks.push(uncompressedBuffer.subarray(sourceOffset, sourceEnd))
       }
     }
 
-    return concatUint8Array(block)
+    return concatUint8Array(blocks)
   }
 }

@@ -44,7 +44,7 @@ async function unzip(inputData: Uint8Array) {
       result.set(chunks[i]!, offset)
       offset += chunks[i]!.length
     }
-    return Buffer.from(result)
+    return result
   } catch (e) {
     //cleanup error message
     if (/incorrect header check/.exec(`${e}`)) {

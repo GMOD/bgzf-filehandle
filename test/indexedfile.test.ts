@@ -15,9 +15,9 @@ async function testRead(basename: string, length: number, position: number) {
   expect(buf.length).toEqual(buf2.length)
   expect(Array.from(buf)).toEqual(Array.from(buf2))
 
-  // const directStat = fs.fstatSync(fd)
-  // const myStat = await f.stat()
-  // expect(myStat.size).toEqual(directStat.size)
+  const directStat = fs.fstatSync(fd)
+  const myStat = await f.stat()
+  expect(myStat.size).toEqual(directStat.size)
 }
 
 test('can read gff3_with_syncs.gff3.gz 1', async () => {
@@ -34,12 +34,20 @@ test('can read gff3_with_syncs.gff3.gz 4', async () => {
   await testRead('gff3_with_syncs.gff3', 2500, 0)
 })
 test('can read gff3_with_syncs.gff3.gz 5', async () => {
-  await testRead('gff3_with_syncs.gff3', 3000, 1)
+  await testRead('gff3_with_syncs.gff3', 2545, 1)
 })
-// test('can read T_ko.2bit', async () => {
-//   await testRead('T_ko.2bit', 10, 0)
-//   await testRead('T_ko.2bit', 10000, 20000)
-//   await testRead('T_ko.2bit', 10000, 1)
-//   await testRead('T_ko.2bit', 10, 0)
-//   await testRead('T_ko.2bit', 10, 1000000)
-// })
+test('can read T_ko.2bit 1', async () => {
+  await testRead('T_ko.2bit', 10, 0)
+})
+test('can read T_ko.2bit 2', async () => {
+  await testRead('T_ko.2bit', 10000, 20000)
+})
+test('can read T_ko.2bit 3', async () => {
+  await testRead('T_ko.2bit', 10000, 1)
+})
+test('can read T_ko.2bit 4', async () => {
+  await testRead('T_ko.2bit', 10, 0)
+})
+test('can read T_ko.2bit 5', async () => {
+  await testRead('T_ko.2bit', 0, 1000000)
+})
