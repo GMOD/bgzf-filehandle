@@ -1,5 +1,5 @@
 import Long from 'long'
-import { LocalFile, GenericFilehandle } from 'generic-filehandle'
+import { LocalFile, GenericFilehandle } from 'generic-filehandle2'
 
 // const COMPRESSED_POSITION = 0
 const UNCOMPRESSED_POSITION = 1

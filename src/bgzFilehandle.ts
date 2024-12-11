@@ -1,4 +1,4 @@
-import { LocalFile, GenericFilehandle } from 'generic-filehandle'
+import { LocalFile, GenericFilehandle } from 'generic-filehandle2'
 
 // locals
 import { unzip } from './unzip'

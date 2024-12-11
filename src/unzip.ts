@@ -16,14 +16,12 @@ interface Chunk {
 // block, so export an unzip function that uses pako directly if we are running
 // in a browser.
 async function unzip(inputData: Uint8Array) {
+  const blocks = [] as Uint8Array[]
   try {
     let strm
     let pos = 0
-    const blocks = [] as Uint8Array[]
     let inflator
-    console.log('starting inputDatalen', inputData.length, inputData.byteLength)
     do {
-      console.log(pos)
       const remainingInput = inputData.subarray(pos)
       inflator = new Inflate()
       //@ts-ignore
@@ -37,10 +35,8 @@ async function unzip(inputData: Uint8Array) {
       blocks.push(inflator.result as Uint8Array)
     } while (strm.avail_in)
 
-    console.log('done', blocks)
     return concatUint8Array(blocks)
   } catch (e) {
-    console.error('WOWOWOWOW', e)
     //cleanup error message
     if (/incorrect header check/.exec(`${e}`)) {
       throw new Error(

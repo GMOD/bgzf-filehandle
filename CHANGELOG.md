@@ -1,3 +1,5 @@
+- Update to generic-filehandle2
+
 # v1.5.4
 
 - Remove zlib import. It was only used for unzipping entire files on node.js
