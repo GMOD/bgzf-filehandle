@@ -1,6 +1,5 @@
 import Long from 'long'
-import { Buffer } from 'buffer'
-import { LocalFile, GenericFilehandle } from 'generic-filehandle'
+import { LocalFile, GenericFilehandle } from 'generic-filehandle2'
 
 // const COMPRESSED_POSITION = 0
 const UNCOMPRESSED_POSITION = 1
@@ -26,7 +25,7 @@ export default class GziIndex {
     }
   }
 
-  _readLongWithOverflow(buf: Buffer, offset = 0, unsigned = true) {
+  _readLongWithOverflow(buf: Uint8Array, offset = 0, unsigned = true) {
     //@ts-ignore
     const long = Long.fromBytesLE(buf.slice(offset, offset + 8), unsigned)
     if (
@@ -47,8 +46,7 @@ export default class GziIndex {
   }
 
   async _readIndex(): Promise<[number, number][]> {
-    let buf = Buffer.allocUnsafe(8)
-    await this.filehandle.read(buf, 0, 8, 0)
+    const buf = await this.filehandle.read(8, 0)
     const numEntries = this._readLongWithOverflow(buf, 0, true)
     if (!numEntries) {
       return [[0, 0]]
@@ -62,15 +60,14 @@ export default class GziIndex {
     if (bufSize > Number.MAX_SAFE_INTEGER) {
       throw new TypeError('integer overflow')
     }
-    buf = Buffer.allocUnsafe(bufSize)
-    await this.filehandle.read(buf, 0, bufSize, 8)
+    const buf2 = await this.filehandle.read(bufSize, 8)
     for (let entryNumber = 0; entryNumber < numEntries; entryNumber += 1) {
       const compressedPosition = this._readLongWithOverflow(
-        buf,
+        buf2,
         entryNumber * 16,
       )
       const uncompressedPosition = this._readLongWithOverflow(
-        buf,
+        buf2,
         entryNumber * 16 + 8,
       )
       entries[entryNumber + 1] = [compressedPosition, uncompressedPosition]
