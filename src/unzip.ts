@@ -19,11 +19,11 @@ async function unzip(inputData: Uint8Array) {
   try {
     let strm
     let pos = 0
-    let i = 0
-    const chunks = []
-    let totalSize = 0
+    const blocks = [] as Uint8Array[]
     let inflator
+    console.log('starting inputDatalen', inputData.length, inputData.byteLength)
     do {
+      console.log(pos)
       const remainingInput = inputData.subarray(pos)
       inflator = new Inflate()
       //@ts-ignore
@@ -34,18 +34,13 @@ async function unzip(inputData: Uint8Array) {
       }
 
       pos += strm.next_in
-      chunks[i] = inflator.result as Uint8Array
-      totalSize += chunks[i]!.length
-      i += 1
+      blocks.push(inflator.result as Uint8Array)
     } while (strm.avail_in)
 
-    const result = new Uint8Array(totalSize)
-    for (let i = 0, offset = 0; i < chunks.length; i++) {
-      result.set(chunks[i]!, offset)
-      offset += chunks[i]!.length
-    }
-    return result
+    console.log('done', blocks)
+    return concatUint8Array(blocks)
   } catch (e) {
+    console.error('WOWOWOWOW', e)
     //cleanup error message
     if (/incorrect header check/.exec(`${e}`)) {
       throw new Error(
