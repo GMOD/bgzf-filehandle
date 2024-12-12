@@ -2,13 +2,21 @@
 [![Coverage Status](https://img.shields.io/codecov/c/github/GMOD/bgzf-filehandle/master.svg?style=flat-square)](https://codecov.io/gh/GMOD/bgzf-filehandle/branch/master)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/GMOD/bgzf-filehandle/push.yml?branch=master)](https://github.com/GMOD/bgzf-filehandle/actions)
 
-Transparently read [indexed block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such as those created by bgzip, using coordinates from the uncompressed file. The module is used in @gmod/indexedfasta to read bgzip-indexed fasta files (with gzi index, fai index, and fa).
+Transparently read
+[indexed block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such
+as those created by bgzip, using coordinates from the uncompressed file. The
+module is used in @gmod/indexedfasta to read bgzip-indexed fasta files (with gzi
+index, fai index, and fa).
 
-Users can also use the `unzip` function to unzip bgzip files whole (which pako has trouble with natively)
+Users can also use the `unzip` function to unzip bgzip files whole (which pako
+has trouble with natively)
 
-You can also use the unzipChunk or unzipChunkSlice functions to unzip ranges given by BAI or TBI files for BAM or tabix file formats (which are bgzip based).
+You can also use the unzipChunkSlice function to unzip ranges given by BAI or
+TBI files for BAM or tabix file formats (which are bgzip based).
 
-The `unzip` utility function properly decompresses BGZF chunks in both node and the browser, using `pako` when running in the browser and native `zlib` when running in node.
+The `unzip` utility function properly decompresses BGZF chunks in both node and
+the browser, using `pako` when running in the browser and native `zlib` when
+running in node.
 
 ## Install
 
@@ -54,7 +62,10 @@ const { buffer, dpositions, cpositions } = await unzipChunkSlice(
 
 ## Academic Use
 
-This package was written with funding from the [NHGRI](http://genome.gov) as part of the [JBrowse](http://jbrowse.org) project. If you use it in an academic project that you publish, please cite the most recent JBrowse paper, which will be linked from [jbrowse.org](http://jbrowse.org).
+This package was written with funding from the [NHGRI](http://genome.gov) as
+part of the [JBrowse](http://jbrowse.org) project. If you use it in an academic
+project that you publish, please cite the most recent JBrowse paper, which will
+be linked from [jbrowse.org](http://jbrowse.org).
 
 ## License
 
