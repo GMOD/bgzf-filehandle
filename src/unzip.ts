@@ -15,12 +15,12 @@ interface Chunk {
 // does not properly uncompress bgzf chunks that contain more than one bgzf
 // block, so export an unzip function that uses pako directly if we are running
 // in a browser.
-async function unzip(inputData: Uint8Array) {
-  const blocks = [] as Uint8Array[]
+export async function unzip(inputData: Uint8Array) {
   try {
     let strm
     let pos = 0
     let inflator
+    const blocks = [] as Uint8Array[]
     do {
       const remainingInput = inputData.subarray(pos)
       inflator = new Inflate()
@@ -37,7 +37,7 @@ async function unzip(inputData: Uint8Array) {
 
     return concatUint8Array(blocks)
   } catch (e) {
-    //cleanup error message
+    // return a slightly more informative error message
     if (/incorrect header check/.exec(`${e}`)) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
@@ -47,127 +47,66 @@ async function unzip(inputData: Uint8Array) {
   }
 }
 
-// similar to pakounzip, except it does extra counting
-// to return the positions of compressed and decompressed
-// data offsets
-async function unzipChunk(inputData: Uint8Array) {
-  try {
-    let strm
-    let cpos = 0
-    let dpos = 0
-    const blocks = [] as Uint8Array[]
-    const cpositions = [] as number[]
-    const dpositions = [] as number[]
-    do {
-      const remainingInput = inputData.slice(cpos)
-      const inflator = new Inflate()
-      // @ts-ignore
-      ;({ strm } = inflator)
-      inflator.push(remainingInput, Z_SYNC_FLUSH)
-      if (inflator.err) {
-        throw new Error(inflator.msg)
-      }
+// keeps track of the position of compressed blocks in terms of file offsets,
+// and a decompressed equivalent
+//
+// also slices (0,minv.dataPosition) and (maxv.dataPosition,end) off
+export async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
+  let strm
+  const { minv, maxv } = chunk
+  let cpos = minv.blockPosition
+  let dpos = minv.dataPosition
+  const chunks = [] as Uint8Array[]
+  const cpositions = [] as number[]
+  const dpositions = [] as number[]
 
-      const buffer = inflator.result as Uint8Array
-      blocks.push(buffer)
+  let i = 0
+  do {
+    const remainingInput = inputData.subarray(cpos - minv.blockPosition)
+    const inflator = new Inflate()
+    // @ts-ignore
+    ;({ strm } = inflator)
+    inflator.push(remainingInput, Z_SYNC_FLUSH)
+    if (inflator.err) {
+      throw new Error(inflator.msg)
+    }
+
+    const buffer = inflator.result
+    chunks.push(buffer as Uint8Array)
+    let len = buffer.length
+
+    cpositions.push(cpos)
+    dpositions.push(dpos)
+    if (chunks.length === 1 && minv.dataPosition) {
+      // this is the first chunk, trim it
+      chunks[0] = chunks[0]!.subarray(minv.dataPosition)
+      len = chunks[0].length
+    }
+    const origCpos = cpos
+    cpos += strm.next_in
+    dpos += len
+
+    if (origCpos >= maxv.blockPosition) {
+      // this is the last chunk, trim it and stop decompressing. note if it is
+      // the same block is minv it subtracts that already trimmed part of the
+      // slice length
+      chunks[i] = chunks[i]!.subarray(
+        0,
+        maxv.blockPosition === minv.blockPosition
+          ? maxv.dataPosition - minv.dataPosition + 1
+          : maxv.dataPosition + 1,
+      )
 
       cpositions.push(cpos)
       dpositions.push(dpos)
-
-      cpos += strm.next_in
-      dpos += buffer.length
-    } while (strm.avail_in)
-
-    const buffer = concatUint8Array(blocks)
-    return {
-      buffer,
-      cpositions,
-      dpositions,
+      break
     }
-  } catch (e) {
-    //cleanup error message
-    if (/incorrect header check/.exec(`${e}`)) {
-      throw new Error(
-        'problem decompressing block: incorrect gzip header check',
-      )
-    }
-    throw e
+    i++
+  } while (strm.avail_in)
+
+  return {
+    buffer: concatUint8Array(chunks),
+    cpositions,
+    dpositions,
   }
 }
-
-// similar to unzipChunk above but slices (0,minv.dataPosition) and
-// (maxv.dataPosition,end) off
-async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
-  try {
-    let strm
-    const { minv, maxv } = chunk
-    let cpos = minv.blockPosition
-    let dpos = minv.dataPosition
-    const chunks = [] as Uint8Array[]
-    const cpositions = [] as number[]
-    const dpositions = [] as number[]
-
-    let i = 0
-    do {
-      const remainingInput = inputData.subarray(cpos - minv.blockPosition)
-      const inflator = new Inflate()
-      // @ts-ignore
-      ;({ strm } = inflator)
-      inflator.push(remainingInput, Z_SYNC_FLUSH)
-      if (inflator.err) {
-        throw new Error(inflator.msg)
-      }
-
-      const buffer = inflator.result
-      chunks.push(buffer as Uint8Array)
-      let len = buffer.length
-
-      cpositions.push(cpos)
-      dpositions.push(dpos)
-      if (chunks.length === 1 && minv.dataPosition) {
-        // this is the first chunk, trim it
-        chunks[0] = chunks[0]!.subarray(minv.dataPosition)
-        len = chunks[0].length
-      }
-      const origCpos = cpos
-      cpos += strm.next_in
-      dpos += len
-
-      if (origCpos >= maxv.blockPosition) {
-        // this is the last chunk, trim it and stop decompressing
-        // note if it is the same block is minv it subtracts that already
-        // trimmed part of the slice length
-
-        chunks[i] = chunks[i]!.subarray(
-          0,
-          maxv.blockPosition === minv.blockPosition
-            ? maxv.dataPosition - minv.dataPosition + 1
-            : maxv.dataPosition + 1,
-        )
-
-        cpositions.push(cpos)
-        dpositions.push(dpos)
-        break
-      }
-      i++
-    } while (strm.avail_in)
-
-    const buffer = concatUint8Array(chunks)
-
-    return { buffer, cpositions, dpositions }
-  } catch (e) {
-    //cleanup error message
-    if (/incorrect header check/.exec(`${e}`)) {
-      throw new Error(
-        'problem decompressing block: incorrect gzip header check',
-      )
-    }
-    throw e
-  }
-}
-
-function nodeUnzip() {
-  throw new Error('nodeUnzip not implemented.')
-}
-
-export { unzip, unzipChunk, unzipChunkSlice, unzip as pakoUnzip, nodeUnzip }
