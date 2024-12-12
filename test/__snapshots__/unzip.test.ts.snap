@@ -1,44 +1,20 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`unzipChunk > can unzip bgzip-1.txt.gz 1`] = `
-[
-  0,
-  22579,
-  87646,
-  152675,
-  217701,
-  282681,
-  287762,
-]
-`;
-
-exports[`unzipChunk > can unzip bgzip-1.txt.gz 2`] = `
-[
-  0,
-  4682,
-  24403,
-  43638,
-  62447,
-  82222,
-  84033,
-]
-`;
-
-exports[`unzipChunkSlice > can unzip bgzip-1.txt.gz 1`] = `
+exports[`can unzip bgzip-1.txt.gz 1`] = `
 [
   0,
   22579,
 ]
 `;
 
-exports[`unzipChunkSlice > can unzip bgzip-1.txt.gz 2`] = `
+exports[`can unzip bgzip-1.txt.gz 2`] = `
 [
   0,
   4682,
 ]
 `;
 
-exports[`unzipChunkSlice > can unzip bgzip-1.txt.gz positive maxv.blockPosition 1`] = `
+exports[`can unzip bgzip-1.txt.gz positive maxv.blockPosition 1`] = `
 [
   50,
   22579,
@@ -46,7 +22,7 @@ exports[`unzipChunkSlice > can unzip bgzip-1.txt.gz positive maxv.blockPosition 
 ]
 `;
 
-exports[`unzipChunkSlice > can unzip bgzip-1.txt.gz positive maxv.blockPosition 2`] = `
+exports[`can unzip bgzip-1.txt.gz positive maxv.blockPosition 2`] = `
 [
   0,
   4682,
@@ -54,14 +30,14 @@ exports[`unzipChunkSlice > can unzip bgzip-1.txt.gz positive maxv.blockPosition 
 ]
 `;
 
-exports[`unzipChunkSlice > can unzip bgzip-1.txt.gz positive minv.dataPosition 1`] = `
+exports[`can unzip bgzip-1.txt.gz positive minv.dataPosition 1`] = `
 [
   50,
   22579,
 ]
 `;
 
-exports[`unzipChunkSlice > can unzip bgzip-1.txt.gz positive minv.dataPosition 2`] = `
+exports[`can unzip bgzip-1.txt.gz positive minv.dataPosition 2`] = `
 [
   0,
   4682,
