@@ -14,10 +14,6 @@ async function testRead(basename: string, length: number, position: number) {
   fs.readSync(fd, buf2, 0, length, position)
   expect(buf.length).toEqual(buf2.length)
   expect(Array.from(buf)).toEqual(Array.from(buf2))
-
-  const directStat = fs.fstatSync(fd)
-  const myStat = await f.stat()
-  expect(myStat.size).toEqual(directStat.size)
 }
 
 test('can read gff3_with_syncs.gff3.gz 1', async () => {

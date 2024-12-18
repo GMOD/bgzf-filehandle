@@ -10,6 +10,7 @@ export default tseslint.config(
       'esm/*',
       'example/*',
       'eslint.config.mjs',
+      'coverage',
     ],
   },
   {

@@ -38,33 +38,9 @@ export default class BgzFilehandle {
     })
   }
 
-  async stat() {
-    const compressedStat = await this.filehandle.stat()
-    return Object.assign(compressedStat, {
-      size: await this.getUncompressedFileSize(),
-      blocks: undefined,
-      blksize: undefined,
-    })
-  }
-
-  async getUncompressedFileSize() {
-    // read the last block's ISIZE (see gzip RFC),
-    // and add it to its uncompressedPosition
-    const [, uncompressedPosition] = await this.gzi.getLastBlock()
-
-    const { size } = await this.filehandle.stat()
-
-    // note: there should be a 28-byte EOF marker (an empty block) at
-    // the end of the file, so we skip backward past that
-    const buf = await this.filehandle.read(4, size - 28 - 4)
-    const dataView = new DataView(buf.buffer)
-    const lastBlockUncompressedSize = dataView.getUint32(0, true)
-    return uncompressedPosition + lastBlockUncompressedSize
-  }
-
   async _readAndUncompressBlock(
-    [compressedPosition]: [number],
-    [nextCompressedPosition]: [number],
+    compressedPosition: number,
+    nextCompressedPosition: number,
   ) {
     let next = nextCompressedPosition
     if (!next) {
@@ -95,10 +71,10 @@ export default class BgzFilehandle {
       blockNum += 1
     ) {
       const uncompressedBuffer = await this._readAndUncompressBlock(
-        blockPositions[blockNum],
-        blockPositions[blockNum + 1],
+        blockPositions[blockNum]![0],
+        blockPositions[blockNum + 1]![0],
       )
-      const [, uncompressedPosition] = blockPositions[blockNum]
+      const [, uncompressedPosition] = blockPositions[blockNum]!
       const sourceOffset =
         uncompressedPosition >= position ? 0 : position - uncompressedPosition
       const sourceEnd =

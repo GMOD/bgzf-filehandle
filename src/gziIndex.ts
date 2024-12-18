@@ -97,7 +97,10 @@ export default class GziIndex {
     return entries.at(-1)
   }
 
-  async getRelevantBlocksForRead(length: number, position: number) {
+  async getRelevantBlocksForRead(
+    length: number,
+    position: number,
+  ): Promise<([number, number] | never[])[]> {
     const endPosition = position + length
     if (length === 0) {
       return []
@@ -129,10 +132,10 @@ export default class GziIndex {
     }
 
     // here's where we read forward
-    relevant.push(entries[searchPosition])
+    relevant.push(entries[searchPosition]!)
     let i = searchPosition + 1
     for (; i < entries.length; i += 1) {
-      relevant.push(entries[i])
+      relevant.push(entries[i]!)
       if (entries[i]![UNCOMPRESSED_POSITION] >= endPosition) {
         break
       }
