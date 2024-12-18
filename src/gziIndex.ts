@@ -1,5 +1,5 @@
 import { LocalFile, GenericFilehandle } from 'generic-filehandle2'
-import { toNumber, fromBytesLE } from 'longfn'
+import { longFromBytesToUnsigned } from './long'
 
 const UNCOMPRESSED_POSITION = 1
 
@@ -59,7 +59,7 @@ export default class GziIndex {
 
   async _readIndex(): Promise<[number, number][]> {
     const buf = await this.filehandle.read(8, 0)
-    const numEntries = toNumber(fromBytesLE(buf.subarray(0, 8), true))
+    const numEntries = longFromBytesToUnsigned(buf)
     if (!numEntries) {
       return [[0, 0]]
     }
@@ -72,21 +72,11 @@ export default class GziIndex {
     if (bufSize > Number.MAX_SAFE_INTEGER) {
       throw new TypeError('integer overflow')
     }
-    const buf2 = await this.filehandle.read(bufSize, 8)
+    const b2 = await this.filehandle.read(bufSize, 8)
     for (let entryNumber = 0; entryNumber < numEntries; entryNumber += 1) {
-      const compressedPosition = toNumber(
-        fromBytesLE(
-          buf2.subarray(entryNumber * 16, entryNumber * 16 + 8),
-          true,
-        ),
-      )
-      const uncompressedPosition = toNumber(
-        fromBytesLE(
-          buf2.subarray(entryNumber * 16 + 8, entryNumber * 16 + 16),
-          true,
-        ),
-      )
-      entries[entryNumber + 1] = [compressedPosition, uncompressedPosition]
+      const compressedPos = longFromBytesToUnsigned(b2, entryNumber * 16)
+      const uncompressedPos = longFromBytesToUnsigned(b2, entryNumber * 16 + 8)
+      entries[entryNumber + 1] = [compressedPos, uncompressedPos]
     }
 
     return entries
