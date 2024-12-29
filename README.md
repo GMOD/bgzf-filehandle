@@ -11,7 +11,7 @@ index, fai index, and fa).
 Users can also use the `unzip` function to unzip bgzip files whole (which pako
 has trouble with natively)
 
-You can also use the unzipChunkSlice function to unzip ranges given by BAI or
+You can also use the `unzipChunkSlice` function to unzip ranges given by BAI or
 TBI files for BAM or tabix file formats (which are bgzip based).
 
 The `unzip` utility function properly decompresses BGZF chunks in both node and
@@ -24,7 +24,7 @@ running in node.
 
 ## Usage
 
-```js
+```typescript
 const { BgzfFilehandle, unzip, unzipChunk } = require('@gmod/bgzf-filehandle')
 
 const f = new BgzfFilehandle({ path: 'path/to/my_file.gz' })
