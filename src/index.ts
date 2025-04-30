@@ -1,2 +1,2 @@
-export { default as BgzfFilehandle } from './bgzFilehandle'
-export * from './unzip'
+export { default as BgzfFilehandle } from './bgzFilehandle.ts'
+export * from './unzip.ts'

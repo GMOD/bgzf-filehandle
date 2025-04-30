@@ -9,6 +9,8 @@
     "sourceMap": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "esModuleInterop": true
   }
 }
