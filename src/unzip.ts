@@ -1,6 +1,8 @@
-//@ts-ignore
-import { Z_SYNC_FLUSH, Inflate } from 'pako'
+import pkg from 'pako'
 import { concatUint8Array } from './util.ts'
+
+//@ts-ignore
+const { Z_SYNC_FLUSH, Inflate } = pkg
 
 interface VirtualOffset {
   blockPosition: number
