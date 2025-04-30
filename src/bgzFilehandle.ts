@@ -1,9 +1,9 @@
-import { LocalFile, GenericFilehandle } from 'generic-filehandle2'
+import type { GenericFilehandle } from 'generic-filehandle2'
+import { LocalFile } from 'generic-filehandle2'
 
-// locals
-import { unzip } from './unzip'
-import GziIndex from './gziIndex'
-import { concatUint8Array } from './util'
+import { unzip } from './unzip.ts'
+import GziIndex from './gziIndex.ts'
+import { concatUint8Array } from './util.ts'
 
 export default class BgzFilehandle {
   filehandle: GenericFilehandle

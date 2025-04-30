@@ -73,4 +73,6 @@ MIT © [Robert Buels](https://github.com/rbuels)
 
 ## Note
 
-This repo is unable to be upgraded to pako v2 at this time due to removal of the Z_SYNC_FLUSH capability. It will produce "invalid distance too far back" errors with pako v2
+This repo is unable to be upgraded to pako v2 at this time due to removal of the
+Z_SYNC_FLUSH capability. It will produce "invalid distance too far back" errors
+with pako v2

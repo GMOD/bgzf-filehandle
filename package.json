@@ -4,8 +4,16 @@
   "description": "read from a compressed bgzip file (with .gzi) as if it were uncompressed",
   "license": "MIT",
   "repository": "gmod/bgzf-filehandle",
-  "main": "dist/index.js",
-  "module": "esm/index.js",
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "import": {
+      "import": "./esm/index.js"
+    },
+    "require": {
+      "require": "./dist/index.js"
+    }
+  },
   "author": {
     "name": "Robert Buels",
     "email": "rbuels@gmail.com",

@@ -1,5 +1,5 @@
 import { LocalFile, GenericFilehandle } from 'generic-filehandle2'
-import { longFromBytesToUnsigned } from './long'
+import { longFromBytesToUnsigned } from './long.ts'
 
 const UNCOMPRESSED_POSITION = 1
 
