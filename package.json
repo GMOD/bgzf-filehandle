@@ -6,6 +6,7 @@
   "repository": "gmod/bgzf-filehandle",
   "type": "module",
   "types": "./dist/index.d.ts",
+  "main": "./dist/index.js",
   "exports": {
     "import": {
       "import": "./esm/index.js"
