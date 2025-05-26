@@ -1,16 +1,20 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import GziIndex from '../src/gziIndex'
+import { LocalFile } from 'generic-filehandle2'
 
 describe('gzi objects', () => {
   it('can read empty gff3_with_syncs.gff3.gz.gzi', async () => {
     const idx = new GziIndex({
-      path: require.resolve('./data/gff3_with_syncs.gff3.gz.gzi'),
+      filehandle: new LocalFile(
+        require.resolve('./data/gff3_with_syncs.gff3.gz.gzi'),
+      ),
     })
     expect(await idx._getIndex()).toEqual([[0, 0]])
   })
   it('can read T_ko.2bit.gz.gzi', async () => {
     const idx = new GziIndex({
-      path: require.resolve('./data/T_ko.2bit.gz.gzi'),
+      filehandle: new LocalFile(require.resolve('./data/T_ko.2bit.gz.gzi')),
     })
     expect(await idx._getIndex()).toEqual([
       [0, 0],

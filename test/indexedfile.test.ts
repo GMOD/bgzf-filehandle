@@ -1,11 +1,14 @@
-import { test, expect } from 'vitest'
 import fs from 'fs'
+
+import { expect, test } from 'vitest'
+
 import { BgzfFilehandle } from '../src'
+import { LocalFile } from 'generic-filehandle2'
 
 async function testRead(basename: string, length: number, position: number) {
   const f = new BgzfFilehandle({
-    path: require.resolve(`./data/${basename}.gz`),
-    gziPath: require.resolve(`./data/${basename}.gz.gzi`),
+    filehandle: new LocalFile(require.resolve(`./data/${basename}.gz`)),
+    gziFilehandle: new LocalFile(require.resolve(`./data/${basename}.gz.gzi`)),
   })
 
   const buf2 = Buffer.allocUnsafe(length)

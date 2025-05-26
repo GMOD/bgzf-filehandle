@@ -1,9 +1,8 @@
-import type { GenericFilehandle } from 'generic-filehandle2'
-import { LocalFile } from 'generic-filehandle2'
-
-import { unzip } from './unzip.ts'
 import GziIndex from './gziIndex.ts'
+import { unzip } from './unzip.ts'
 import { concatUint8Array } from './util.ts'
+
+import type { GenericFilehandle } from 'generic-filehandle2'
 
 export default class BgzFilehandle {
   filehandle: GenericFilehandle
@@ -11,30 +10,15 @@ export default class BgzFilehandle {
 
   constructor({
     filehandle,
-    path,
     gziFilehandle,
-    gziPath,
   }: {
-    filehandle?: GenericFilehandle
-    path?: string
-    gziFilehandle?: GenericFilehandle
-    gziPath?: string
+    filehandle: GenericFilehandle
+    gziFilehandle: GenericFilehandle
   }) {
-    if (filehandle) {
-      this.filehandle = filehandle
-    } else if (path) {
-      this.filehandle = new LocalFile(path)
-    } else {
-      throw new TypeError('either filehandle or path must be defined')
-    }
-
-    if (!gziFilehandle && !gziPath && !path) {
-      throw new TypeError('either gziFilehandle or gziPath must be defined')
-    }
+    this.filehandle = filehandle
 
     this.gzi = new GziIndex({
       filehandle: gziFilehandle,
-      path: !gziFilehandle && !gziPath && path ? gziPath : `${path}.gzi`,
     })
   }
 

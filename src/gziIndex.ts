@@ -1,5 +1,6 @@
-import { LocalFile, GenericFilehandle } from 'generic-filehandle2'
 import { longFromBytesToUnsigned } from './long.ts'
+
+import type { GenericFilehandle } from 'generic-filehandle2'
 
 const UNCOMPRESSED_POSITION = 1
 
@@ -31,20 +32,8 @@ export default class GziIndex {
 
   index?: Promise<[number, number][]>
 
-  constructor({
-    filehandle,
-    path,
-  }: {
-    filehandle?: GenericFilehandle
-    path?: string
-  }) {
-    if (filehandle) {
-      this.filehandle = filehandle
-    } else if (path) {
-      this.filehandle = new LocalFile(path)
-    } else {
-      throw new TypeError('either filehandle or path must be defined')
-    }
+  constructor({ filehandle }: { filehandle: GenericFilehandle }) {
+    this.filehandle = filehandle
   }
 
   _getIndex() {

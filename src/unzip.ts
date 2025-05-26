@@ -1,4 +1,5 @@
 import pkg from 'pako'
+
 import { concatUint8Array } from './util.ts'
 
 //@ts-ignore

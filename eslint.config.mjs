@@ -1,4 +1,5 @@
 import eslint from '@eslint/js'
+import importPlugin from 'eslint-plugin-import'
 import eslintPluginUnicorn from 'eslint-plugin-unicorn'
 import tseslint from 'typescript-eslint'
 
@@ -25,6 +26,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   ...tseslint.configs.stylisticTypeChecked,
   ...tseslint.configs.strictTypeChecked,
+  importPlugin.flatConfigs.recommended,
   eslintPluginUnicorn.configs.recommended,
   {
     rules: {
@@ -83,6 +85,7 @@ export default tseslint.config(
       'unicorn/prefer-number-properties': 'off',
       'unicorn/no-process-exit': 'off',
       'unicorn/prefer-at': 'off',
+
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
@@ -95,6 +98,24 @@ export default tseslint.config(
       '@typescript-eslint/no-deprecated': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
       'no-empty': 'off',
+
+      'import/no-unresolved': 'off',
+      'import/order': [
+        'error',
+        {
+          named: true,
+          'newlines-between': 'always',
+          alphabetize: {
+            order: 'asc',
+          },
+          groups: [
+            'builtin',
+            ['external', 'internal'],
+            ['parent', 'sibling', 'index', 'object'],
+            'type',
+          ],
+        },
+      ],
     },
   },
 )

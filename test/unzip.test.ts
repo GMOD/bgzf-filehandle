@@ -1,5 +1,7 @@
 import fs from 'fs'
-import { test, expect } from 'vitest'
+
+import { expect, test } from 'vitest'
+
 import { unzip, unzipChunkSlice } from '../src/unzip'
 
 test('can unzip bgzip-1.txt.gz', async () => {
