@@ -1,9 +1,9 @@
 import fs from 'fs'
 
+import { LocalFile } from 'generic-filehandle2'
 import { expect, test } from 'vitest'
 
 import { BgzfFilehandle } from '../src'
-import { LocalFile } from 'generic-filehandle2'
 
 async function testRead(basename: string, length: number, position: number) {
   const f = new BgzfFilehandle({

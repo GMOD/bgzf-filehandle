@@ -1,7 +1,7 @@
+import { LocalFile } from 'generic-filehandle2'
 import { describe, expect, it } from 'vitest'
 
 import GziIndex from '../src/gziIndex'
-import { LocalFile } from 'generic-filehandle2'
 
 describe('gzi objects', () => {
   it('can read empty gff3_with_syncs.gff3.gz.gzi', async () => {
