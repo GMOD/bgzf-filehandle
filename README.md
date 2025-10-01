@@ -15,8 +15,7 @@ You can also use the `unzipChunkSlice` function to unzip ranges given by BAI or
 TBI files for BAM or tabix file formats (which are bgzip based).
 
 The `unzip` utility function properly decompresses BGZF chunks in both node and
-the browser, using `pako` when running in the browser and native `zlib` when
-running in node.
+the browser.
 
 ## Install
 
@@ -25,7 +24,7 @@ running in node.
 ## Usage
 
 ```typescript
-const { BgzfFilehandle, unzip, unzipChunk } = require('@gmod/bgzf-filehandle')
+const { BgzfFilehandle, unzip } = require('@gmod/bgzf-filehandle')
 
 const f = new BgzfFilehandle({ path: 'path/to/my_file.gz' })
 // assumes a .gzi index exists at path/to/my_file.gz.gzi. can also
@@ -44,16 +43,12 @@ const { size } = f.stat() // stat gives the size as if the file were uncompresse
 const chunkDataBuffer = readDirectlyFromFile(someFile, 123, 456)
 const unzippedBuffer = await unzip(chunkDataBuffer)
 
-// unzipChunk takes a buffer and returns a decompressed buffer plus the offsets
-// of the block boundaries in the bgzip file in compressed (cpositions) and
-// decompressed (dpositions) coordinates
-// you can ignore dpositions/cpositions if your code doesn't care about stable feature IDs
-const { buffer, dpositions, cpositions } = await unzipChunk(chunkDataBuffer)
-
-// similar to the above unzipChunk but takes extra chunk argument and trims
-// off (0,chunk.minv.dataPosition) and (chunk.maxv.dataPosition)
-// used especially for generating stable feature IDs across chunk boundaries
-// normal unzip or unzipChunk can be used if this is not important
+// unzipChunkSlice unzips the buffer, and and slices out
+// (0,chunk.minv.dataPosition) and (chunk.maxv.dataPosition)
+//
+// the dpositions and cpositions indicate the block boundaries in compressed
+// and decompressed coordinates which can be used for generating stable feature
+// IDs across chunk boundaries
 const { buffer, dpositions, cpositions } = await unzipChunkSlice(
   chunkDataBuffer,
   chunk,
