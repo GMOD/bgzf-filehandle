@@ -5,6 +5,24 @@ import { concatUint8Array } from './util.ts'
 //@ts-ignore
 const { Z_SYNC_FLUSH, Inflate } = pkg
 
+// Type for the block cache
+export type BlockCache = Map<string, { buffer: Uint8Array; nextIn: number }>
+
+// Generate cache key from block position and data hash
+function generateCacheKey(
+  blockPosition: number,
+  inputData: Uint8Array,
+): string {
+  // Simple hash of first 32 bytes for cache key uniqueness
+  const hashData = inputData.subarray(0, Math.min(32, inputData.length))
+  let hash = 0
+  const len = hashData.length
+  for (let i = 0; i < len; i++) {
+    hash = ((hash << 5) - hash + hashData[i]!) & 0xffffffff
+  }
+  return `${blockPosition}_${hash}`
+}
+
 interface VirtualOffset {
   blockPosition: number
   dataPosition: number
@@ -54,7 +72,11 @@ export async function unzip(inputData: Uint8Array) {
 // and a decompressed equivalent
 //
 // also slices (0,minv.dataPosition) and (maxv.dataPosition,end) off
-export async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
+export async function unzipChunkSlice(
+  inputData: Uint8Array,
+  chunk: Chunk,
+  blockCache?: BlockCache,
+) {
   try {
     let strm
     const { minv, maxv } = chunk
@@ -65,18 +87,43 @@ export async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
     const dpositions = [] as number[]
 
     let i = 0
+    let wasFromCache = false
+    let cacheHits = 0
+    let cacheMisses = 0
     do {
       const remainingInput = inputData.subarray(cpos - minv.blockPosition)
-      const inflator = new Inflate()
-      // @ts-ignore
-      ;({ strm } = inflator)
-      inflator.push(remainingInput, Z_SYNC_FLUSH)
-      if (inflator.err) {
-        throw new Error(inflator.msg)
+      const cacheKey = generateCacheKey(cpos, remainingInput)
+
+      let buffer: Uint8Array
+      let nextIn: number
+
+      // Check cache first
+      const cached = blockCache?.get(cacheKey)
+      if (cached) {
+        buffer = cached.buffer
+        nextIn = cached.nextIn
+        wasFromCache = true
+        cacheHits++
+      } else {
+        // Not in cache, decompress and store
+        const inflator = new Inflate()
+        // @ts-ignore
+        ;({ strm } = inflator)
+        inflator.push(remainingInput, Z_SYNC_FLUSH)
+        if (inflator.err) {
+          throw new Error(inflator.msg)
+        }
+
+        buffer = inflator.result as Uint8Array
+        nextIn = strm.next_in
+        wasFromCache = false
+        cacheMisses++
+
+        // Cache the decompressed block
+        blockCache?.set(cacheKey, { buffer, nextIn })
       }
 
-      const buffer = inflator.result
-      chunks.push(buffer as Uint8Array)
+      chunks.push(buffer)
       let len = buffer.length
 
       cpositions.push(cpos)
@@ -87,7 +134,7 @@ export async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
         len = chunks[0].length
       }
       const origCpos = cpos
-      cpos += strm.next_in
+      cpos += nextIn
       dpos += len
 
       if (origCpos >= maxv.blockPosition) {
@@ -106,7 +153,19 @@ export async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
         break
       }
       i++
-    } while (strm.avail_in)
+    } while (
+      wasFromCache
+        ? cpos < inputData.length + minv.blockPosition
+        : strm.avail_in
+    )
+
+    const totalBlocks = cacheHits + cacheMisses
+    const hitRate =
+      totalBlocks > 0 ? ((cacheHits / totalBlocks) * 100).toFixed(1) : '0.0'
+    const cacheStatus = blockCache ? `${hitRate}% hit rate` : 'no cache'
+    // console.log(
+    //   `unzipChunkSlice: ${cacheHits} hits, ${cacheMisses} misses (${cacheStatus}, ${totalBlocks} blocks)`,
+    // )
 
     return {
       buffer: concatUint8Array(chunks),
