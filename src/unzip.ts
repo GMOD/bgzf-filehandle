@@ -88,10 +88,6 @@ export async function unzipChunkSlice(
 
     let i = 0
     let wasFromCache = false
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    let cacheHits = 0
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    let cacheMisses = 0
     do {
       const remainingInput = inputData.subarray(cpos - minv.blockPosition)
       const cacheKey = generateCacheKey(cpos, remainingInput)
@@ -105,7 +101,6 @@ export async function unzipChunkSlice(
         buffer = cached.buffer
         nextIn = cached.nextIn
         wasFromCache = true
-        cacheHits++
       } else {
         // Not in cache, decompress and store
         const inflator = new Inflate()
@@ -119,7 +114,6 @@ export async function unzipChunkSlice(
         buffer = inflator.result as Uint8Array
         nextIn = strm.next_in
         wasFromCache = false
-        cacheMisses++
 
         // Cache the decompressed block
         blockCache?.set(cacheKey, { buffer, nextIn })
@@ -160,14 +154,6 @@ export async function unzipChunkSlice(
         ? cpos < inputData.length + minv.blockPosition
         : strm.avail_in
     )
-
-    // const totalBlocks = cacheHits + cacheMisses
-    // const hitRate =
-    //   totalBlocks > 0 ? ((cacheHits / totalBlocks) * 100).toFixed(1) : '0.0'
-    // const cacheStatus = blockCache ? `${hitRate}% hit rate` : 'no cache'
-    // console.log(
-    //   `unzipChunkSlice: ${cacheHits} hits, ${cacheMisses} misses (${cacheStatus}, ${totalBlocks} blocks)`,
-    // )
 
     return {
       buffer: concatUint8Array(chunks),
