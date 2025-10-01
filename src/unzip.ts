@@ -88,7 +88,9 @@ export async function unzipChunkSlice(
 
     let i = 0
     let wasFromCache = false
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     let cacheHits = 0
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     let cacheMisses = 0
     do {
       const remainingInput = inputData.subarray(cpos - minv.blockPosition)
@@ -159,10 +161,10 @@ export async function unzipChunkSlice(
         : strm.avail_in
     )
 
-    const totalBlocks = cacheHits + cacheMisses
-    const hitRate =
-      totalBlocks > 0 ? ((cacheHits / totalBlocks) * 100).toFixed(1) : '0.0'
-    const cacheStatus = blockCache ? `${hitRate}% hit rate` : 'no cache'
+    // const totalBlocks = cacheHits + cacheMisses
+    // const hitRate =
+    //   totalBlocks > 0 ? ((cacheHits / totalBlocks) * 100).toFixed(1) : '0.0'
+    // const cacheStatus = blockCache ? `${hitRate}% hit rate` : 'no cache'
     // console.log(
     //   `unzipChunkSlice: ${cacheHits} hits, ${cacheMisses} misses (${cacheStatus}, ${totalBlocks} blocks)`,
     // )
