@@ -6,7 +6,10 @@ import { concatUint8Array } from './util.ts'
 const { Z_SYNC_FLUSH, Inflate } = pkg
 
 // Type for the block cache
-export type BlockCache = Map<string, { buffer: Uint8Array; nextIn: number }>
+export interface BlockCache {
+  get(key: string): { buffer: Uint8Array; nextIn: number } | undefined
+  set(key: string, value: { buffer: Uint8Array; nextIn: number }): void
+}
 
 // Generate cache key from block position and data hash
 function generateCacheKey(
