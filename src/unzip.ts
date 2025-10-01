@@ -5,8 +5,8 @@ import { concatUint8Array } from './util.ts'
 //@ts-ignore
 const { Z_SYNC_FLUSH, Inflate } = pkg
 
-// Simple cache for decompressed gzip blocks
-const blockCache = new Map<string, { buffer: Uint8Array; nextIn: number }>()
+// Type for the block cache
+export type BlockCache = Map<string, { buffer: Uint8Array; nextIn: number }>
 
 // Generate cache key from block position and data hash
 function generateCacheKey(
@@ -72,7 +72,11 @@ export async function unzip(inputData: Uint8Array) {
 // and a decompressed equivalent
 //
 // also slices (0,minv.dataPosition) and (maxv.dataPosition,end) off
-export async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
+export async function unzipChunkSlice(
+  inputData: Uint8Array,
+  chunk: Chunk,
+  blockCache?: BlockCache,
+) {
   try {
     let strm
     const { minv, maxv } = chunk
@@ -94,7 +98,7 @@ export async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
       let nextIn: number
 
       // Check cache first
-      const cached = blockCache.get(cacheKey)
+      const cached = blockCache?.get(cacheKey)
       if (cached) {
         buffer = cached.buffer
         nextIn = cached.nextIn
@@ -116,7 +120,7 @@ export async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
         cacheMisses++
 
         // Cache the decompressed block
-        blockCache.set(cacheKey, { buffer, nextIn })
+        blockCache?.set(cacheKey, { buffer, nextIn })
       }
 
       chunks.push(buffer)
@@ -158,9 +162,10 @@ export async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
     const totalBlocks = cacheHits + cacheMisses
     const hitRate =
       totalBlocks > 0 ? ((cacheHits / totalBlocks) * 100).toFixed(1) : '0.0'
-    console.log(
-      `unzipChunkSlice: ${cacheHits} hits, ${cacheMisses} misses (${hitRate}% hit rate, ${totalBlocks} blocks)`,
-    )
+    const cacheStatus = blockCache ? `${hitRate}% hit rate` : 'no cache'
+    // console.log(
+    //   `unzipChunkSlice: ${cacheHits} hits, ${cacheMisses} misses (${cacheStatus}, ${totalBlocks} blocks)`,
+    // )
 
     return {
       buffer: concatUint8Array(chunks),
