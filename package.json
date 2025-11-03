@@ -41,11 +41,10 @@
   ],
   "dependencies": {
     "generic-filehandle2": "^2.0.5",
-    "pako": "^1.0.11"
+    "@progress/pako-esm": "^1.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
-    "@types/pako": "^2.0.0",
     "@typescript-eslint/eslint-plugin": "^8.16.0",
     "@typescript-eslint/parser": "^8.16.0",
     "@vitest/coverage-v8": "^4.0.6",
