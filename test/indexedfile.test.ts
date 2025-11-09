@@ -3,7 +3,7 @@ import fs from 'fs'
 import { LocalFile } from 'generic-filehandle2'
 import { expect, test } from 'vitest'
 
-import { BgzfFilehandle } from '../src'
+import { BgzfFilehandle } from '../src/index.ts'
 
 async function testRead(basename: string, length: number, position: number) {
   const f = new BgzfFilehandle({

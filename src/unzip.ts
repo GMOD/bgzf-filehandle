@@ -1,5 +1,5 @@
 // @ts-expect-error
-import { Z_SYNC_FLUSH, Inflate } from '@progress/pako-esm'
+import { Inflate, Z_SYNC_FLUSH } from 'pako-esm2'
 
 import { concatUint8Array } from './util.ts'
 
@@ -35,7 +35,7 @@ interface Chunk {
 
 // browserify-zlib, which is the zlib shim used by default in webpacked code,
 // does not properly uncompress bgzf chunks that contain more than one bgzf
-// block, so export an unzip function that uses @progress/@progress/pako-esm directly if we are running
+// block, so export an unzip function that uses @progress/pako-esm2 directly if we are running
 // in a browser.
 export async function unzip(inputData: Uint8Array) {
   try {
