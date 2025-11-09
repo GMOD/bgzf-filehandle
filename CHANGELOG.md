@@ -32,7 +32,7 @@
 
 # 1.4.0
 
-- Use "browser" field in package.json to choose node vs pako unzip
+- Use "browser" field in package.json to choose node vs pako-esm2 unzip
 
 # v1.3.4
 
@@ -65,7 +65,7 @@
 
 # v1.2.1
 
-- Fix pako unzip in browser
+- Fix pako-esm2 unzip in browser
 
 # v1.2.0
 

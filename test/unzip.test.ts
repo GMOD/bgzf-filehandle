@@ -2,7 +2,7 @@ import fs from 'fs'
 
 import { expect, test } from 'vitest'
 
-import { unzip, unzipChunkSlice } from '../src/unzip'
+import { unzip, unzipChunkSlice } from '../src/unzip.ts'
 
 test('can unzip bgzip-1.txt.gz', async () => {
   const testData = fs.readFileSync(require.resolve('./data/bgzip-1.txt.gz'))

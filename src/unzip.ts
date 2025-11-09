@@ -1,9 +1,6 @@
-import pkg from 'pako'
+import { Inflate, Z_SYNC_FLUSH } from 'pako-esm2'
 
 import { concatUint8Array } from './util.ts'
-
-//@ts-ignore
-const { Z_SYNC_FLUSH, Inflate } = pkg
 
 // Type for the block cache
 export interface BlockCache {
@@ -37,7 +34,7 @@ interface Chunk {
 
 // browserify-zlib, which is the zlib shim used by default in webpacked code,
 // does not properly uncompress bgzf chunks that contain more than one bgzf
-// block, so export an unzip function that uses pako directly if we are running
+// block, so export an unzip function that uses @progress/pako-esm2 directly if we are running
 // in a browser.
 export async function unzip(inputData: Uint8Array) {
   try {
@@ -47,17 +44,18 @@ export async function unzip(inputData: Uint8Array) {
     const blocks = [] as Uint8Array[]
     do {
       const remainingInput = inputData.subarray(pos)
-      inflator = new Inflate()
-      //@ts-ignore
+      inflator = new Inflate(undefined)
       ;({ strm } = inflator)
       inflator.push(remainingInput, Z_SYNC_FLUSH)
       if (inflator.err) {
         throw new Error(inflator.msg)
       }
 
-      pos += strm.next_in
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      pos += strm!.next_in
       blocks.push(inflator.result as Uint8Array)
-    } while (strm.avail_in)
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+    } while (strm!.avail_in)
 
     return concatUint8Array(blocks)
   } catch (e) {
@@ -106,8 +104,7 @@ export async function unzipChunkSlice(
         wasFromCache = true
       } else {
         // Not in cache, decompress and store
-        const inflator = new Inflate()
-        // @ts-ignore
+        const inflator = new Inflate(undefined)
         ;({ strm } = inflator)
         inflator.push(remainingInput, Z_SYNC_FLUSH)
         if (inflator.err) {
@@ -115,7 +112,8 @@ export async function unzipChunkSlice(
         }
 
         buffer = inflator.result as Uint8Array
-        nextIn = strm.next_in
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+        nextIn = strm!.next_in
         wasFromCache = false
 
         // Cache the decompressed block
@@ -155,7 +153,8 @@ export async function unzipChunkSlice(
     } while (
       wasFromCache
         ? cpos < inputData.length + minv.blockPosition
-        : strm.avail_in
+        : // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+          strm!.avail_in
     )
 
     return {
