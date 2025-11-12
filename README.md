@@ -71,3 +71,6 @@ MIT © [Robert Buels](https://github.com/rbuels)
 This repo is unable to be upgraded to pako v2 at this time due to removal of the
 Z_SYNC_FLUSH capability. It will produce "invalid distance too far back" errors
 with pako v2
+
+Was updated in 2025 to use native browser DecompressionStream, following code
+example demonstrated by https://github.com/nrminor/genotype/ (Thanks!)
