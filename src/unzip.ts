@@ -40,10 +40,10 @@ async function inflateSingleBlock(
   const writer = decompressor.writable.getWriter()
   const reader = decompressor.readable.getReader()
 
-  // Write compressed data
-  // @ts-expect-error this expects a "BufferSource" object which tsc errors on with Uint8Array
-  await writer.write(compressedData)
-  await writer.close()
+  // Write compressed data (cast to BufferSource for DOM compatibility)
+  const writePromise = writer
+    .write(compressedData as BufferSource)
+    .then(() => writer.close())
 
   // Read decompressed result
   const chunks: Uint8Array[] = []
@@ -57,6 +57,9 @@ async function inflateSingleBlock(
     chunks.push(value)
     totalLength += value.length
   }
+
+  // Ensure write is complete
+  await writePromise
 
   // Combine chunks
   const result = new Uint8Array(totalLength)
@@ -175,8 +178,9 @@ export async function unzip(inputData: Uint8Array) {
       try {
         const result = await inflateWithDecompressionStream(inputData)
         return result
-      } catch {
+      } catch (e) {
         // If that fails, fall back to pako which handles multiple blocks better
+        console.warn(`Encountered error ${e}: attempting pako`)
         return inflateWithPako(inputData)
       }
     }
