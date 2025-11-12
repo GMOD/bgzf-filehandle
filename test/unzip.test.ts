@@ -1,6 +1,6 @@
 import fs from 'fs'
 
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import { unzip, unzipChunkSlice } from '../src/unzip.ts'
 
@@ -11,11 +11,14 @@ test('can unzip bgzip-1.txt.gz', async () => {
 })
 
 test('test error message modification', async () => {
+  const originalWarn = console.warn
+  console.warn = vi.fn()
   const testData = fs.readFileSync(require.resolve('./data/bgzip-1.txt.gz'))
 
-  await expect(unzip(testData.slice(2))).rejects.toThrow(
+  await expect(unzip(testData.subarray(2))).rejects.toThrow(
     /problem decompressing block/,
   )
+  console.warn = originalWarn
 })
 
 test('can unzip bgzip-1.txt.gz', async () => {

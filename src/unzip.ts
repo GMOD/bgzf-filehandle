@@ -1,3 +1,28 @@
+// Note: this was refactored in 2025 to use DecompressionStream based on example from
+// https://github.com/nrminor/genotype/ (permalink
+// https://github.com/nrminor/genotype/blob/a11218f7c28e39238dde058935bc43666f4ae39a/src/formats/bam/bgzf.ts)
+// This repo has the following license
+// MIT License
+//
+// Copyright (c) 2025 Nicholas R. Minor
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 import { Inflate, Z_SYNC_FLUSH } from 'pako-esm2'
 
 import { concatUint8Array } from './util.ts'
@@ -49,6 +74,7 @@ async function inflateSingleBlock(
   const chunks: Uint8Array[] = []
   let totalLength = 0
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   while (true) {
     const { done, value } = await reader.read()
     if (done) {
@@ -198,7 +224,7 @@ export async function unzip(inputData: Uint8Array) {
   }
 }
 
-// Helper function for decompressing a single block with position tracking
+// Helper function for decompressing a single block with position tracking using pako
 function inflateBlockWithPako(remainingInput: Uint8Array) {
   const inflator = new Inflate(undefined)
   const { strm } = inflator
@@ -209,10 +235,32 @@ function inflateBlockWithPako(remainingInput: Uint8Array) {
 
   return {
     buffer: inflator.result as Uint8Array,
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+
     nextIn: strm!.next_in,
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-    availIn: strm!.avail_in,
+  }
+}
+
+// Helper function for decompressing a single block with position tracking
+// Uses DecompressionStream when available, falls back to pako
+async function inflateBlock(
+  remainingInput: Uint8Array,
+  useNative: boolean,
+): Promise<{ buffer: Uint8Array; nextIn: number }> {
+  // Parse block size from BGZF header
+  const blockSize = getBgzfBlockSize(remainingInput, 0)
+  if (!blockSize || blockSize > remainingInput.length) {
+    throw new Error('Unable to parse BGZF block size')
+  }
+
+  const blockData = remainingInput.subarray(0, blockSize)
+
+  if (useNative) {
+    // Use native DecompressionStream
+    const buffer = await inflateSingleBlock(blockData)
+    return { buffer, nextIn: blockSize }
+  } else {
+    // Use pako
+    return inflateBlockWithPako(remainingInput)
   }
 }
 
@@ -220,17 +268,12 @@ function inflateBlockWithPako(remainingInput: Uint8Array) {
 // and a decompressed equivalent
 //
 // also slices (0,minv.dataPosition) and (maxv.dataPosition,end) off
-//
-// Note: This function uses pako instead of DecompressionStream because it requires
-// precise tracking of how many input bytes were consumed (strm.next_in) to handle
-// BGZF block boundaries correctly. DecompressionStream doesn't expose this information.
 export async function unzipChunkSlice(
   inputData: Uint8Array,
   chunk: Chunk,
   blockCache?: BlockCache,
 ) {
   try {
-    let availIn = 0
     const { minv, maxv } = chunk
     let cpos = minv.blockPosition
     let dpos = minv.dataPosition
@@ -238,10 +281,16 @@ export async function unzipChunkSlice(
     const cpositions = [] as number[]
     const dpositions = [] as number[]
 
+    // Try to use native DecompressionStream, fall back to pako if it fails
+    const useNative = typeof DecompressionStream !== 'undefined'
     let i = 0
-    let wasFromCache = false
-    do {
+
+    while (cpos < inputData.length + minv.blockPosition) {
       const remainingInput = inputData.subarray(cpos - minv.blockPosition)
+      if (remainingInput.length === 0) {
+        break
+      }
+
       const cacheKey = generateCacheKey(cpos, remainingInput)
 
       let buffer: Uint8Array
@@ -252,14 +301,22 @@ export async function unzipChunkSlice(
       if (cached) {
         buffer = cached.buffer
         nextIn = cached.nextIn
-        wasFromCache = true
       } else {
         // Not in cache, decompress and store
-        const result = inflateBlockWithPako(remainingInput)
-        buffer = result.buffer
-        nextIn = result.nextIn
-        availIn = result.availIn
-        wasFromCache = false
+        try {
+          const result = await inflateBlock(remainingInput, useNative)
+          buffer = result.buffer
+          nextIn = result.nextIn
+        } catch (e) {
+          // If native fails, try pako
+          if (useNative) {
+            const result = inflateBlockWithPako(remainingInput)
+            buffer = result.buffer
+            nextIn = result.nextIn
+          } else {
+            throw e
+          }
+        }
 
         // Cache the decompressed block
         blockCache?.set(cacheKey, { buffer, nextIn })
@@ -295,9 +352,7 @@ export async function unzipChunkSlice(
         break
       }
       i++
-    } while (
-      wasFromCache ? cpos < inputData.length + minv.blockPosition : availIn
-    )
+    }
 
     return {
       buffer: concatUint8Array(chunks),
