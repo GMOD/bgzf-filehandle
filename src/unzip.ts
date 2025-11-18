@@ -8,20 +8,6 @@ export interface BlockCache {
   set(key: string, value: { buffer: Uint8Array; nextIn: number }): void
 }
 
-// Generate cache key from block position and data hash
-function generateCacheKey(
-  blockPosition: number,
-  inputData: Uint8Array,
-): string {
-  // Simple hash of first 32 bytes for cache key uniqueness
-  const hashData = inputData.subarray(0, Math.min(32, inputData.length))
-  let hash = 0
-  const len = hashData.length
-  for (let i = 0; i < len; i++) {
-    hash = ((hash << 5) - hash + hashData[i]!) & 0xffffffff
-  }
-  return `${blockPosition}_${hash}`
-}
 
 interface VirtualOffset {
   blockPosition: number
@@ -91,7 +77,7 @@ export async function unzipChunkSlice(
     let wasFromCache = false
     do {
       const remainingInput = inputData.subarray(cpos - minv.blockPosition)
-      const cacheKey = generateCacheKey(cpos, remainingInput)
+      const cacheKey = cpos.toString()
 
       let buffer: Uint8Array
       let nextIn: number
