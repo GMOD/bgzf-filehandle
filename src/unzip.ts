@@ -8,7 +8,6 @@ export interface BlockCache {
   set(key: string, value: { buffer: Uint8Array; nextIn: number }): void
 }
 
-
 interface VirtualOffset {
   blockPosition: number
   dataPosition: number
@@ -78,6 +77,7 @@ export async function unzipChunkSlice(
 
     let i = 0
     let wasFromCache = false
+    let totalLength = 0
     do {
       const remainingInput = inputData.subarray(cpos - minv.blockPosition)
       const cacheKey = cpos.toString()
@@ -133,11 +133,13 @@ export async function unzipChunkSlice(
             ? maxv.dataPosition - minv.dataPosition + 1
             : maxv.dataPosition + 1,
         )
+        totalLength += chunks[i]!.length
 
         cpositions.push(cpos)
         dpositions.push(dpos)
         break
       }
+      totalLength += len
       i++
     } while (
       wasFromCache
@@ -147,7 +149,7 @@ export async function unzipChunkSlice(
     )
 
     return {
-      buffer: concatUint8Array(chunks),
+      buffer: concatUint8Array(chunks, totalLength),
       cpositions,
       dpositions,
     }
