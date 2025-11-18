@@ -8,21 +8,6 @@ export interface BlockCache {
   set(key: string, value: { buffer: Uint8Array; nextIn: number }): void
 }
 
-// Generate cache key from block position and data hash
-function generateCacheKey(
-  blockPosition: number,
-  inputData: Uint8Array,
-): string {
-  // Simple hash of first 32 bytes for cache key uniqueness
-  const hashData = inputData.subarray(0, Math.min(32, inputData.length))
-  let hash = 0
-  const len = hashData.length
-  for (let i = 0; i < len; i++) {
-    hash = ((hash << 5) - hash + hashData[i]!) & 0xffffffff
-  }
-  return `${blockPosition}_${hash}`
-}
-
 interface VirtualOffset {
   blockPosition: number
   dataPosition: number
@@ -42,6 +27,7 @@ export async function unzip(inputData: Uint8Array) {
     let pos = 0
     let inflator
     const blocks = [] as Uint8Array[]
+    let totalLength = 0
     do {
       const remainingInput = inputData.subarray(pos)
       inflator = new Inflate(undefined)
@@ -53,11 +39,13 @@ export async function unzip(inputData: Uint8Array) {
 
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       pos += strm!.next_in
-      blocks.push(inflator.result as Uint8Array)
+      const result = inflator.result as Uint8Array
+      blocks.push(result)
+      totalLength += result.length
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     } while (strm!.avail_in)
 
-    return concatUint8Array(blocks)
+    return concatUint8Array(blocks, totalLength)
   } catch (e) {
     // return a slightly more informative error message
     if (/incorrect header check/.exec(`${e}`)) {
@@ -89,9 +77,10 @@ export async function unzipChunkSlice(
 
     let i = 0
     let wasFromCache = false
+    let totalLength = 0
     do {
       const remainingInput = inputData.subarray(cpos - minv.blockPosition)
-      const cacheKey = generateCacheKey(cpos, remainingInput)
+      const cacheKey = cpos.toString()
 
       let buffer: Uint8Array
       let nextIn: number
@@ -144,11 +133,13 @@ export async function unzipChunkSlice(
             ? maxv.dataPosition - minv.dataPosition + 1
             : maxv.dataPosition + 1,
         )
+        totalLength += chunks[i]!.length
 
         cpositions.push(cpos)
         dpositions.push(dpos)
         break
       }
+      totalLength += len
       i++
     } while (
       wasFromCache
@@ -158,7 +149,7 @@ export async function unzipChunkSlice(
     )
 
     return {
-      buffer: concatUint8Array(chunks),
+      buffer: concatUint8Array(chunks, totalLength),
       cpositions,
       dpositions,
     }
