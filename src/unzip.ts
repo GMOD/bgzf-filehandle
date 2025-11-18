@@ -28,6 +28,7 @@ export async function unzip(inputData: Uint8Array) {
     let pos = 0
     let inflator
     const blocks = [] as Uint8Array[]
+    let totalLength = 0
     do {
       const remainingInput = inputData.subarray(pos)
       inflator = new Inflate(undefined)
@@ -39,11 +40,13 @@ export async function unzip(inputData: Uint8Array) {
 
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       pos += strm!.next_in
-      blocks.push(inflator.result as Uint8Array)
+      const result = inflator.result as Uint8Array
+      blocks.push(result)
+      totalLength += result.length
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     } while (strm!.avail_in)
 
-    return concatUint8Array(blocks)
+    return concatUint8Array(blocks, totalLength)
   } catch (e) {
     // return a slightly more informative error message
     if (/incorrect header check/.exec(`${e}`)) {
