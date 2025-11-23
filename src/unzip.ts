@@ -30,7 +30,7 @@ export async function unzip(inputData: Uint8Array) {
     let totalLength = 0
     do {
       const remainingInput = inputData.subarray(pos)
-      inflator = new Inflate(undefined)
+      inflator = new Inflate({ raw: true })
       ;({ strm } = inflator)
       inflator.push(remainingInput, Z_SYNC_FLUSH)
       if (inflator.err) {
@@ -93,7 +93,7 @@ export async function unzipChunkSlice(
         wasFromCache = true
       } else {
         // Not in cache, decompress and store
-        const inflator = new Inflate(undefined)
+        const inflator = new Inflate({ raw: true })
         ;({ strm } = inflator)
         inflator.push(remainingInput, Z_SYNC_FLUSH)
         if (inflator.err) {
