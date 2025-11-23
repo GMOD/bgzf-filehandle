@@ -2,6 +2,26 @@ import { Inflate, Z_SYNC_FLUSH } from 'pako-esm2'
 
 import { concatUint8Array } from './util.ts'
 
+function parseGzipHeader(data: Uint8Array) {
+  let offset = 10
+  const flags = data[3]!
+
+  if (flags & 0x04) {
+    const xlen = data[offset]! | (data[offset + 1]! << 8)
+    offset += 2 + xlen
+  }
+  if (flags & 0x08) {
+    while (data[offset++] !== 0) {}
+  }
+  if (flags & 0x10) {
+    while (data[offset++] !== 0) {}
+  }
+  if (flags & 0x02) {
+    offset += 2
+  }
+  return offset
+}
+
 // Type for the block cache
 export interface BlockCache {
   get(key: string): { buffer: Uint8Array; nextIn: number } | undefined
@@ -23,37 +43,31 @@ interface Chunk {
 // in a browser.
 export async function unzip(inputData: Uint8Array) {
   try {
-    let strm
     let pos = 0
     let inflator
     const blocks = [] as Uint8Array[]
     let totalLength = 0
     do {
       const remainingInput = inputData.subarray(pos)
+      const headerSize = parseGzipHeader(remainingInput)
+      const blockSize = (remainingInput[16]! | (remainingInput[17]! << 8)) + 1
+      const deflateData = remainingInput.subarray(headerSize, blockSize - 8)
+
       inflator = new Inflate({ raw: true })
-      ;({ strm } = inflator)
-      inflator.push(remainingInput, Z_SYNC_FLUSH)
+      inflator.push(deflateData, Z_SYNC_FLUSH)
       if (inflator.err) {
         throw new Error(inflator.msg)
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-      pos += strm!.next_in
+      pos += blockSize
       const result = inflator.result as Uint8Array
       blocks.push(result)
       totalLength += result.length
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-    } while (strm!.avail_in)
+    } while (pos < inputData.length)
 
     return concatUint8Array(blocks, totalLength)
   } catch (e) {
-    // return a slightly more informative error message
-    if (/incorrect header check/.exec(`${e}`)) {
-      throw new Error(
-        'problem decompressing block: incorrect gzip header check',
-      )
-    }
-    throw e
+    throw new Error(`problem decompressing block`, { cause: e })
   }
 }
 
@@ -67,7 +81,6 @@ export async function unzipChunkSlice(
   blockCache?: BlockCache,
 ) {
   try {
-    let strm
     const { minv, maxv } = chunk
     let cpos = minv.blockPosition
     let dpos = minv.dataPosition
@@ -76,7 +89,6 @@ export async function unzipChunkSlice(
     const dpositions = [] as number[]
 
     let i = 0
-    let wasFromCache = false
     let totalLength = 0
     do {
       const remainingInput = inputData.subarray(cpos - minv.blockPosition)
@@ -90,20 +102,20 @@ export async function unzipChunkSlice(
       if (cached) {
         buffer = cached.buffer
         nextIn = cached.nextIn
-        wasFromCache = true
       } else {
         // Not in cache, decompress and store
+        const headerSize = parseGzipHeader(remainingInput)
+        const blockSize = (remainingInput[16]! | (remainingInput[17]! << 8)) + 1
+        const deflateData = remainingInput.subarray(headerSize, blockSize - 8)
+
         const inflator = new Inflate({ raw: true })
-        ;({ strm } = inflator)
-        inflator.push(remainingInput, Z_SYNC_FLUSH)
+        inflator.push(deflateData, Z_SYNC_FLUSH)
         if (inflator.err) {
           throw new Error(inflator.msg)
         }
 
         buffer = inflator.result as Uint8Array
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-        nextIn = strm!.next_in
-        wasFromCache = false
+        nextIn = blockSize
 
         // Cache the decompressed block
         blockCache?.set(cacheKey, { buffer, nextIn })
@@ -141,12 +153,7 @@ export async function unzipChunkSlice(
       }
       totalLength += len
       i++
-    } while (
-      wasFromCache
-        ? cpos < inputData.length + minv.blockPosition
-        : // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-          strm!.avail_in
-    )
+    } while (cpos < inputData.length + minv.blockPosition)
 
     return {
       buffer: concatUint8Array(chunks, totalLength),
@@ -154,12 +161,6 @@ export async function unzipChunkSlice(
       dpositions,
     }
   } catch (e) {
-    // return a slightly more informative error message
-    if (/incorrect header check/.exec(`${e}`)) {
-      throw new Error(
-        'problem decompressing block: incorrect gzip header check',
-      )
-    }
-    throw e
+    throw new Error(`problem decompressing block`, { cause: e })
   }
 }

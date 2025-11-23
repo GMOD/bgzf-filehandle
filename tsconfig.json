@@ -1,7 +1,7 @@
 {
   "include": ["src"],
   "compilerOptions": {
-    "target": "es2020",
+    "target": "es2022",
     "types": ["node"],
     "outDir": "esm",
     "declaration": true,
