@@ -3,7 +3,7 @@
 exports[`can unzip bgzip-1.txt.gz 1`] = `
 [
   0,
-  22579,
+  101,
 ]
 `;
 
@@ -18,7 +18,7 @@ exports[`can unzip bgzip-1.txt.gz positive maxv.blockPosition 1`] = `
 [
   50,
   22579,
-  87646,
+  22680,
 ]
 `;
 
@@ -33,7 +33,7 @@ exports[`can unzip bgzip-1.txt.gz positive maxv.blockPosition 2`] = `
 exports[`can unzip bgzip-1.txt.gz positive minv.dataPosition 1`] = `
 [
   50,
-  22579,
+  101,
 ]
 `;
 

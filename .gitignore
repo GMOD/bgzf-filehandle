@@ -5,4 +5,5 @@ yarn-error.log
 coverage/
 test/data/extended/
 .eslintcache
+esm_*
 esm
