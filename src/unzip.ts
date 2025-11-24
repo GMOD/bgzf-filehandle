@@ -1,5 +1,7 @@
 import { Inflate, Z_SYNC_FLUSH } from 'pako-esm2'
 
+import { concatUint8Array } from './util.ts'
+
 function parseGzipHeader(data: Uint8Array) {
   let offset = 10
   const flags = data[3]!
@@ -118,45 +120,20 @@ export async function unzipChunkSlice(
     const { minv, maxv } = chunk
     let cpos = minv.blockPosition
     let dpos = minv.dataPosition
+    const chunks = [] as Uint8Array[]
     const cpositions = [] as number[]
     const dpositions = [] as number[]
 
-    const blocksToProcess = []
-    let estimatedLength = 0
-
+    let i = 0
+    let totalLength = 0
     while (cpos < inputData.length + minv.blockPosition) {
       const remainingInput = inputData.subarray(cpos - minv.blockPosition)
       const blockSize = (remainingInput[16]! | (remainingInput[17]! << 8)) + 1
-      const isize =
-        remainingInput[blockSize - 4]! |
-        (remainingInput[blockSize - 3]! << 8) |
-        (remainingInput[blockSize - 2]! << 16) |
-        (remainingInput[blockSize - 1]! << 24)
-
-      blocksToProcess.push({ cpos, blockSize, isize })
-      estimatedLength += isize
-
-      const origCpos = cpos
-      cpos += blockSize
-
-      if (origCpos >= maxv.blockPosition) {
-        break
-      }
-    }
-
-    const result = new Uint8Array(estimatedLength)
-    let writeOffset = 0
-    cpos = minv.blockPosition
-    dpos = minv.dataPosition
-
-    for (let i = 0; i < blocksToProcess.length; i++) {
-      const { cpos: blockCpos, blockSize } = blocksToProcess[i]!
-      const remainingInput = inputData.subarray(blockCpos - minv.blockPosition)
-      const cacheKey = blockCpos.toString()
+      const cacheKey = cpos.toString()
 
       let buffer: Uint8Array
-      const cached = blockCache?.get(cacheKey)
 
+      const cached = blockCache?.get(cacheKey)
       if (cached) {
         buffer = cached.buffer
       } else {
@@ -173,36 +150,38 @@ export async function unzipChunkSlice(
         blockCache?.set(cacheKey, { buffer, nextIn: blockSize })
       }
 
-      let sliceStart = 0
-      let sliceEnd = buffer.length
-
-      if (i === 0 && minv.dataPosition) {
-        sliceStart = minv.dataPosition
-      }
-
-      if (blockCpos >= maxv.blockPosition) {
-        sliceEnd =
-          maxv.blockPosition === minv.blockPosition
-            ? maxv.dataPosition - minv.dataPosition + 1
-            : maxv.dataPosition + 1
-      }
-
-      const slice = buffer.subarray(sliceStart, sliceEnd)
-      result.set(slice, writeOffset)
+      chunks.push(buffer)
+      let len = buffer.length
 
       cpositions.push(cpos)
       dpositions.push(dpos)
-
-      writeOffset += slice.length
+      if (chunks.length === 1 && minv.dataPosition) {
+        chunks[0] = chunks[0]!.subarray(minv.dataPosition)
+        len = chunks[0].length
+      }
+      const origCpos = cpos
       cpos += blockSize
-      dpos += buffer.length - sliceStart
+      dpos += len
+
+      if (origCpos >= maxv.blockPosition) {
+        chunks[i] = chunks[i]!.subarray(
+          0,
+          maxv.blockPosition === minv.blockPosition
+            ? maxv.dataPosition - minv.dataPosition + 1
+            : maxv.dataPosition + 1,
+        )
+        totalLength += chunks[i]!.length
+
+        cpositions.push(cpos)
+        dpositions.push(dpos)
+        break
+      }
+      totalLength += len
+      i++
     }
 
-    cpositions.push(cpos)
-    dpositions.push(dpos)
-
     return {
-      buffer: result.subarray(0, writeOffset),
+      buffer: concatUint8Array(chunks, totalLength),
       cpositions,
       dpositions,
     }
