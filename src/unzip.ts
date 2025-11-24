@@ -1,7 +1,5 @@
 import { Inflate, Z_SYNC_FLUSH } from 'pako-esm2'
 
-import { concatUint8Array } from './util.ts'
-
 function parseGzipHeader(data: Uint8Array) {
   let offset = 10
   const flags = data[3]!
@@ -118,17 +116,56 @@ export async function unzipChunkSlice(
 ) {
   try {
     const { minv, maxv } = chunk
-    let cpos = minv.blockPosition
-    let dpos = minv.dataPosition
-    const chunks = [] as Uint8Array[]
-    const cpositions = [] as number[]
-    const dpositions = [] as number[]
 
-    let i = 0
+    // First pass: calculate total size and collect block metadata
+    const blockInfos: { cpos: number; blockSize: number; isize: number }[] = []
+    let cpos = minv.blockPosition
     let totalLength = 0
+
     while (cpos < inputData.length + minv.blockPosition) {
       const remainingInput = inputData.subarray(cpos - minv.blockPosition)
       const blockSize = (remainingInput[16]! | (remainingInput[17]! << 8)) + 1
+      const isize =
+        remainingInput[blockSize - 4]! |
+        (remainingInput[blockSize - 3]! << 8) |
+        (remainingInput[blockSize - 2]! << 16) |
+        (remainingInput[blockSize - 1]! << 24)
+
+      const isFirstBlock = blockInfos.length === 0
+      const isLastBlock = cpos >= maxv.blockPosition
+
+      let effectiveSize = isize
+      if (isFirstBlock && minv.dataPosition) {
+        effectiveSize -= minv.dataPosition
+      }
+      if (isLastBlock) {
+        effectiveSize =
+          cpos === minv.blockPosition
+            ? maxv.dataPosition - minv.dataPosition + 1
+            : maxv.dataPosition + 1 - (isFirstBlock ? minv.dataPosition : 0)
+      }
+
+      blockInfos.push({ cpos, blockSize, isize })
+      totalLength += effectiveSize
+
+      if (isLastBlock) {
+        break
+      }
+      cpos += blockSize
+    }
+
+    // Pre-allocate result buffer
+    const result = new Uint8Array(totalLength)
+    const cpositions: number[] = []
+    const dpositions: number[] = []
+
+    // Second pass: decompress and copy directly into result
+    let dpos = minv.dataPosition
+    let resultOffset = 0
+
+    for (let i = 0; i < blockInfos.length; i++) {
+      const { cpos, blockSize } = blockInfos[i]!
+      const remainingInput = inputData.subarray(cpos - minv.blockPosition)
       const cacheKey = cpos.toString()
 
       let buffer: Uint8Array
@@ -150,38 +187,40 @@ export async function unzipChunkSlice(
         blockCache?.set(cacheKey, { buffer, nextIn: blockSize })
       }
 
-      chunks.push(buffer)
-      let len = buffer.length
-
       cpositions.push(cpos)
       dpositions.push(dpos)
-      if (chunks.length === 1 && minv.dataPosition) {
-        chunks[0] = chunks[0]!.subarray(minv.dataPosition)
-        len = chunks[0].length
-      }
-      const origCpos = cpos
-      cpos += blockSize
-      dpos += len
 
-      if (origCpos >= maxv.blockPosition) {
-        chunks[i] = chunks[i]!.subarray(
-          0,
-          maxv.blockPosition === minv.blockPosition
-            ? maxv.dataPosition - minv.dataPosition + 1
-            : maxv.dataPosition + 1,
-        )
-        totalLength += chunks[i]!.length
+      const isFirstBlock = i === 0
+      const isLastBlock = cpos >= maxv.blockPosition
 
-        cpositions.push(cpos)
-        dpositions.push(dpos)
-        break
+      let startOffset = 0
+      let endOffset = buffer.length
+
+      if (isFirstBlock && minv.dataPosition) {
+        startOffset = minv.dataPosition
       }
-      totalLength += len
-      i++
+      if (isLastBlock) {
+        endOffset =
+          cpos === minv.blockPosition
+            ? maxv.dataPosition + 1
+            : maxv.dataPosition + 1
+      }
+
+      const slice = buffer.subarray(startOffset, endOffset)
+      result.set(slice, resultOffset)
+      resultOffset += slice.length
+      dpos += endOffset - startOffset
+    }
+
+    // Add final position entries
+    if (blockInfos.length > 0) {
+      const lastInfo = blockInfos[blockInfos.length - 1]!
+      cpositions.push(lastInfo.cpos + lastInfo.blockSize)
+      dpositions.push(dpos)
     }
 
     return {
-      buffer: concatUint8Array(chunks, totalLength),
+      buffer: result,
       cpositions,
       dpositions,
     }
