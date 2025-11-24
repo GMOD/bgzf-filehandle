@@ -1,7 +1,5 @@
 import { Inflate, Z_SYNC_FLUSH } from 'pako-esm2'
 
-import { concatUint8Array } from './util.ts'
-
 function parseGzipHeader(data: Uint8Array) {
   let offset = 10
   const flags = data[3]!
@@ -63,6 +61,12 @@ export async function unzip(inputData: Uint8Array) {
       blockInfo.push({ pos, blockSize, isize })
       totalLength += isize
       pos += blockSize
+    }
+
+    if (blockInfo.length === 0 && inputData.length > 0) {
+      throw new Error(
+        `No valid BGZF blocks found in ${inputData.length} bytes of data`,
+      )
     }
 
     const result = new Uint8Array(totalLength)
