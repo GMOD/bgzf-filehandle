@@ -17,10 +17,9 @@ interface Chunk {
   maxv: VirtualOffset
 }
 
-// browserify-zlib, which is the zlib shim used by default in webpacked code,
-// does not properly uncompress bgzf chunks that contain more than one bgzf
-// block, so export an unzip function that uses @progress/pako-esm2 directly if we are running
-// in a browser.
+// browserify-zlib and pako do not properly uncompress bgzf chunks that contain
+// more than one bgzip block. bgzip is a type of 'multi-member' gzip file type.
+// we make a custom unzip function to handle the bgzip blocks
 export async function unzip(inputData: Uint8Array) {
   try {
     let strm
