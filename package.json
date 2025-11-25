@@ -25,6 +25,8 @@
   "scripts": {
     "test": "vitest",
     "lint": "eslint --report-unused-disable-directives --max-warnings 0",
+    "benchonly": "vitest bench",
+    "bench": "./scripts/build-both-branches.sh \"$BRANCH1\" \"$BRANCH2\" && vitest bench",
     "clean": "rimraf dist esm",
     "prebuild": "yarn clean",
     "format": "prettier --write .",
@@ -41,7 +43,8 @@
   ],
   "dependencies": {
     "fflate": "^0.8.2",
-    "generic-filehandle2": "^2.0.5"
+    "generic-filehandle2": "^2.0.5",
+    "pako-esm2": "^1.0.15"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",

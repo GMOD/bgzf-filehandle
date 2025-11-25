@@ -22,7 +22,7 @@ function parseBgzfBlockSize(data: Uint8Array) {
     throw new Error('Not a gzip file')
   }
 
-  const flags = data[3]
+  const flags = data[3]!
   let pos = 10
 
   if (flags & 0x04) {
