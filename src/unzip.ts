@@ -55,7 +55,13 @@ export async function unzip(inputData: Uint8Array) {
 
     while (pos < inputData.length) {
       const remainingInput = inputData.subarray(pos)
+      if (remainingInput.length < 18) {
+        break
+      }
       const blockSize = parseBgzfBlockSize(remainingInput)
+      if (blockSize > remainingInput.length) {
+        break
+      }
       const block = remainingInput.subarray(0, blockSize)
       const result = gunzipSync(block)
       blocks.push(result)
