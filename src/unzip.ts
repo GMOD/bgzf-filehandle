@@ -1,4 +1,4 @@
-import { Inflate, Z_SYNC_FLUSH } from 'pako-esm2'
+import { gunzipSync } from 'fflate'
 
 import { concatUint8Array } from './util.ts'
 
@@ -17,38 +17,55 @@ interface Chunk {
   maxv: VirtualOffset
 }
 
+function parseBgzfBlockSize(data: Uint8Array) {
+  if (data[0] !== 0x1f || data[1] !== 0x8b) {
+    throw new Error('Not a gzip file')
+  }
+
+  const flags = data[3]
+  let pos = 10
+
+  if (flags & 0x04) {
+    const xlen = data[pos]! | (data[pos + 1]! << 8)
+    pos += 2
+    const extraEnd = pos + xlen
+    while (pos < extraEnd) {
+      const si1 = data[pos]
+      const si2 = data[pos + 1]
+      const slen = data[pos + 2]! | (data[pos + 3]! << 8)
+      if (si1 === 66 && si2 === 67 && slen === 2) {
+        const bsize = data[pos + 4]! | (data[pos + 5]! << 8)
+        return bsize + 1
+      }
+      pos += 4 + slen
+    }
+  }
+  throw new Error('Not a BGZF block: missing BSIZE in extra field')
+}
+
 // browserify-zlib, which is the zlib shim used by default in webpacked code,
 // does not properly uncompress bgzf chunks that contain more than one bgzf
-// block, so export an unzip function that uses @progress/pako-esm2 directly if we are running
+// block, so export an unzip function that uses fflate directly if we are running
 // in a browser.
 export async function unzip(inputData: Uint8Array) {
   try {
-    let strm
     let pos = 0
-    let inflator
     const blocks = [] as Uint8Array[]
     let totalLength = 0
-    do {
-      const remainingInput = inputData.subarray(pos)
-      inflator = new Inflate(undefined)
-      ;({ strm } = inflator)
-      inflator.push(remainingInput, Z_SYNC_FLUSH)
-      if (inflator.err) {
-        throw new Error(inflator.msg)
-      }
 
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-      pos += strm!.next_in
-      const result = inflator.result as Uint8Array
+    while (pos < inputData.length) {
+      const remainingInput = inputData.subarray(pos)
+      const blockSize = parseBgzfBlockSize(remainingInput)
+      const block = remainingInput.subarray(0, blockSize)
+      const result = gunzipSync(block)
       blocks.push(result)
       totalLength += result.length
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-    } while (strm!.avail_in)
+      pos += blockSize
+    }
 
     return concatUint8Array(blocks, totalLength)
   } catch (e) {
-    // return a slightly more informative error message
-    if (/incorrect header check/.exec(`${e}`)) {
+    if (/Not a gzip file/.exec(`${e}`)) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
       )
@@ -67,7 +84,6 @@ export async function unzipChunkSlice(
   blockCache?: BlockCache,
 ) {
   try {
-    let strm
     const { minv, maxv } = chunk
     let cpos = minv.blockPosition
     let dpos = minv.dataPosition
@@ -76,36 +92,23 @@ export async function unzipChunkSlice(
     const dpositions = [] as number[]
 
     let i = 0
-    let wasFromCache = false
     let totalLength = 0
-    do {
+
+    while (cpos < inputData.length + minv.blockPosition) {
       const remainingInput = inputData.subarray(cpos - minv.blockPosition)
       const cacheKey = cpos.toString()
 
       let buffer: Uint8Array
       let nextIn: number
 
-      // Check cache first
       const cached = blockCache?.get(cacheKey)
       if (cached) {
         buffer = cached.buffer
         nextIn = cached.nextIn
-        wasFromCache = true
       } else {
-        // Not in cache, decompress and store
-        const inflator = new Inflate(undefined)
-        ;({ strm } = inflator)
-        inflator.push(remainingInput, Z_SYNC_FLUSH)
-        if (inflator.err) {
-          throw new Error(inflator.msg)
-        }
-
-        buffer = inflator.result as Uint8Array
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-        nextIn = strm!.next_in
-        wasFromCache = false
-
-        // Cache the decompressed block
+        nextIn = parseBgzfBlockSize(remainingInput)
+        const block = remainingInput.subarray(0, nextIn)
+        buffer = gunzipSync(block)
         blockCache?.set(cacheKey, { buffer, nextIn })
       }
 
@@ -115,7 +118,6 @@ export async function unzipChunkSlice(
       cpositions.push(cpos)
       dpositions.push(dpos)
       if (chunks.length === 1 && minv.dataPosition) {
-        // this is the first chunk, trim it
         chunks[0] = chunks[0]!.subarray(minv.dataPosition)
         len = chunks[0].length
       }
@@ -124,9 +126,6 @@ export async function unzipChunkSlice(
       dpos += len
 
       if (origCpos >= maxv.blockPosition) {
-        // this is the last chunk, trim it and stop decompressing. note if it is
-        // the same block is minv it subtracts that already trimmed part of the
-        // slice length
         chunks[i] = chunks[i]!.subarray(
           0,
           maxv.blockPosition === minv.blockPosition
@@ -141,12 +140,7 @@ export async function unzipChunkSlice(
       }
       totalLength += len
       i++
-    } while (
-      wasFromCache
-        ? cpos < inputData.length + minv.blockPosition
-        : // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-          strm!.avail_in
-    )
+    }
 
     return {
       buffer: concatUint8Array(chunks, totalLength),
@@ -154,8 +148,7 @@ export async function unzipChunkSlice(
       dpositions,
     }
   } catch (e) {
-    // return a slightly more informative error message
-    if (/incorrect header check/.exec(`${e}`)) {
+    if (/Not a gzip file/.exec(`${e}`)) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
       )
