@@ -1,4 +1,4 @@
-import { MultiMemberGzip } from 'pako-esm2'
+import { decompressBlock, decompressAll } from './wasm/index.ts'
 
 import { concatUint8Array } from './util.ts'
 
@@ -17,15 +17,12 @@ interface Chunk {
   maxv: VirtualOffset
 }
 
-// Reusable decompressor instance
-const decompressor = new MultiMemberGzip()
-
 // browserify-zlib and pako do not properly uncompress bgzf chunks that contain
 // more than one bgzip block. bgzip is a type of 'multi-member' gzip file type.
 // we make a custom unzip function to handle the bgzip blocks
 export async function unzip(inputData: Uint8Array) {
   try {
-    return decompressor.decompressAll(inputData)
+    return await decompressAll(inputData)
   } catch (e) {
     // return a slightly more informative error message
     if (/incorrect header check/.exec(`${e}`)) {
@@ -72,12 +69,11 @@ export async function unzipChunkSlice(
         bytesRead = cached.bytesRead
         hasMore = cpos + bytesRead < inputData.length + minv.blockPosition
       } else {
-        // Not in cache, decompress
-        // @ts-expect-error
-        const result = decompressor.decompressBlock(remainingInput)
+        // Not in cache, decompress using WASM
+        const result = await decompressBlock(remainingInput)
         buffer = result.data
         bytesRead = result.bytesRead
-        hasMore = result.hasMore
+        hasMore = bytesRead > 0 && cpos + bytesRead < inputData.length + minv.blockPosition
 
         // Cache the decompressed block
         blockCache?.set(cacheKey, { buffer, bytesRead })
