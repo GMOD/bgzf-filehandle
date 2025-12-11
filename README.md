@@ -8,6 +8,8 @@ as those created by bgzip, using coordinates from the uncompressed file. The
 module is used in @gmod/indexedfasta to read bgzip-indexed fasta files (with gzi
 index, fai index, and fa).
 
+From v7, we use WASM to decompress
+
 Users can also use the `unzip` function to unzip bgzip files whole (which pako
 has trouble with natively)
 
