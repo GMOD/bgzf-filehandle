@@ -2,59 +2,49 @@ use libdeflater::Decompressor;
 use std::cell::RefCell;
 use wasm_bindgen::prelude::*;
 
-const BGZF_MAX_UNCOMPRESSED: usize = 65536;
-
 thread_local! {
     static DECOMPRESSOR: RefCell<Decompressor> = RefCell::new(Decompressor::new());
-    // Reusable output buffer to avoid repeated allocations
-    static OUTPUT_BUF: RefCell<Vec<u8>> = RefCell::new(vec![0u8; BGZF_MAX_UNCOMPRESSED]);
 }
 
-#[inline(always)]
-fn parse_bgzf_header(input: &[u8]) -> Option<(usize, usize)> {
-    // BGZF has a fixed header structure - optimize for it
+fn parse_bgzf_header(input: &[u8]) -> Result<(usize, usize), &'static str> {
     // Minimum BGZF block: 18 header + 8 trailer = 26 bytes
     if input.len() < 26 {
-        return None;
+        return Err("input too short");
     }
 
     // Check: magic (1f 8b), method (08), flags (04 = FEXTRA)
     if input[0] != 0x1f || input[1] != 0x8b || input[2] != 8 || input[3] != 4 {
-        return None;
+        return Err("invalid bgzf header");
     }
 
-    // BGZF always has XLEN=6, SI1='B', SI2='C', SLEN=2 at fixed positions
-    // pos 10-11: XLEN (should be 6)
-    // pos 12: SI1 ('B')
-    // pos 13: SI2 ('C')
-    // pos 14-15: SLEN (should be 2)
-    // pos 16-17: BSIZE
-    if input[10] != 6 || input[11] != 0
-        || input[12] != b'B' || input[13] != b'C'
-        || input[14] != 2 || input[15] != 0
+    // BGZF has XLEN=6, SI1='B', SI2='C', SLEN=2 at fixed positions
+    if input[10] != 6
+        || input[11] != 0
+        || input[12] != b'B'
+        || input[13] != b'C'
+        || input[14] != 2
+        || input[15] != 0
     {
-        return None;
+        return Err("invalid bgzf header");
     }
 
     let bsize = u16::from_le_bytes([input[16], input[17]]) as usize + 1;
 
     if input.len() < bsize || bsize < 26 {
-        return None;
+        return Err("invalid block size");
     }
 
     // Header is always 18 bytes for standard BGZF
-    Some((18, bsize))
+    Ok((18, bsize))
 }
 
-#[inline(always)]
 fn decompress_bgzf_block(input: &[u8]) -> Result<(Vec<u8>, usize), &'static str> {
     if input.is_empty() {
         return Ok((Vec::new(), 0));
     }
 
-    let (header_size, block_size) = parse_bgzf_header(input).ok_or("invalid bgzf header")?;
+    let (header_size, block_size) = parse_bgzf_header(input)?;
 
-    // Read ISIZE from trailer (last 4 bytes of block)
     let trailer_pos = block_size - 8;
     let isize = u32::from_le_bytes([
         input[trailer_pos + 4],
@@ -65,19 +55,8 @@ fn decompress_bgzf_block(input: &[u8]) -> Result<(Vec<u8>, usize), &'static str>
 
     let deflate_data = &input[header_size..trailer_pos];
 
-    // Use thread-local buffer when possible to avoid allocation
-    let data = if isize <= BGZF_MAX_UNCOMPRESSED {
-        OUTPUT_BUF.with(|buf| {
-            DECOMPRESSOR.with(|d| {
-                let mut decompressor = d.borrow_mut();
-                let mut output = buf.borrow_mut();
-                decompressor
-                    .deflate_decompress(deflate_data, &mut output[..isize])
-                    .map(|actual_size| output[..actual_size].to_vec())
-            })
-        })
-    } else {
-        DECOMPRESSOR.with(|d| {
+    let data = DECOMPRESSOR
+        .with(|d| {
             let mut decompressor = d.borrow_mut();
             let mut output = vec![0u8; isize];
             decompressor
@@ -87,8 +66,7 @@ fn decompress_bgzf_block(input: &[u8]) -> Result<(Vec<u8>, usize), &'static str>
                     output
                 })
         })
-    }
-    .map_err(|_| "decompression failed")?;
+        .map_err(|_| "decompression failed")?;
 
     Ok((data, block_size))
 }
@@ -102,8 +80,8 @@ pub struct DecompressResult {
 #[wasm_bindgen]
 impl DecompressResult {
     #[wasm_bindgen(getter)]
-    pub fn data(&self) -> js_sys::Uint8Array {
-        js_sys::Uint8Array::from(&self.data[..])
+    pub fn data(&self) -> Vec<u8> {
+        self.data.clone()
     }
 
     #[wasm_bindgen(getter)]
@@ -119,7 +97,7 @@ pub fn decompress_block(input: &[u8]) -> Result<DecompressResult, JsError> {
 }
 
 #[wasm_bindgen]
-pub fn decompress_all(input: &[u8]) -> Result<js_sys::Uint8Array, JsError> {
+pub fn decompress_all(input: &[u8]) -> Result<Vec<u8>, JsError> {
     let mut output = Vec::with_capacity(input.len() * 4);
     let mut offset = 0;
 
@@ -134,7 +112,7 @@ pub fn decompress_all(input: &[u8]) -> Result<js_sys::Uint8Array, JsError> {
         offset += bytes_read;
     }
 
-    Ok(js_sys::Uint8Array::from(&output[..]))
+    Ok(output)
 }
 
 #[wasm_bindgen]
@@ -147,18 +125,18 @@ pub struct ChunkSliceResult {
 #[wasm_bindgen]
 impl ChunkSliceResult {
     #[wasm_bindgen(getter)]
-    pub fn buffer(&self) -> js_sys::Uint8Array {
-        js_sys::Uint8Array::from(&self.buffer[..])
+    pub fn buffer(&self) -> Vec<u8> {
+        self.buffer.clone()
     }
 
     #[wasm_bindgen(getter)]
-    pub fn cpositions(&self) -> js_sys::Uint32Array {
-        js_sys::Uint32Array::from(&self.cpositions[..])
+    pub fn cpositions(&self) -> Vec<u32> {
+        self.cpositions.clone()
     }
 
     #[wasm_bindgen(getter)]
-    pub fn dpositions(&self) -> js_sys::Uint32Array {
-        js_sys::Uint32Array::from(&self.dpositions[..])
+    pub fn dpositions(&self) -> Vec<u32> {
+        self.dpositions.clone()
     }
 }
 
@@ -175,7 +153,6 @@ pub fn decompress_chunk_slice(
     let max_block_pos = max_block_position as usize;
     let max_data_pos = max_data_position as usize;
 
-    // Pre-allocate with reasonable capacity
     let mut cpositions: Vec<u32> = Vec::with_capacity(16);
     let mut dpositions: Vec<u32> = Vec::with_capacity(16);
     let mut buffer = Vec::with_capacity(input.len() * 4);
