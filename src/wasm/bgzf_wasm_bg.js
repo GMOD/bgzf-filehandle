@@ -3,6 +3,11 @@ export function __wbg_set_wasm(val) {
     wasm = val;
 }
 
+function getArrayU32FromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return getUint32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
+}
+
 function getArrayU8FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return getUint8ArrayMemory0().subarray(ptr / 1, ptr / 1 + len);
@@ -11,6 +16,14 @@ function getArrayU8FromWasm0(ptr, len) {
 function getStringFromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return decodeText(ptr, len);
+}
+
+let cachedUint32ArrayMemory0 = null;
+function getUint32ArrayMemory0() {
+    if (cachedUint32ArrayMemory0 === null || cachedUint32ArrayMemory0.byteLength === 0) {
+        cachedUint32ArrayMemory0 = new Uint32Array(wasm.memory.buffer);
+    }
+    return cachedUint32ArrayMemory0;
 }
 
 let cachedUint8ArrayMemory0 = null;
@@ -50,97 +63,55 @@ function decodeText(ptr, len) {
 
 let WASM_VECTOR_LEN = 0;
 
-const BlockInfoFinalization = (typeof FinalizationRegistry === 'undefined')
+const ChunkSliceResultFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_blockinfo_free(ptr >>> 0, 1));
-
-const BlockResultsFinalization = (typeof FinalizationRegistry === 'undefined')
-    ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_blockresults_free(ptr >>> 0, 1));
+    : new FinalizationRegistry(ptr => wasm.__wbg_chunksliceresult_free(ptr >>> 0, 1));
 
 const DecompressResultFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_decompressresult_free(ptr >>> 0, 1));
 
-export class BlockInfo {
+export class ChunkSliceResult {
     static __wrap(ptr) {
         ptr = ptr >>> 0;
-        const obj = Object.create(BlockInfo.prototype);
+        const obj = Object.create(ChunkSliceResult.prototype);
         obj.__wbg_ptr = ptr;
-        BlockInfoFinalization.register(obj, obj.__wbg_ptr, obj);
+        ChunkSliceResultFinalization.register(obj, obj.__wbg_ptr, obj);
         return obj;
     }
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
         this.__wbg_ptr = 0;
-        BlockInfoFinalization.unregister(this);
+        ChunkSliceResultFinalization.unregister(this);
         return ptr;
     }
     free() {
         const ptr = this.__destroy_into_raw();
-        wasm.__wbg_blockinfo_free(ptr, 0);
+        wasm.__wbg_chunksliceresult_free(ptr, 0);
     }
     /**
-     * @returns {number}
+     * @returns {Uint32Array}
      */
-    get compressed_size() {
-        const ret = wasm.blockinfo_compressed_size(this.__wbg_ptr);
-        return ret >>> 0;
+    get cpositions() {
+        const ret = wasm.chunksliceresult_cpositions(this.__wbg_ptr);
+        return ret;
     }
     /**
-     * @returns {number}
+     * @returns {Uint32Array}
      */
-    get compressed_offset() {
-        const ret = wasm.blockinfo_compressed_offset(this.__wbg_ptr);
-        return ret >>> 0;
+    get dpositions() {
+        const ret = wasm.chunksliceresult_dpositions(this.__wbg_ptr);
+        return ret;
     }
     /**
      * @returns {Uint8Array}
      */
-    get data() {
-        const ret = wasm.blockinfo_data(this.__wbg_ptr);
-        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-        return v1;
+    get buffer() {
+        const ret = wasm.chunksliceresult_buffer(this.__wbg_ptr);
+        return ret;
     }
 }
-if (Symbol.dispose) BlockInfo.prototype[Symbol.dispose] = BlockInfo.prototype.free;
-
-export class BlockResults {
-    static __wrap(ptr) {
-        ptr = ptr >>> 0;
-        const obj = Object.create(BlockResults.prototype);
-        obj.__wbg_ptr = ptr;
-        BlockResultsFinalization.register(obj, obj.__wbg_ptr, obj);
-        return obj;
-    }
-    __destroy_into_raw() {
-        const ptr = this.__wbg_ptr;
-        this.__wbg_ptr = 0;
-        BlockResultsFinalization.unregister(this);
-        return ptr;
-    }
-    free() {
-        const ptr = this.__destroy_into_raw();
-        wasm.__wbg_blockresults_free(ptr, 0);
-    }
-    /**
-     * @param {number} index
-     * @returns {BlockInfo | undefined}
-     */
-    get(index) {
-        const ret = wasm.blockresults_get(this.__wbg_ptr, index);
-        return ret === 0 ? undefined : BlockInfo.__wrap(ret);
-    }
-    /**
-     * @returns {number}
-     */
-    get length() {
-        const ret = wasm.blockresults_length(this.__wbg_ptr);
-        return ret >>> 0;
-    }
-}
-if (Symbol.dispose) BlockResults.prototype[Symbol.dispose] = BlockResults.prototype.free;
+if (Symbol.dispose) ChunkSliceResult.prototype[Symbol.dispose] = ChunkSliceResult.prototype.free;
 
 export class DecompressResult {
     static __wrap(ptr) {
@@ -164,7 +135,7 @@ export class DecompressResult {
      * @returns {number}
      */
     get bytes_read() {
-        const ret = wasm.blockinfo_compressed_offset(this.__wbg_ptr);
+        const ret = wasm.decompressresult_bytes_read(this.__wbg_ptr);
         return ret >>> 0;
     }
     /**
@@ -172,9 +143,7 @@ export class DecompressResult {
      */
     get data() {
         const ret = wasm.decompressresult_data(this.__wbg_ptr);
-        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-        return v1;
+        return ret;
     }
 }
 if (Symbol.dispose) DecompressResult.prototype[Symbol.dispose] = DecompressResult.prototype.free;
@@ -187,26 +156,10 @@ export function decompress_all(input) {
     const ptr0 = passArray8ToWasm0(input, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
     const ret = wasm.decompress_all(ptr0, len0);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
-}
-
-/**
- * @param {Uint8Array} input
- * @returns {BlockResults}
- */
-export function decompress_all_blocks(input) {
-    const ptr0 = passArray8ToWasm0(input, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.decompress_all_blocks(ptr0, len0);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
-    return BlockResults.__wrap(ret[0]);
+    return takeFromExternrefTable0(ret[0]);
 }
 
 /**
@@ -223,6 +176,24 @@ export function decompress_block(input) {
     return DecompressResult.__wrap(ret[0]);
 }
 
+/**
+ * @param {Uint8Array} input
+ * @param {number} min_block_position
+ * @param {number} min_data_position
+ * @param {number} max_block_position
+ * @param {number} max_data_position
+ * @returns {ChunkSliceResult}
+ */
+export function decompress_chunk_slice(input, min_block_position, min_data_position, max_block_position, max_data_position) {
+    const ptr0 = passArray8ToWasm0(input, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.decompress_chunk_slice(ptr0, len0, min_block_position, min_data_position, max_block_position, max_data_position);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return ChunkSliceResult.__wrap(ret[0]);
+}
+
 export function __wbg_Error_52673b7de5a0ca89(arg0, arg1) {
     const ret = Error(getStringFromWasm0(arg0, arg1));
     return ret;
@@ -230,6 +201,16 @@ export function __wbg_Error_52673b7de5a0ca89(arg0, arg1) {
 
 export function __wbg___wbindgen_throw_dd24417ed36fc46e(arg0, arg1) {
     throw new Error(getStringFromWasm0(arg0, arg1));
+};
+
+export function __wbg_new_from_slice_db0691b69e9d3891(arg0, arg1) {
+    const ret = new Uint32Array(getArrayU32FromWasm0(arg0, arg1));
+    return ret;
+};
+
+export function __wbg_new_from_slice_f9c22b9153b26992(arg0, arg1) {
+    const ret = new Uint8Array(getArrayU8FromWasm0(arg0, arg1));
+    return ret;
 };
 
 export function __wbindgen_init_externref_table() {

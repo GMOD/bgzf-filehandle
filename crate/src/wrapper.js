@@ -40,3 +40,25 @@ export async function decompressAll(input) {
     await init();
     return bg.decompress_all(input);
 }
+
+export async function decompressChunkSlice(
+    input,
+    minBlockPosition,
+    minDataPosition,
+    maxBlockPosition,
+    maxDataPosition
+) {
+    await init();
+    const result = bg.decompress_chunk_slice(
+        input,
+        minBlockPosition,
+        minDataPosition,
+        maxBlockPosition,
+        maxDataPosition
+    );
+    const buffer = result.buffer;
+    const cpositions = [...result.cpositions];
+    const dpositions = [...result.dpositions];
+    result.free();
+    return { buffer, cpositions, dpositions };
+}

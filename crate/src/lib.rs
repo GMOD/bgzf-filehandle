@@ -2,7 +2,6 @@ use libdeflater::Decompressor;
 use std::cell::RefCell;
 use wasm_bindgen::prelude::*;
 
-// Reuse decompressor to avoid allocation overhead on each call
 thread_local! {
     static DECOMPRESSOR: RefCell<Decompressor> = RefCell::new(Decompressor::new());
 }
@@ -17,7 +16,6 @@ fn parse_gzip_header(input: &[u8]) -> Result<GzipHeader, &'static str> {
         return Err("input too short for gzip header");
     }
 
-    // Check magic bytes and compression method in one go
     if input[0] != 0x1f || input[1] != 0x8b || input[2] != 8 {
         return Err("invalid gzip header");
     }
@@ -25,7 +23,6 @@ fn parse_gzip_header(input: &[u8]) -> Result<GzipHeader, &'static str> {
     let flags = input[3];
     let mut pos = 10;
 
-    // FEXTRA - this is where BGZF stores the block size
     let mut bsize = None;
     if flags & 0x04 != 0 {
         let xlen = u16::from_le_bytes([input[pos], input[pos + 1]]) as usize;
@@ -36,15 +33,17 @@ fn parse_gzip_header(input: &[u8]) -> Result<GzipHeader, &'static str> {
             return Err("truncated extra field");
         }
 
-        // Fast path: BGZF always has BC subfield at fixed position
-        // SI1='B'(0x42), SI2='C'(0x43), SLEN=2
-        if xlen >= 6 && input[pos] == b'B' && input[pos + 1] == b'C' && input[pos + 2] == 2 && input[pos + 3] == 0 {
+        if xlen >= 6
+            && input[pos] == b'B'
+            && input[pos + 1] == b'C'
+            && input[pos + 2] == 2
+            && input[pos + 3] == 0
+        {
             bsize = Some(u16::from_le_bytes([input[pos + 4], input[pos + 5]]));
         }
         pos = extra_end;
     }
 
-    // FNAME - null terminated string
     if flags & 0x08 != 0 {
         while pos < input.len() && input[pos] != 0 {
             pos += 1;
@@ -52,7 +51,6 @@ fn parse_gzip_header(input: &[u8]) -> Result<GzipHeader, &'static str> {
         pos += 1;
     }
 
-    // FCOMMENT - null terminated string
     if flags & 0x10 != 0 {
         while pos < input.len() && input[pos] != 0 {
             pos += 1;
@@ -60,7 +58,6 @@ fn parse_gzip_header(input: &[u8]) -> Result<GzipHeader, &'static str> {
         pos += 1;
     }
 
-    // FHCRC
     if flags & 0x02 != 0 {
         pos += 2;
     }
@@ -95,7 +92,6 @@ fn decompress_block_internal(input: &[u8]) -> Result<InternalDecompressResult, &
         return Err("invalid block size");
     }
 
-    // Read ISIZE from trailer (last 4 bytes) - skip CRC32
     let trailer_pos = block_size - 8;
     let isize = u32::from_le_bytes([
         input[trailer_pos + 4],
@@ -106,17 +102,18 @@ fn decompress_block_internal(input: &[u8]) -> Result<InternalDecompressResult, &
 
     let deflate_data = &input[header.header_size..trailer_pos];
 
-    // Use thread-local decompressor to avoid allocation
-    let data = DECOMPRESSOR.with(|d| {
-        let mut decompressor = d.borrow_mut();
-        let mut output = vec![0u8; isize];
-        decompressor
-            .deflate_decompress(deflate_data, &mut output)
-            .map(|actual_size| {
-                output.truncate(actual_size);
-                output
-            })
-    }).map_err(|_| "decompression failed")?;
+    let data = DECOMPRESSOR
+        .with(|d| {
+            let mut decompressor = d.borrow_mut();
+            let mut output = vec![0u8; isize];
+            decompressor
+                .deflate_decompress(deflate_data, &mut output)
+                .map(|actual_size| {
+                    output.truncate(actual_size);
+                    output
+                })
+        })
+        .map_err(|_| "decompression failed")?;
 
     Ok(InternalDecompressResult {
         data,
@@ -133,8 +130,8 @@ pub struct DecompressResult {
 #[wasm_bindgen]
 impl DecompressResult {
     #[wasm_bindgen(getter)]
-    pub fn data(&self) -> Vec<u8> {
-        std::mem::take(&mut self.data.clone())
+    pub fn data(&self) -> js_sys::Uint8Array {
+        js_sys::Uint8Array::from(&self.data[..])
     }
 
     #[wasm_bindgen(getter)]
@@ -153,8 +150,7 @@ pub fn decompress_block(input: &[u8]) -> Result<DecompressResult, JsError> {
 }
 
 #[wasm_bindgen]
-pub fn decompress_all(input: &[u8]) -> Result<Vec<u8>, JsError> {
-    // Pre-allocate with estimate (typical BGZF compression ratio ~3-4x)
+pub fn decompress_all(input: &[u8]) -> Result<js_sys::Uint8Array, JsError> {
     let mut output = Vec::with_capacity(input.len() * 4);
     let mut offset = 0;
 
@@ -169,75 +165,104 @@ pub fn decompress_all(input: &[u8]) -> Result<Vec<u8>, JsError> {
         offset += result.bytes_read;
     }
 
-    Ok(output)
+    Ok(js_sys::Uint8Array::from(&output[..]))
 }
 
 #[wasm_bindgen]
-pub struct BlockInfo {
-    data: Vec<u8>,
-    compressed_offset: usize,
-    compressed_size: usize,
+pub struct ChunkSliceResult {
+    buffer: Vec<u8>,
+    cpositions: Vec<u32>,
+    dpositions: Vec<u32>,
 }
 
 #[wasm_bindgen]
-impl BlockInfo {
+impl ChunkSliceResult {
     #[wasm_bindgen(getter)]
-    pub fn data(&self) -> Vec<u8> {
-        self.data.clone()
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn compressed_offset(&self) -> usize {
-        self.compressed_offset
+    pub fn buffer(&self) -> js_sys::Uint8Array {
+        js_sys::Uint8Array::from(&self.buffer[..])
     }
 
     #[wasm_bindgen(getter)]
-    pub fn compressed_size(&self) -> usize {
-        self.compressed_size
+    pub fn cpositions(&self) -> js_sys::Uint32Array {
+        js_sys::Uint32Array::from(&self.cpositions[..])
     }
-}
 
-#[wasm_bindgen]
-pub struct BlockResults {
-    blocks: Vec<BlockInfo>,
-}
-
-#[wasm_bindgen]
-impl BlockResults {
     #[wasm_bindgen(getter)]
-    pub fn length(&self) -> usize {
-        self.blocks.len()
-    }
-
-    pub fn get(&self, index: usize) -> Option<BlockInfo> {
-        self.blocks.get(index).map(|b| BlockInfo {
-            data: b.data.clone(),
-            compressed_offset: b.compressed_offset,
-            compressed_size: b.compressed_size,
-        })
+    pub fn dpositions(&self) -> js_sys::Uint32Array {
+        js_sys::Uint32Array::from(&self.dpositions[..])
     }
 }
 
 #[wasm_bindgen]
-pub fn decompress_all_blocks(input: &[u8]) -> Result<BlockResults, JsError> {
-    let mut blocks = Vec::new();
-    let mut offset = 0;
+pub fn decompress_chunk_slice(
+    input: &[u8],
+    min_block_position: u32,
+    min_data_position: u32,
+    max_block_position: u32,
+    max_data_position: u32,
+) -> Result<ChunkSliceResult, JsError> {
+    let min_block_pos = min_block_position as usize;
+    let min_data_pos = min_data_position as usize;
+    let max_block_pos = max_block_position as usize;
+    let max_data_pos = max_data_position as usize;
 
-    while offset < input.len() {
-        let result = decompress_block_internal(&input[offset..]).map_err(JsError::new)?;
+    let mut cpositions: Vec<u32> = Vec::new();
+    let mut dpositions: Vec<u32> = Vec::new();
+    let mut buffer = Vec::with_capacity(input.len() * 4);
+
+    let mut cpos = min_block_pos;
+    let mut dpos = min_data_pos;
+
+    while cpos < input.len() + min_block_pos {
+        let input_offset = cpos - min_block_pos;
+        if input_offset >= input.len() {
+            break;
+        }
+
+        let result = decompress_block_internal(&input[input_offset..]).map_err(JsError::new)?;
 
         if result.bytes_read == 0 {
             break;
         }
 
-        blocks.push(BlockInfo {
-            data: result.data,
-            compressed_offset: offset,
-            compressed_size: result.bytes_read,
-        });
+        cpositions.push(cpos as u32);
+        dpositions.push(dpos as u32);
 
-        offset += result.bytes_read;
+        let is_first = buffer.is_empty() && cpositions.len() == 1;
+        let is_last = cpos >= max_block_pos;
+
+        let block_data = &result.data;
+        let start = if is_first { min_data_pos } else { 0 };
+
+        let end = if is_last {
+            if cpos == min_block_pos {
+                max_data_pos + 1
+            } else {
+                max_data_pos + 1
+            }
+            .min(block_data.len())
+        } else {
+            block_data.len()
+        };
+
+        if start < end && start < block_data.len() {
+            buffer.extend_from_slice(&block_data[start..end]);
+        }
+
+        let len = result.data.len();
+        cpos += result.bytes_read;
+        dpos += len - start;
+
+        if is_last {
+            cpositions.push(cpos as u32);
+            dpositions.push(dpos as u32);
+            break;
+        }
     }
 
-    Ok(BlockResults { blocks })
+    Ok(ChunkSliceResult {
+        buffer,
+        cpositions,
+        dpositions,
+    })
 }
