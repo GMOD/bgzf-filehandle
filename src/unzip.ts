@@ -1,4 +1,4 @@
-import { decompressBlock, decompressAll } from './wasm/index.ts'
+import { decompressBlock, decompressAll } from './wasm/bgzf-wasm-inlined.js'
 
 import { concatUint8Array } from './util.ts'
 

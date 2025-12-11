@@ -1,8 +1,39 @@
-use flate2::read::GzDecoder;
+use flate2::bufread::GzDecoder;
 use std::io::{Cursor, Read};
 use wasm_bindgen::prelude::*;
 
-/// Result of decompressing a single gzip block
+/// Internal result type for decompression
+struct InternalDecompressResult {
+    data: Vec<u8>,
+    bytes_read: usize,
+}
+
+/// Internal function to decompress a single gzip member
+fn decompress_block_internal(input: &[u8]) -> Result<InternalDecompressResult, String> {
+    if input.is_empty() {
+        return Ok(InternalDecompressResult {
+            data: Vec::new(),
+            bytes_read: 0,
+        });
+    }
+
+    // Cursor<&[u8]> implements BufRead, so we can use bufread::GzDecoder directly
+    let cursor = Cursor::new(input);
+    let mut decoder = GzDecoder::new(cursor);
+
+    let mut output = Vec::new();
+    decoder.read_to_end(&mut output).map_err(|e| e.to_string())?;
+
+    // Get bytes consumed from the underlying cursor
+    let bytes_read = decoder.into_inner().position() as usize;
+
+    Ok(InternalDecompressResult {
+        data: output,
+        bytes_read,
+    })
+}
+
+/// Result of decompressing a single gzip block (for WASM export)
 #[wasm_bindgen]
 pub struct DecompressResult {
     data: Vec<u8>,
@@ -26,18 +57,10 @@ impl DecompressResult {
 /// Returns the decompressed data and the number of bytes consumed from input.
 #[wasm_bindgen]
 pub fn decompress_block(input: &[u8]) -> Result<DecompressResult, JsError> {
-    let cursor = Cursor::new(input);
-    let mut decoder = GzDecoder::new(cursor);
-
-    let mut output = Vec::new();
-    decoder.read_to_end(&mut output).map_err(|e| JsError::new(&e.to_string()))?;
-
-    // Get bytes consumed from the underlying cursor
-    let bytes_read = decoder.into_inner().position() as usize;
-
+    let result = decompress_block_internal(input).map_err(|e| JsError::new(&e))?;
     Ok(DecompressResult {
-        data: output,
-        bytes_read,
+        data: result.data,
+        bytes_read: result.bytes_read,
     })
 }
 
@@ -48,12 +71,14 @@ pub fn decompress_all(input: &[u8]) -> Result<Vec<u8>, JsError> {
     let mut offset = 0;
 
     while offset < input.len() {
-        let result = decompress_block(&input[offset..])?;
-        output.extend_from_slice(&result.data);
+        let result = decompress_block_internal(&input[offset..])
+            .map_err(|e| JsError::new(&e))?;
 
         if result.bytes_read == 0 {
             break;
         }
+
+        output.extend_from_slice(&result.data);
         offset += result.bytes_read;
     }
 
@@ -115,7 +140,8 @@ pub fn decompress_all_blocks(input: &[u8]) -> Result<BlockResults, JsError> {
     let mut offset = 0;
 
     while offset < input.len() {
-        let result = decompress_block(&input[offset..])?;
+        let result = decompress_block_internal(&input[offset..])
+            .map_err(|e| JsError::new(&e))?;
 
         if result.bytes_read == 0 {
             break;

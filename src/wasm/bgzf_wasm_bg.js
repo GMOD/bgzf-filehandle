@@ -149,7 +149,7 @@ export class BlockResults {
 if (Symbol.dispose) BlockResults.prototype[Symbol.dispose] = BlockResults.prototype.free;
 
 /**
- * Result of decompressing a single gzip block
+ * Result of decompressing a single gzip block (for WASM export)
  */
 export class DecompressResult {
     static __wrap(ptr) {

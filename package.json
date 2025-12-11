@@ -1,6 +1,6 @@
 {
-  "name": "@gmod/bgzf-filehandle",
-  "version": "6.0.0",
+  "name": "@gmod/bgzf-filehandle-wasm",
+  "version": "1.0.0",
   "description": "read from a compressed bgzip file (with .gzi) as if it were uncompressed",
   "license": "MIT",
   "repository": "gmod/bgzf-filehandle",
@@ -57,7 +57,9 @@
     "rimraf": "^6.0.1",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.48.0",
-    "vitest": "^4.0.14"
+    "vitest": "^4.0.14",
+    "webpack": "^5.103.0",
+    "webpack-cli": "^6.0.1"
   },
   "publishConfig": {
     "access": "public"
