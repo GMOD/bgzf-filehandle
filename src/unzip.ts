@@ -2,6 +2,7 @@ import {
   decompressAll,
   decompressChunkSlice,
 } from './wasm/bgzf-wasm-inlined.js'
+import { ungzip } from 'pako-esm2'
 
 // Type for the block cache (kept for API compatibility but not used in fast path)
 export interface BlockCache {
@@ -23,30 +24,34 @@ function hasGzipHeader(data: Uint8Array) {
 }
 
 async function decompressGzip(inputData: Uint8Array) {
-  const ds = new DecompressionStream('gzip')
-  const writer = ds.writable.getWriter()
-  const writePromise = writer
-    .write(inputData as Uint8Array<ArrayBuffer>)
-    .then(() => writer.close())
-  const chunks: Uint8Array[] = []
-  const reader = ds.readable.getReader()
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) {
-      break
+  if (typeof DecompressionStream !== 'undefined') {
+    const ds = new DecompressionStream('gzip')
+    const writer = ds.writable.getWriter()
+    const writePromise = writer
+      .write(inputData as Uint8Array<ArrayBuffer>)
+      .then(() => writer.close())
+    const chunks: Uint8Array[] = []
+    const reader = ds.readable.getReader()
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) {
+        break
+      }
+      chunks.push(value)
     }
-    chunks.push(value)
+    await writePromise
+    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+    const result = new Uint8Array(totalLength)
+    let offset = 0
+    for (const chunk of chunks) {
+      result.set(chunk, offset)
+      offset += chunk.length
+    }
+    return result
+  } else {
+    return ungzip(inputData, undefined)
   }
-  await writePromise
-  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
-  const result = new Uint8Array(totalLength)
-  let offset = 0
-  for (const chunk of chunks) {
-    result.set(chunk, offset)
-    offset += chunk.length
-  }
-  return result
 }
 
 export async function unzip(inputData: Uint8Array) {
