@@ -19,12 +19,12 @@ const testFiles = [
   {
     path: 'test/data/T_ko.2bit.gz',
     label: 'T_ko.2bit.gz (518KB)',
-    iterations: 100,
+    iterations: 1000,
   },
   {
     path: 'test/data/out.sorted.gff.gz',
     label: 'out.sorted.gff.gz (5.2MB)',
-    iterations: 20,
+    iterations: 100,
   },
 ]
 

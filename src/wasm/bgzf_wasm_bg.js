@@ -62,9 +62,6 @@ const DecompressResultFinalization = (typeof FinalizationRegistry === 'undefined
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_decompressresult_free(ptr >>> 0, 1));
 
-/**
- * Result of decompressing all blocks with position tracking
- */
 export class BlockInfo {
     static __wrap(ptr) {
         ptr = ptr >>> 0;
@@ -109,9 +106,6 @@ export class BlockInfo {
 }
 if (Symbol.dispose) BlockInfo.prototype[Symbol.dispose] = BlockInfo.prototype.free;
 
-/**
- * Container for multiple block results
- */
 export class BlockResults {
     static __wrap(ptr) {
         ptr = ptr >>> 0;
@@ -148,9 +142,6 @@ export class BlockResults {
 }
 if (Symbol.dispose) BlockResults.prototype[Symbol.dispose] = BlockResults.prototype.free;
 
-/**
- * Result of decompressing a single gzip block (for WASM export)
- */
 export class DecompressResult {
     static __wrap(ptr) {
         ptr = ptr >>> 0;
@@ -189,7 +180,6 @@ export class DecompressResult {
 if (Symbol.dispose) DecompressResult.prototype[Symbol.dispose] = DecompressResult.prototype.free;
 
 /**
- * Decompress all gzip members from input, returning concatenated data.
  * @param {Uint8Array} input
  * @returns {Uint8Array}
  */
@@ -206,7 +196,6 @@ export function decompress_all(input) {
 }
 
 /**
- * Decompress all blocks and return them separately with position info.
  * @param {Uint8Array} input
  * @returns {BlockResults}
  */
@@ -221,8 +210,6 @@ export function decompress_all_blocks(input) {
 }
 
 /**
- * Decompress a single gzip member from the input buffer.
- * Returns the decompressed data and the number of bytes consumed from input.
  * @param {Uint8Array} input
  * @returns {DecompressResult}
  */

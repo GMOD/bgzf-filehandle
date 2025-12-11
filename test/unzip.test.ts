@@ -13,7 +13,9 @@ test('can unzip bgzip-1.txt.gz', async () => {
 test('test error message modification', async () => {
   const testData = fs.readFileSync(require.resolve('./data/bgzip-1.txt.gz'))
 
-  await expect(unzip(testData.slice(2))).rejects.toThrow(/invalid gzip header/)
+  await expect(unzip(testData.slice(2))).rejects.toThrow(
+    /invalid gzip magic bytes/,
+  )
 })
 
 test('can unzip bgzip-1.txt.gz', async () => {
@@ -51,5 +53,5 @@ test('test error message modification', async () => {
       minv: { dataPosition: 40, blockPosition: 0 },
       maxv: { dataPosition: 100, blockPosition: 0 },
     }),
-  ).rejects.toThrow(/invalid gzip header/)
+  ).rejects.toThrow(/invalid gzip magic bytes/)
 })
