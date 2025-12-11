@@ -18,13 +18,35 @@ interface Chunk {
   maxv: VirtualOffset
 }
 
+function hasGzipHeader(data: Uint8Array) {
+  return data.length >= 2 && data[0] === 0x1f && data[1] === 0x8b
+}
+
 async function decompressGzip(inputData: Uint8Array) {
   const ds = new DecompressionStream('gzip')
   const writer = ds.writable.getWriter()
-  writer.write(inputData)
-  writer.close()
-  const result = await new Response(ds.readable).arrayBuffer()
-  return new Uint8Array(result)
+  const writePromise = writer
+    .write(inputData as Uint8Array<ArrayBuffer>)
+    .then(() => writer.close())
+  const chunks: Uint8Array[] = []
+  const reader = ds.readable.getReader()
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) {
+      break
+    }
+    chunks.push(value)
+  }
+  await writePromise
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+  const result = new Uint8Array(totalLength)
+  let offset = 0
+  for (const chunk of chunks) {
+    result.set(chunk, offset)
+    offset += chunk.length
+  }
+  return result
 }
 
 export async function unzip(inputData: Uint8Array) {
@@ -32,7 +54,12 @@ export async function unzip(inputData: Uint8Array) {
     return await decompressAll(inputData)
   } catch (e) {
     if (/invalid bgzf header/.exec(`${e}`)) {
-      return decompressGzip(inputData)
+      if (hasGzipHeader(inputData)) {
+        return decompressGzip(inputData)
+      }
+      throw new Error(
+        'problem decompressing block: not a valid bgzf or gzip block',
+      )
     }
     if (/invalid gzip header/.exec(`${e}`)) {
       throw new Error(

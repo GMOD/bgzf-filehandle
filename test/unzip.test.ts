@@ -13,7 +13,9 @@ test('can unzip bgzip-1.txt.gz', async () => {
 test('test error message modification', async () => {
   const testData = fs.readFileSync(require.resolve('./data/bgzip-1.txt.gz'))
 
-  await expect(unzip(testData.slice(2))).rejects.toThrow(/invalid bgzf header/)
+  await expect(unzip(testData.slice(2))).rejects.toThrow(
+    /not a valid bgzf or gzip block/,
+  )
 })
 
 test('can unzip bgzip-1.txt.gz', async () => {
