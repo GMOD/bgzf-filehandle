@@ -1,6 +1,6 @@
-import { decompressBlock, decompressAll } from './wasm/bgzf-wasm-inlined.js'
-
 import { concatUint8Array } from './util.ts'
+import { decompressAll, decompressBlock } from './wasm/bgzf-wasm-inlined.js'
+
 
 // Type for the block cache
 export interface BlockCache {
