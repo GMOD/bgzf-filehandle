@@ -53,3 +53,12 @@ test('test error message modification', async () => {
     }),
   ).rejects.toThrow(/invalid bgzf header/)
 })
+
+test('can unzip plain gzip file (non-bgzf)', async () => {
+  const testData = fs.readFileSync(
+    require.resolve('./data/plain-gzip-test.txt.gz'),
+  )
+  const result = await unzip(testData)
+  const text = new TextDecoder().decode(result)
+  expect(text).toBe('Hello, this is a plain gzip test file.\n')
+})
