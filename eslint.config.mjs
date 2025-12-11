@@ -8,8 +8,11 @@ export default defineConfig(
   {
     ignores: [
       'webpack.config.js',
+      'src/wasm/*',
       'dist/*',
+      'crate/*',
       'esm/*',
+      'esm_*/*',
       'example/*',
       'benchmarks/*',
       'eslint.config.mjs',
