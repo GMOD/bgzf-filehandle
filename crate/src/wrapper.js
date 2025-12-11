@@ -18,7 +18,6 @@ async function init() {
             });
             wasm = instance.exports;
             bg.__wbg_set_wasm(wasm);
-            bg.__wbindgen_init_externref_table();
             return wasm;
         })();
     }
