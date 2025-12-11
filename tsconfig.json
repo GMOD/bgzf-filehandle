@@ -1,12 +1,8 @@
 {
-  "include": [
-    "src"
-  ],
+  "include": ["src"],
   "compilerOptions": {
     "target": "es2022",
-    "types": [
-      "node"
-    ],
+    "types": ["node"],
     "outDir": "esm",
     "declaration": true,
     "moduleResolution": "node",
