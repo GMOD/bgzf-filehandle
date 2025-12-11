@@ -73,6 +73,7 @@ export async function unzipChunkSlice(
         hasMore = cpos + bytesRead < inputData.length + minv.blockPosition
       } else {
         // Not in cache, decompress
+        // @ts-expect-error
         const result = decompressor.decompressBlock(remainingInput)
         buffer = result.data
         bytesRead = result.bytesRead
