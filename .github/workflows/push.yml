@@ -13,7 +13,7 @@ jobs:
         with:
           node-version: 20.x
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
       - name: Install wasm-bindgen-cli

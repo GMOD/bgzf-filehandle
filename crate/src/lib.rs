@@ -1,51 +1,42 @@
 use libdeflater::Decompressor;
-use std::cell::RefCell;
 use wasm_bindgen::prelude::*;
 
-thread_local! {
-    static DECOMPRESSOR: RefCell<Decompressor> = RefCell::new(Decompressor::new());
-}
+const BGZF_HEADER_SIZE: usize = 18;
+const BGZF_TRAILER_SIZE: usize = 8;
+const BGZF_MIN_BLOCK_SIZE: usize = BGZF_HEADER_SIZE + BGZF_TRAILER_SIZE;
 
-fn parse_bgzf_header(input: &[u8]) -> Result<(usize, usize), &'static str> {
-    // Minimum BGZF block: 18 header + 8 trailer = 26 bytes
-    if input.len() < 26 {
-        return Err("input too short");
+fn parse_bgzf_header(input: &[u8]) -> Option<usize> {
+    if input.len() < BGZF_MIN_BLOCK_SIZE {
+        return None;
     }
 
-    // Check: magic (1f 8b), method (08), flags (04 = FEXTRA)
+    // Check fixed BGZF header bytes in one comparison where possible
+    // magic (1f 8b), method (08), flags (04)
     if input[0] != 0x1f || input[1] != 0x8b || input[2] != 8 || input[3] != 4 {
-        return Err("invalid bgzf header");
+        return None;
     }
 
-    // BGZF has XLEN=6, SI1='B', SI2='C', SLEN=2 at fixed positions
-    if input[10] != 6
-        || input[11] != 0
-        || input[12] != b'B'
-        || input[13] != b'C'
-        || input[14] != 2
-        || input[15] != 0
-    {
-        return Err("invalid bgzf header");
+    // XLEN=6, SI1='B', SI2='C', SLEN=2
+    if input[10] != 6 || input[12] != b'B' || input[13] != b'C' {
+        return None;
     }
 
     let bsize = u16::from_le_bytes([input[16], input[17]]) as usize + 1;
 
-    if input.len() < bsize || bsize < 26 {
-        return Err("invalid block size");
+    if input.len() >= bsize && bsize >= BGZF_MIN_BLOCK_SIZE {
+        Some(bsize)
+    } else {
+        None
     }
-
-    // Header is always 18 bytes for standard BGZF
-    Ok((18, bsize))
 }
 
-fn decompress_bgzf_block(input: &[u8]) -> Result<(Vec<u8>, usize), &'static str> {
-    if input.is_empty() {
-        return Ok((Vec::new(), 0));
-    }
+fn decompress_block_into(
+    input: &[u8],
+    decompressor: &mut Decompressor,
+) -> Result<(Vec<u8>, usize), &'static str> {
+    let block_size = parse_bgzf_header(input).ok_or("invalid bgzf header")?;
 
-    let (header_size, block_size) = parse_bgzf_header(input)?;
-
-    let trailer_pos = block_size - 8;
+    let trailer_pos = block_size - BGZF_TRAILER_SIZE;
     let isize = u32::from_le_bytes([
         input[trailer_pos + 4],
         input[trailer_pos + 5],
@@ -53,22 +44,14 @@ fn decompress_bgzf_block(input: &[u8]) -> Result<(Vec<u8>, usize), &'static str>
         input[trailer_pos + 7],
     ]) as usize;
 
-    let deflate_data = &input[header_size..trailer_pos];
+    let deflate_data = &input[BGZF_HEADER_SIZE..trailer_pos];
+    let mut output = vec![0u8; isize];
 
-    let data = DECOMPRESSOR
-        .with(|d| {
-            let mut decompressor = d.borrow_mut();
-            let mut output = vec![0u8; isize];
-            decompressor
-                .deflate_decompress(deflate_data, &mut output)
-                .map(|actual_size| {
-                    output.truncate(actual_size);
-                    output
-                })
-        })
+    decompressor
+        .deflate_decompress(deflate_data, &mut output)
         .map_err(|_| "decompression failed")?;
 
-    Ok((data, block_size))
+    Ok((output, block_size))
 }
 
 #[wasm_bindgen]
@@ -92,17 +75,26 @@ impl DecompressResult {
 
 #[wasm_bindgen]
 pub fn decompress_block(input: &[u8]) -> Result<DecompressResult, JsError> {
-    let (data, bytes_read) = decompress_bgzf_block(input).map_err(JsError::new)?;
+    if input.is_empty() {
+        return Ok(DecompressResult {
+            data: Vec::new(),
+            bytes_read: 0,
+        });
+    }
+    let mut decompressor = Decompressor::new();
+    let (data, bytes_read) = decompress_block_into(input, &mut decompressor).map_err(JsError::new)?;
     Ok(DecompressResult { data, bytes_read })
 }
 
 #[wasm_bindgen]
 pub fn decompress_all(input: &[u8]) -> Result<Vec<u8>, JsError> {
+    let mut decompressor = Decompressor::new();
     let mut output = Vec::with_capacity(input.len() * 4);
     let mut offset = 0;
 
     while offset < input.len() {
-        let (data, bytes_read) = decompress_bgzf_block(&input[offset..]).map_err(JsError::new)?;
+        let (data, bytes_read) =
+            decompress_block_into(&input[offset..], &mut decompressor).map_err(JsError::new)?;
 
         if bytes_read == 0 {
             break;
@@ -153,6 +145,7 @@ pub fn decompress_chunk_slice(
     let max_block_pos = max_block_position as usize;
     let max_data_pos = max_data_position as usize;
 
+    let mut decompressor = Decompressor::new();
     let mut cpositions: Vec<u32> = Vec::with_capacity(16);
     let mut dpositions: Vec<u32> = Vec::with_capacity(16);
     let mut buffer = Vec::with_capacity(input.len() * 4);
@@ -165,7 +158,8 @@ pub fn decompress_chunk_slice(
         let input_offset = cpos - min_block_pos;
 
         let (block_data, bytes_read) =
-            decompress_bgzf_block(&input[input_offset..]).map_err(JsError::new)?;
+            decompress_block_into(&input[input_offset..], &mut decompressor)
+                .map_err(JsError::new)?;
 
         if bytes_read == 0 {
             break;

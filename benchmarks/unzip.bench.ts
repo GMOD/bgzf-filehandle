@@ -41,7 +41,7 @@ for (const { path, label, iterations } of testFiles) {
         async () => {
           await unzip(data)
         },
-        { iterations },
+        { iterations, warmupIterations: 10 },
       )
     }
   })
@@ -95,7 +95,7 @@ for (const { path, label, iterations, chunk } of chunkSliceTestFiles) {
         async () => {
           await unzipChunkSlice(data, chunk)
         },
-        { iterations },
+        { iterations, warmupIterations: 10 },
       )
     }
   })
