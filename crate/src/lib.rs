@@ -93,8 +93,23 @@ pub fn decompress_all(input: &[u8]) -> Result<Vec<u8>, JsError> {
     let mut offset = 0;
 
     while offset < input.len() {
+        let remaining = &input[offset..];
+
+        // Check if we have a valid complete block
+        match parse_bgzf_header(remaining) {
+            Some(_) => {}
+            None => {
+                // If this is the first block and it's invalid, throw an error
+                // If we've already processed blocks, just stop (truncated input)
+                if offset == 0 {
+                    return Err(JsError::new("invalid bgzf header"));
+                }
+                break;
+            }
+        }
+
         let (data, bytes_read) =
-            decompress_block_into(&input[offset..], &mut decompressor).map_err(JsError::new)?;
+            decompress_block_into(remaining, &mut decompressor).map_err(JsError::new)?;
 
         if bytes_read == 0 {
             break;
@@ -156,10 +171,23 @@ pub fn decompress_chunk_slice(
 
     while cpos - min_block_pos < input.len() {
         let input_offset = cpos - min_block_pos;
+        let remaining = &input[input_offset..];
+
+        // Check if we have a valid complete block
+        match parse_bgzf_header(remaining) {
+            Some(_) => {}
+            None => {
+                // If this is the first block and it's invalid, throw an error
+                // If we've already processed blocks, just stop (truncated input)
+                if cpos == min_block_pos {
+                    return Err(JsError::new("invalid bgzf header"));
+                }
+                break;
+            }
+        }
 
         let (block_data, bytes_read) =
-            decompress_block_into(&input[input_offset..], &mut decompressor)
-                .map_err(JsError::new)?;
+            decompress_block_into(remaining, &mut decompressor).map_err(JsError::new)?;
 
         if bytes_read == 0 {
             break;
