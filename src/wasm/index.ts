@@ -12,6 +12,7 @@ async function ensureInit() {
     return
   }
   if (!initPromise) {
+    // @ts-expect-error
     initPromise = init().then(() => {
       initialized = true
     })
