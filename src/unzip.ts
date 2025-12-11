@@ -1,11 +1,11 @@
-import { Inflate, Z_SYNC_FLUSH } from 'pako-esm2'
+import { MultiMemberGzip } from 'pako-esm2'
 
 import { concatUint8Array } from './util.ts'
 
 // Type for the block cache
 export interface BlockCache {
-  get(key: string): { buffer: Uint8Array; nextIn: number } | undefined
-  set(key: string, value: { buffer: Uint8Array; nextIn: number }): void
+  get(key: string): { buffer: Uint8Array; bytesRead: number } | undefined
+  set(key: string, value: { buffer: Uint8Array; bytesRead: number }): void
 }
 
 interface VirtualOffset {
@@ -17,34 +17,15 @@ interface Chunk {
   maxv: VirtualOffset
 }
 
+// Reusable decompressor instance
+const decompressor = new MultiMemberGzip()
+
 // browserify-zlib and pako do not properly uncompress bgzf chunks that contain
 // more than one bgzip block. bgzip is a type of 'multi-member' gzip file type.
 // we make a custom unzip function to handle the bgzip blocks
 export async function unzip(inputData: Uint8Array) {
   try {
-    let strm
-    let pos = 0
-    let inflator
-    const blocks = [] as Uint8Array[]
-    let totalLength = 0
-    do {
-      const remainingInput = inputData.subarray(pos)
-      inflator = new Inflate(undefined)
-      ;({ strm } = inflator)
-      inflator.push(remainingInput, Z_SYNC_FLUSH)
-      if (inflator.err) {
-        throw new Error(inflator.msg)
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-      pos += strm!.next_in
-      const result = inflator.result as Uint8Array
-      blocks.push(result)
-      totalLength += result.length
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-    } while (strm!.avail_in)
-
-    return concatUint8Array(blocks, totalLength)
+    return decompressor.decompressAll(inputData)
   } catch (e) {
     // return a slightly more informative error message
     if (/incorrect header check/.exec(`${e}`)) {
@@ -66,7 +47,6 @@ export async function unzipChunkSlice(
   blockCache?: BlockCache,
 ) {
   try {
-    let strm
     const { minv, maxv } = chunk
     let cpos = minv.blockPosition
     let dpos = minv.dataPosition
@@ -75,37 +55,31 @@ export async function unzipChunkSlice(
     const dpositions = [] as number[]
 
     let i = 0
-    let wasFromCache = false
     let totalLength = 0
-    do {
+    let hasMore = true
+
+    while (hasMore && cpos < inputData.length + minv.blockPosition) {
       const remainingInput = inputData.subarray(cpos - minv.blockPosition)
       const cacheKey = cpos.toString()
 
       let buffer: Uint8Array
-      let nextIn: number
+      let bytesRead: number
 
       // Check cache first
       const cached = blockCache?.get(cacheKey)
       if (cached) {
         buffer = cached.buffer
-        nextIn = cached.nextIn
-        wasFromCache = true
+        bytesRead = cached.bytesRead
+        hasMore = cpos + bytesRead < inputData.length + minv.blockPosition
       } else {
-        // Not in cache, decompress and store
-        const inflator = new Inflate(undefined)
-        ;({ strm } = inflator)
-        inflator.push(remainingInput, Z_SYNC_FLUSH)
-        if (inflator.err) {
-          throw new Error(inflator.msg)
-        }
-
-        buffer = inflator.result as Uint8Array
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-        nextIn = strm!.next_in
-        wasFromCache = false
+        // Not in cache, decompress
+        const result = decompressor.decompressBlock(remainingInput)
+        buffer = result.data
+        bytesRead = result.bytesRead
+        hasMore = result.hasMore
 
         // Cache the decompressed block
-        blockCache?.set(cacheKey, { buffer, nextIn })
+        blockCache?.set(cacheKey, { buffer, bytesRead })
       }
 
       chunks.push(buffer)
@@ -119,7 +93,7 @@ export async function unzipChunkSlice(
         len = chunks[0].length
       }
       const origCpos = cpos
-      cpos += nextIn
+      cpos += bytesRead
       dpos += len
 
       if (origCpos >= maxv.blockPosition) {
@@ -140,12 +114,7 @@ export async function unzipChunkSlice(
       }
       totalLength += len
       i++
-    } while (
-      wasFromCache
-        ? cpos < inputData.length + minv.blockPosition
-        : // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-          strm!.avail_in
-    )
+    }
 
     return {
       buffer: concatUint8Array(chunks, totalLength),

@@ -43,7 +43,7 @@
   ],
   "dependencies": {
     "generic-filehandle2": "^2.0.5",
-    "pako-esm2": "^1.0.1"
+    "pako-esm2": "^2.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
