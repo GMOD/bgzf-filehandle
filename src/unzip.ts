@@ -1,8 +1,9 @@
+import { ungzip } from 'pako-esm2'
+
 import {
   decompressAll,
   decompressChunkSlice,
 } from './wasm/bgzf-wasm-inlined.js'
-import { ungzip } from 'pako-esm2'
 
 // Type for the block cache (kept for API compatibility but not used in fast path)
 export interface BlockCache {
