@@ -195,7 +195,7 @@ export async function decompressChunkCached(
   filehandle: Filehandle,
   chunk: ChunkLike,
   cache: ByteCache,
-  opts?: Record<string, unknown>,
+  opts?: { signal?: AbortSignal },
 ): Promise<ChunkDecompressResult> {
   const { minv, maxv } = chunk
 
