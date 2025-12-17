@@ -11,7 +11,6 @@ export const decompress_block: (a: number, b: number, c: number) => void;
 export const decompress_chunk_slice: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
 export const decompressresult_bytes_read: (a: number) => number;
 export const decompressresult_data: (a: number, b: number) => void;
-export const parse_block_boundaries: (a: number, b: number, c: number) => void;
 export const __wbindgen_add_to_stack_pointer: (a: number) => number;
 export const __wbindgen_export: (a: number, b: number, c: number) => void;
 export const __wbindgen_export2: (a: number, b: number) => number;

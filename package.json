@@ -44,8 +44,7 @@
   ],
   "dependencies": {
     "generic-filehandle2": "^2.0.16",
-    "pako-esm2": "^2.0.2",
-    "quick-lru": "4.0.0"
+    "pako-esm2": "^2.0.2"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",

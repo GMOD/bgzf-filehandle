@@ -63,7 +63,4 @@ export async function decompressChunkSlice(
 }
 
 
-export async function parseBlockBoundaries(input) {
-  await init()
-  return [...bg.parse_block_boundaries(input)]
-}
+

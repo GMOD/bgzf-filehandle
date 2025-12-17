@@ -1,11 +1,8 @@
 import { ungzip } from 'pako-esm2'
 
-import ByteCache from './byteCache.ts'
 import {
   decompressAll,
-  decompressBlock,
   decompressChunkSlice,
-  parseBlockBoundaries,
 } from './wasm/bgzf-wasm-inlined.js'
 
 // Type for the block cache (kept for API compatibility but not used in fast path)
@@ -127,124 +124,4 @@ export interface BlockInfo {
   blockPosition: number
   compressedStart: number
   compressedEnd: number
-}
-
-export async function getBlockPositions(
-  inputData: Uint8Array,
-  minBlockPosition: number,
-): Promise<BlockInfo[]> {
-  const boundaries = await parseBlockBoundaries(inputData)
-  const numBlocks = boundaries.length - 1
-
-  if (numBlocks === 0) {
-    return []
-  }
-
-  const blocks: BlockInfo[] = []
-
-  for (let i = 0; i < numBlocks; i++) {
-    const relativeStart = boundaries[i]!
-    const relativeEnd = boundaries[i + 1]!
-    const absoluteBlockPos = minBlockPosition + relativeStart
-
-    blocks.push({
-      blockPosition: absoluteBlockPos,
-      compressedStart: relativeStart,
-      compressedEnd: relativeEnd,
-    })
-  }
-
-  return blocks
-}
-
-export async function decompressSingleBlock(
-  inputData: Uint8Array,
-  blockInfo: BlockInfo,
-): Promise<DecompressedBlock> {
-  const blockInput = inputData.subarray(
-    blockInfo.compressedStart,
-    blockInfo.compressedEnd,
-  )
-  const result = await decompressBlock(blockInput)
-
-  return {
-    blockPosition: blockInfo.blockPosition,
-    data: result.data,
-    compressedSize: blockInfo.compressedEnd - blockInfo.compressedStart,
-  }
-}
-
-export interface ChunkDecompressResult {
-  buffer: Uint8Array
-  cpositions: number[]
-  dpositions: number[]
-}
-
-interface ChunkLike {
-  minv: VirtualOffset
-  maxv: VirtualOffset
-  fetchedSize(): number
-}
-
-/**
- * Decompress a chunk using a byte cache to skip already-decompressed blocks.
- * This reads compressed data from the filehandle, decompresses only uncached
- * blocks, caches them, and returns the concatenated decompressed data.
- */
-export async function decompressChunkCached(
-  filehandle: Filehandle,
-  chunk: ChunkLike,
-  cache: ByteCache,
-  opts?: { signal?: AbortSignal },
-): Promise<ChunkDecompressResult> {
-  const { minv, maxv } = chunk
-
-  // Read compressed data
-  const compressedData = await filehandle.read(
-    chunk.fetchedSize(),
-    minv.blockPosition,
-    opts,
-  )
-
-  // Get block boundaries
-  const blockInfos = await getBlockPositions(compressedData, minv.blockPosition)
-
-  // Filter to blocks within chunk range
-  const relevantBlocks = blockInfos.filter(
-    b => b.blockPosition <= maxv.blockPosition,
-  )
-
-  // Decompress blocks (using cache where possible)
-  const decompressedBlocks: Uint8Array[] = []
-  const cpositions: number[] = []
-  const dpositions: number[] = []
-  let totalDecompressedSize = 0
-
-  for (const blockInfo of relevantBlocks) {
-    let blockData = cache.get(blockInfo.blockPosition)
-
-    if (!blockData) {
-      const decompressed = await decompressSingleBlock(
-        compressedData,
-        blockInfo,
-      )
-      blockData = decompressed.data
-      cache.set(blockInfo.blockPosition, blockData)
-    }
-
-    cpositions.push(blockInfo.blockPosition)
-    dpositions.push(totalDecompressedSize)
-    decompressedBlocks.push(blockData)
-    totalDecompressedSize += blockData.length
-  }
-
-  // Concatenate all decompressed data
-  const buffer = new Uint8Array(totalDecompressedSize)
-  let bufferOffset = 0
-  for (const block of decompressedBlocks) {
-    buffer.set(block, bufferOffset)
-    bufferOffset += block.length
-  }
-
-  return { buffer, cpositions, dpositions }
 }
