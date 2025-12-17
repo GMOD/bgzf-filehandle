@@ -82,7 +82,8 @@ pub fn decompress_block(input: &[u8]) -> Result<DecompressResult, JsError> {
         });
     }
     let mut decompressor = Decompressor::new();
-    let (data, bytes_read) = decompress_block_into(input, &mut decompressor).map_err(JsError::new)?;
+    let (data, bytes_read) =
+        decompress_block_into(input, &mut decompressor).map_err(JsError::new)?;
     Ok(DecompressResult { data, bytes_read })
 }
 
@@ -226,4 +227,23 @@ pub fn decompress_chunk_slice(
         cpositions,
         dpositions,
     })
+}
+
+#[wasm_bindgen]
+pub fn parse_block_boundaries(input: &[u8]) -> Vec<u32> {
+    let mut boundaries = Vec::with_capacity(input.len() / 10000);
+    let mut offset = 0;
+
+    while offset < input.len() {
+        let remaining = &input[offset..];
+        match parse_bgzf_header(remaining) {
+            Some(block_size) => {
+                boundaries.push(offset as u32);
+                offset += block_size;
+            }
+            None => break,
+        }
+    }
+    boundaries.push(offset as u32);
+    boundaries
 }
