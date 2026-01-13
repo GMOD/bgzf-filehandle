@@ -18,9 +18,9 @@ function dropObject(idx) {
     heap_next = idx;
 }
 
-function getArrayU32FromWasm0(ptr, len) {
+function getArrayF64FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
-    return getUint32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
+    return getFloat64ArrayMemory0().subarray(ptr / 8, ptr / 8 + len);
 }
 
 function getArrayU8FromWasm0(ptr, len) {
@@ -36,17 +36,17 @@ function getDataViewMemory0() {
     return cachedDataViewMemory0;
 }
 
+let cachedFloat64ArrayMemory0 = null;
+function getFloat64ArrayMemory0() {
+    if (cachedFloat64ArrayMemory0 === null || cachedFloat64ArrayMemory0.byteLength === 0) {
+        cachedFloat64ArrayMemory0 = new Float64Array(wasm.memory.buffer);
+    }
+    return cachedFloat64ArrayMemory0;
+}
+
 function getStringFromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return decodeText(ptr, len);
-}
-
-let cachedUint32ArrayMemory0 = null;
-function getUint32ArrayMemory0() {
-    if (cachedUint32ArrayMemory0 === null || cachedUint32ArrayMemory0.byteLength === 0) {
-        cachedUint32ArrayMemory0 = new Uint32Array(wasm.memory.buffer);
-    }
-    return cachedUint32ArrayMemory0;
 }
 
 let cachedUint8ArrayMemory0 = null;
@@ -120,7 +120,7 @@ export class ChunkSliceResult {
         wasm.__wbg_chunksliceresult_free(ptr, 0);
     }
     /**
-     * @returns {Uint32Array}
+     * @returns {Float64Array}
      */
     get cpositions() {
         try {
@@ -128,15 +128,15 @@ export class ChunkSliceResult {
             wasm.chunksliceresult_cpositions(retptr, this.__wbg_ptr);
             var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
             var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-            var v1 = getArrayU32FromWasm0(r0, r1).slice();
-            wasm.__wbindgen_export(r0, r1 * 4, 4);
+            var v1 = getArrayF64FromWasm0(r0, r1).slice();
+            wasm.__wbindgen_export(r0, r1 * 8, 8);
             return v1;
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
         }
     }
     /**
-     * @returns {Uint32Array}
+     * @returns {Float64Array}
      */
     get dpositions() {
         try {
@@ -144,8 +144,8 @@ export class ChunkSliceResult {
             wasm.chunksliceresult_dpositions(retptr, this.__wbg_ptr);
             var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
             var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-            var v1 = getArrayU32FromWasm0(r0, r1).slice();
-            wasm.__wbindgen_export(r0, r1 * 4, 4);
+            var v1 = getArrayF64FromWasm0(r0, r1).slice();
+            wasm.__wbindgen_export(r0, r1 * 8, 8);
             return v1;
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
@@ -262,6 +262,8 @@ export function decompress_block(input) {
 }
 
 /**
+ * Decompress a slice of BGZF data between two virtual offsets.
+ * Position parameters use f64 to map to JS number, supporting files >4GB.
  * @param {Uint8Array} input
  * @param {number} min_block_position
  * @param {number} min_data_position

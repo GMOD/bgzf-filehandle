@@ -56,8 +56,8 @@ export async function decompressChunkSlice(
     maxDataPosition,
   )
   const buffer = result.buffer
-  const cpositions = [...result.cpositions]
-  const dpositions = [...result.dpositions]
+  const cpositions = result.cpositions
+  const dpositions = result.dpositions
   result.free()
   return { buffer, cpositions, dpositions }
 }
