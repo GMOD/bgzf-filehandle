@@ -24,8 +24,8 @@ test('can unzip bgzip-1.txt.gz', async () => {
     minv: { dataPosition: 0, blockPosition: 0 },
     maxv: { dataPosition: 100, blockPosition: 0 },
   })
-  expect(dpositions).toMatchSnapshot()
-  expect(cpositions).toMatchSnapshot()
+  expect([...dpositions]).toEqual([0, 22579])
+  expect([...cpositions]).toEqual([0, 4682])
 })
 test('can unzip bgzip-1.txt.gz positive minv.dataPosition', async () => {
   const testData = fs.readFileSync(require.resolve('./data/paired.bam'))
@@ -33,8 +33,8 @@ test('can unzip bgzip-1.txt.gz positive minv.dataPosition', async () => {
     minv: { dataPosition: 50, blockPosition: 0 },
     maxv: { dataPosition: 100, blockPosition: 0 },
   })
-  expect(dpositions).toMatchSnapshot()
-  expect(cpositions).toMatchSnapshot()
+  expect([...dpositions]).toEqual([50, 22579])
+  expect([...cpositions]).toEqual([0, 4682])
 })
 test('can unzip bgzip-1.txt.gz positive maxv.blockPosition', async () => {
   const testData = fs.readFileSync(require.resolve('./data/paired.bam'))
@@ -42,8 +42,8 @@ test('can unzip bgzip-1.txt.gz positive maxv.blockPosition', async () => {
     minv: { dataPosition: 50, blockPosition: 0 },
     maxv: { dataPosition: 100, blockPosition: 1 },
   })
-  expect(dpositions).toMatchSnapshot()
-  expect(cpositions).toMatchSnapshot()
+  expect([...dpositions]).toEqual([50, 22579, 87646])
+  expect([...cpositions]).toEqual([0, 4682, 24403])
 })
 
 test('test error message modification', async () => {
