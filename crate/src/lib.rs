@@ -30,26 +30,40 @@ fn parse_bgzf_header(input: &[u8]) -> Option<usize> {
     }
 }
 
+fn get_block_output_size(input: &[u8], block_size: usize) -> usize {
+    let trailer_pos = block_size - BGZF_TRAILER_SIZE;
+    u32::from_le_bytes([
+        input[trailer_pos + 4],
+        input[trailer_pos + 5],
+        input[trailer_pos + 6],
+        input[trailer_pos + 7],
+    ]) as usize
+}
+
+fn decompress_block_into_slice(
+    input: &[u8],
+    block_size: usize,
+    output: &mut [u8],
+    decompressor: &mut Decompressor,
+) -> Result<(), &'static str> {
+    let trailer_pos = block_size - BGZF_TRAILER_SIZE;
+    let deflate_data = &input[BGZF_HEADER_SIZE..trailer_pos];
+
+    decompressor
+        .deflate_decompress(deflate_data, output)
+        .map_err(|_| "decompression failed")?;
+
+    Ok(())
+}
+
 fn decompress_block_with_size(
     input: &[u8],
     block_size: usize,
     decompressor: &mut Decompressor,
 ) -> Result<Vec<u8>, &'static str> {
-    let trailer_pos = block_size - BGZF_TRAILER_SIZE;
-    let isize = u32::from_le_bytes([
-        input[trailer_pos + 4],
-        input[trailer_pos + 5],
-        input[trailer_pos + 6],
-        input[trailer_pos + 7],
-    ]) as usize;
-
-    let deflate_data = &input[BGZF_HEADER_SIZE..trailer_pos];
+    let isize = get_block_output_size(input, block_size);
     let mut output = vec![0u8; isize];
-
-    decompressor
-        .deflate_decompress(deflate_data, &mut output)
-        .map_err(|_| "decompression failed")?;
-
+    decompress_block_into_slice(input, block_size, &mut output, decompressor)?;
     Ok(output)
 }
 
@@ -114,10 +128,17 @@ pub fn decompress_all(input: &[u8]) -> Result<Vec<u8>, JsError> {
             }
         };
 
-        let data =
-            decompress_block_with_size(remaining, block_size, &mut decompressor).map_err(JsError::new)?;
+        let output_size = get_block_output_size(remaining, block_size);
+        let output_start = output.len();
+        output.resize(output_start + output_size, 0);
+        decompress_block_into_slice(
+            remaining,
+            block_size,
+            &mut output[output_start..],
+            &mut decompressor,
+        )
+        .map_err(JsError::new)?;
 
-        output.extend_from_slice(&data);
         offset += block_size;
     }
 
@@ -169,6 +190,8 @@ pub fn decompress_chunk_slice(
     let mut cpositions: Vec<f64> = Vec::with_capacity(16);
     let mut dpositions: Vec<f64> = Vec::with_capacity(16);
     let mut buffer = Vec::with_capacity(input.len() * 4);
+    // Reusable scratch buffer, grows as needed
+    let mut scratch: Vec<u8> = Vec::new();
 
     let mut cpos = min_block_pos;
     let mut dpos = min_data_pos;
@@ -188,28 +211,36 @@ pub fn decompress_chunk_slice(
             }
         };
 
-        let block_data =
-            decompress_block_with_size(remaining, block_size, &mut decompressor).map_err(JsError::new)?;
+        let output_size = get_block_output_size(remaining, block_size);
+        if scratch.len() < output_size {
+            scratch.resize(output_size, 0);
+        }
+        decompress_block_into_slice(
+            remaining,
+            block_size,
+            &mut scratch[..output_size],
+            &mut decompressor,
+        )
+        .map_err(JsError::new)?;
 
         cpositions.push(cpos as f64);
         dpositions.push(dpos as f64);
 
         let is_last = cpos >= max_block_pos;
-        let block_len = block_data.len();
 
         let start = if is_first { min_data_pos } else { 0 };
         let end = if is_last {
-            (max_data_pos + 1).min(block_len)
+            (max_data_pos + 1).min(output_size)
         } else {
-            block_len
+            output_size
         };
 
         if start < end {
-            buffer.extend_from_slice(&block_data[start..end]);
+            buffer.extend_from_slice(&scratch[start..end]);
         }
 
         cpos += block_size;
-        dpos += block_len - start;
+        dpos += output_size - start;
         is_first = false;
 
         if is_last {
