@@ -2,20 +2,20 @@
 /* eslint-disable */
 
 export class ChunkSliceResult {
-  private constructor();
-  free(): void;
-  [Symbol.dispose](): void;
-  readonly cpositions: Float64Array;
-  readonly dpositions: Float64Array;
-  readonly buffer: Uint8Array;
+    private constructor();
+    free(): void;
+    [Symbol.dispose](): void;
+    readonly buffer: Uint8Array;
+    readonly cpositions: Float64Array;
+    readonly dpositions: Float64Array;
 }
 
 export class DecompressResult {
-  private constructor();
-  free(): void;
-  [Symbol.dispose](): void;
-  readonly bytes_read: number;
-  readonly data: Uint8Array;
+    private constructor();
+    free(): void;
+    [Symbol.dispose](): void;
+    readonly bytes_read: number;
+    readonly data: Uint8Array;
 }
 
 export function decompress_all(input: Uint8Array): Uint8Array;
