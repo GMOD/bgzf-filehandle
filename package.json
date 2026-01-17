@@ -43,23 +43,23 @@
     "biojs"
   ],
   "dependencies": {
-    "generic-filehandle2": "^2.0.16",
+    "generic-filehandle2": "^2.0.18",
     "pako-esm2": "^2.0.2"
   },
   "devDependencies": {
-    "@types/node": "^22.15.3",
-    "@typescript-eslint/eslint-plugin": "^8.50.0",
-    "@typescript-eslint/parser": "^8.50.0",
-    "@vitest/coverage-v8": "^4.0.16",
+    "@types/node": "^25.0.9",
+    "@typescript-eslint/eslint-plugin": "^8.53.0",
+    "@typescript-eslint/parser": "^8.53.0",
+    "@vitest/coverage-v8": "^4.0.17",
     "eslint": "^9.39.2",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-unicorn": "^62.0.0",
-    "prettier": "^3.4.1",
+    "prettier": "^3.8.0",
     "rimraf": "^6.0.1",
     "typescript": "^5.7.0",
-    "typescript-eslint": "^8.50.0",
-    "vitest": "^4.0.16",
-    "webpack": "^5.104.0",
+    "typescript-eslint": "^8.53.0",
+    "vitest": "^4.0.17",
+    "webpack": "^5.104.1",
     "webpack-cli": "^6.0.1"
   },
   "publishConfig": {
