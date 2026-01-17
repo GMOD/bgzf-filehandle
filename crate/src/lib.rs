@@ -126,8 +126,9 @@ pub fn decompress_all(input: &[u8]) -> Result<Vec<u8>, JsError> {
 #[wasm_bindgen]
 pub struct ChunkSliceResult {
     buffer: Vec<u8>,
-    cpositions: Vec<u32>,
-    dpositions: Vec<u32>,
+    // f64 maps to JS number, supporting files >4GB (safe up to 2^53 bytes)
+    cpositions: Vec<f64>,
+    dpositions: Vec<f64>,
 }
 
 #[wasm_bindgen]
@@ -138,23 +139,25 @@ impl ChunkSliceResult {
     }
 
     #[wasm_bindgen(getter)]
-    pub fn cpositions(&self) -> Vec<u32> {
+    pub fn cpositions(&self) -> Vec<f64> {
         self.cpositions.clone()
     }
 
     #[wasm_bindgen(getter)]
-    pub fn dpositions(&self) -> Vec<u32> {
+    pub fn dpositions(&self) -> Vec<f64> {
         self.dpositions.clone()
     }
 }
 
+/// Decompress a slice of BGZF data between two virtual offsets.
+/// Position parameters use f64 to map to JS number, supporting files >4GB.
 #[wasm_bindgen]
 pub fn decompress_chunk_slice(
     input: &[u8],
-    min_block_position: u32,
-    min_data_position: u32,
-    max_block_position: u32,
-    max_data_position: u32,
+    min_block_position: f64,
+    min_data_position: f64,
+    max_block_position: f64,
+    max_data_position: f64,
 ) -> Result<ChunkSliceResult, JsError> {
     let min_block_pos = min_block_position as usize;
     let min_data_pos = min_data_position as usize;
@@ -162,8 +165,8 @@ pub fn decompress_chunk_slice(
     let max_data_pos = max_data_position as usize;
 
     let mut decompressor = Decompressor::new();
-    let mut cpositions: Vec<u32> = Vec::with_capacity(16);
-    let mut dpositions: Vec<u32> = Vec::with_capacity(16);
+    let mut cpositions: Vec<f64> = Vec::with_capacity(16);
+    let mut dpositions: Vec<f64> = Vec::with_capacity(16);
     let mut buffer = Vec::with_capacity(input.len() * 4);
 
     let mut cpos = min_block_pos;
@@ -194,8 +197,8 @@ pub fn decompress_chunk_slice(
             break;
         }
 
-        cpositions.push(cpos as u32);
-        dpositions.push(dpos as u32);
+        cpositions.push(cpos as f64);
+        dpositions.push(dpos as f64);
 
         let is_last = cpos >= max_block_pos;
         let block_len = block_data.len();
@@ -216,8 +219,8 @@ pub fn decompress_chunk_slice(
         is_first = false;
 
         if is_last {
-            cpositions.push(cpos as u32);
-            dpositions.push(dpos as u32);
+            cpositions.push(cpos as f64);
+            dpositions.push(dpos as f64);
             break;
         }
     }
