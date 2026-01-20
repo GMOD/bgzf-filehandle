@@ -161,6 +161,8 @@ export function decompress_block(input) {
 /**
  * Decompress a slice of BGZF data between two virtual offsets.
  * Position parameters use f64 to map to JS number, supporting files >4GB.
+ * The input buffer should be a slice starting at min_block_position in the original file.
+ * Positions are tracked as f64 to preserve precision for large files.
  * @param {Uint8Array} input
  * @param {number} min_block_position
  * @param {number} min_data_position
