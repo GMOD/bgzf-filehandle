@@ -48,8 +48,8 @@
   },
   "devDependencies": {
     "@types/node": "^25.0.9",
-    "@typescript-eslint/eslint-plugin": "^8.53.0",
-    "@typescript-eslint/parser": "^8.53.0",
+    "@typescript-eslint/eslint-plugin": "^8.53.1",
+    "@typescript-eslint/parser": "^8.53.1",
     "@vitest/coverage-v8": "^4.0.17",
     "eslint": "^9.39.2",
     "eslint-plugin-import": "^2.31.0",
@@ -57,7 +57,7 @@
     "prettier": "^3.8.0",
     "rimraf": "^6.0.1",
     "typescript": "^5.7.0",
-    "typescript-eslint": "^8.53.0",
+    "typescript-eslint": "^8.53.1",
     "vitest": "^4.0.17",
     "webpack": "^5.104.1",
     "webpack-cli": "^6.0.1"

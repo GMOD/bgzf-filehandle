@@ -151,6 +151,8 @@ impl ChunkSliceResult {
 
 /// Decompress a slice of BGZF data between two virtual offsets.
 /// Position parameters use f64 to map to JS number, supporting files >4GB.
+/// The input buffer should be a slice starting at min_block_position in the original file.
+/// Positions are tracked as f64 to preserve precision for large files.
 #[wasm_bindgen]
 pub fn decompress_chunk_slice(
     input: &[u8],
@@ -159,9 +161,9 @@ pub fn decompress_chunk_slice(
     max_block_position: f64,
     max_data_position: f64,
 ) -> Result<ChunkSliceResult, JsError> {
-    let min_block_pos = min_block_position as usize;
+    // Use f64 for position tracking to support >4GB files
+    // Only convert to usize when indexing into the input buffer
     let min_data_pos = min_data_position as usize;
-    let max_block_pos = max_block_position as usize;
     let max_data_pos = max_data_position as usize;
 
     let mut decompressor = Decompressor::new();
@@ -169,12 +171,15 @@ pub fn decompress_chunk_slice(
     let mut dpositions: Vec<f64> = Vec::with_capacity(16);
     let mut buffer = Vec::with_capacity(input.len() * 4);
 
-    let mut cpos = min_block_pos;
-    let mut dpos = min_data_pos;
+    // Track positions as f64 to preserve precision for large files
+    let mut cpos = min_block_position;
+    let mut dpos = min_data_position;
     let mut is_first = true;
 
-    while cpos - min_block_pos < input.len() {
-        let input_offset = cpos - min_block_pos;
+    // input_offset is the position within the input buffer (always fits in usize)
+    // since input buffer size is limited by available memory
+    while (cpos - min_block_position) < (input.len() as f64) {
+        let input_offset = (cpos - min_block_position) as usize;
         let remaining = &input[input_offset..];
 
         // Check if we have a valid complete block
@@ -183,7 +188,7 @@ pub fn decompress_chunk_slice(
             None => {
                 // If this is the first block and it's invalid, throw an error
                 // If we've already processed blocks, just stop (truncated input)
-                if cpos == min_block_pos {
+                if cpos == min_block_position {
                     return Err(JsError::new("invalid bgzf header"));
                 }
                 break;
@@ -197,10 +202,10 @@ pub fn decompress_chunk_slice(
             break;
         }
 
-        cpositions.push(cpos as f64);
-        dpositions.push(dpos as f64);
+        cpositions.push(cpos);
+        dpositions.push(dpos);
 
-        let is_last = cpos >= max_block_pos;
+        let is_last = cpos >= max_block_position;
         let block_len = block_data.len();
 
         let start = if is_first { min_data_pos } else { 0 };
@@ -214,13 +219,13 @@ pub fn decompress_chunk_slice(
             buffer.extend_from_slice(&block_data[start..end]);
         }
 
-        cpos += bytes_read;
-        dpos += block_len - start;
+        cpos += bytes_read as f64;
+        dpos += (block_len - start) as f64;
         is_first = false;
 
         if is_last {
-            cpositions.push(cpos as f64);
-            dpositions.push(dpos as f64);
+            cpositions.push(cpos);
+            dpositions.push(dpos);
             break;
         }
     }
