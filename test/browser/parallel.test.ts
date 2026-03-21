@@ -77,3 +77,4 @@ test(
   () => runBrowserTest('/test/browser/messageport-test.html', 'MessagePort pool'),
   120000,
 )
+
