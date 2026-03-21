@@ -1,11 +1,13 @@
 import path from 'node:path'
 
-import { expect, test, afterAll, beforeAll } from 'vitest'
-import puppeteer from 'puppeteer'
-import type { Browser } from 'puppeteer'
-import type http from 'node:http'
+import { launch } from 'puppeteer'
+import { afterAll, beforeAll, expect, test } from 'vitest'
 
 import { startServer } from './serve.ts'
+
+import type http from 'node:http'
+import type { Browser } from 'puppeteer'
+
 
 const rootDir = path.resolve(import.meta.dirname, '../..')
 
@@ -18,22 +20,18 @@ beforeAll(async () => {
   server = result.server
   port = result.port
 
-  browser = await puppeteer.launch({
+  browser = await launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   })
 }, 30000)
 
 afterAll(async () => {
-  if (browser) {
-    await browser.close()
-  }
-  if (server) {
-    server.close()
-  }
+  await browser.close()
+  server.close()
 })
 
-async function runBrowserTest(pagePath: string, testName: string, timeout = 60000) {
+async function runBrowserTest(pagePath: string, testName: string, _timeout = 60000) {
   const page = await browser.newPage()
 
   page.on('console', (msg) => {
@@ -49,13 +47,13 @@ async function runBrowserTest(pagePath: string, testName: string, timeout = 6000
   )
 
   const results = await page.evaluate(async () => {
-    // @ts-ignore - runTests is defined in the HTML page
+    // @ts-expect-error - runTests is defined in the HTML page's global scope
     return globalThis.runTests()
   })
 
   console.log(`${testName}:`)
   for (const r of results as { name: string; pass: boolean; detail?: string; error?: string }[]) {
-    const detail = r.detail ? ` (${r.detail.replace(/\n/g, '\n    ')})` : ''
+    const detail = r.detail ? ` (${r.detail.replaceAll('\n', '\n    ')})` : ''
     console.log(`  ${r.pass ? 'PASS' : 'FAIL'}: ${r.name}${detail}${r.error ? ` - ${r.error}` : ''}`)
   }
 
