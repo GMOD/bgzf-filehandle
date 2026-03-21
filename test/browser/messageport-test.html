@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>BGZF MessagePort Pool Test</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "pako-esm2": "/node_modules/pako-esm2/esm/main.js",
+        "generic-filehandle2": "/node_modules/generic-filehandle2/esm/browser.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <script type="module">
+    import {
+      unzipChunkSlice,
+      createBgzfWorkerPool,
+      scanBgzfBlocks,
+      BgzfWorkerPoolHost,
+      createPoolPort,
+    } from '/esm/index.js'
+
+    async function fetchFile(path) {
+      const response = await fetch(path)
+      return new Uint8Array(await response.arrayBuffer())
+    }
+
+    window.runTests = async () => {
+      const results = []
+      const NUM_BGZF_WORKERS = 8
+
+      // Create the pool on the main thread
+      const pool = await createBgzfWorkerPool(NUM_BGZF_WORKERS)
+      const host = new BgzfWorkerPoolHost(pool)
+
+      // Simulate 3 "RPC workers" that each get a MessagePort
+      const NUM_RPC_WORKERS = 3
+      const rpcWorkers = []
+
+      for (let i = 0; i < NUM_RPC_WORKERS; i++) {
+        const port = createPoolPort(host)
+        // Create a real worker that uses BgzfWorkerPoolClient
+        console.log(`Creating RPC worker ${i}...`)
+        const worker = new Worker('/test/browser/rpc-worker-sim.js', { type: 'module' })
+        worker.onerror = (e) => {
+          console.error('Worker error:', e.message, e.filename, e.lineno)
+          e.preventDefault()
+        }
+        worker.onmessageerror = (e) => console.error('Worker message error:', e)
+
+        const ready = new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error(`RPC worker ${i} init timeout`)), 10000)
+          worker.onmessage = (e) => {
+            if (e.data.type === 'ready') {
+              clearTimeout(timeout)
+              resolve()
+            }
+          }
+        })
+        worker.postMessage({ type: 'initPort' }, [port])
+        await ready
+
+        rpcWorkers.push(worker)
+      }
+
+      results.push({
+        name: `setup: ${NUM_BGZF_WORKERS} BGZF workers, ${NUM_RPC_WORKERS} RPC workers`,
+        pass: true,
+      })
+
+      // Test: single RPC worker decompressing via MessagePort → shared pool
+      {
+        const data = await fetchFile('/test/data/chr22_nanopore_subset.bam')
+        const sharedBuf = new SharedArrayBuffer(data.byteLength)
+        new Uint8Array(sharedBuf).set(data)
+
+        // Sequential baseline on main thread for comparison
+        const blocks = scanBgzfBlocks(data, 0, data.length)
+        const lastBlock = blocks[blocks.length - 1]
+        const chunk = {
+          minv: { dataPosition: 0, blockPosition: 0 },
+          maxv: { dataPosition: 65535, blockPosition: lastBlock.filePosition },
+        }
+        await unzipChunkSlice(data, chunk)
+        const seqStart = performance.now()
+        for (let i = 0; i < 3; i++) {
+          await unzipChunkSlice(data, chunk)
+        }
+        const seqTime = performance.now() - seqStart
+
+        const benchResult = await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('benchmark timeout')), 30000)
+          rpcWorkers[0].onmessage = (e) => {
+            clearTimeout(timeout)
+            if (e.data.type === 'benchResult') resolve(e.data)
+            if (e.data.type === 'error') reject(new Error(e.data.message))
+          }
+          rpcWorkers[0].postMessage({
+            type: 'benchmark',
+            sharedData: sharedBuf,
+            iterations: 3,
+          })
+        })
+
+        results.push({
+          name: 'RPC worker → MessagePort → shared pool: chr22_nanopore.bam',
+          pass: true,
+          detail: `${benchResult.blocks} blocks, 3x: mainthread-seq=${seqTime.toFixed(0)}ms worker-via-pool=${benchResult.parTime.toFixed(0)}ms speedup=${(seqTime / benchResult.parTime).toFixed(2)}x`,
+        })
+      }
+
+      // Test: 3 RPC workers decompressing concurrently via shared pool
+      {
+        const files = [
+          '/test/data/chr22_nanopore_subset.bam',
+          '/test/data/out.bam',
+          '/test/data/shortreads_300x.bam',
+        ]
+        const sharedBufs = []
+        for (const f of files) {
+          const data = await fetchFile(f)
+          const sab = new SharedArrayBuffer(data.byteLength)
+          new Uint8Array(sab).set(data)
+          sharedBufs.push(sab)
+        }
+
+        // Sequential: one worker at a time
+        const seqStart = performance.now()
+        for (let i = 0; i < 3; i++) {
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('seq benchmark timeout')), 30000)
+            rpcWorkers[0].onmessage = (e) => {
+              clearTimeout(timeout)
+              if (e.data.type === 'benchResult') resolve(e.data)
+              if (e.data.type === 'error') reject(new Error(e.data.message))
+            }
+            rpcWorkers[0].postMessage({
+              type: 'benchmark',
+              sharedData: sharedBufs[i],
+              iterations: 2,
+            })
+          })
+        }
+        const seqTotal = performance.now() - seqStart
+
+        // Concurrent: all 3 RPC workers at once, sharing the pool
+        const parStart = performance.now()
+        const parPromises = rpcWorkers.map((worker, i) =>
+          new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('par benchmark timeout')), 30000)
+            worker.onmessage = (e) => {
+              clearTimeout(timeout)
+              if (e.data.type === 'benchResult') resolve(e.data)
+              if (e.data.type === 'error') reject(new Error(e.data.message))
+            }
+            worker.postMessage({
+              type: 'benchmark',
+              sharedData: sharedBufs[i],
+              iterations: 2,
+            })
+          })
+        )
+        await Promise.all(parPromises)
+        const parTotal = performance.now() - parStart
+
+        results.push({
+          name: '3 concurrent RPC workers sharing pool',
+          pass: true,
+          detail: `sequential=${seqTotal.toFixed(0)}ms concurrent=${parTotal.toFixed(0)}ms speedup=${(seqTotal / parTotal).toFixed(2)}x`,
+        })
+      }
+
+      // Cleanup
+      for (const w of rpcWorkers) {
+        w.terminate()
+      }
+      host.destroy()
+
+      return results
+    }
+  </script>
+</body>
+</html>
