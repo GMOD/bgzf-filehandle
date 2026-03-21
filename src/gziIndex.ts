@@ -38,9 +38,9 @@ export default class GziIndex {
 
   _getIndex() {
     if (!this.index) {
-      this.index = this._readIndex().catch((e: unknown) => {
+      this.index = this._readIndex().catch((error: unknown) => {
         this.index = undefined
-        throw e
+        throw error
       })
     }
     return this.index
@@ -119,7 +119,7 @@ export default class GziIndex {
         break
       }
     }
-    if (relevant[relevant.length - 1]![UNCOMPRESSED_POSITION] < endPosition) {
+    if (relevant.at(-1)![UNCOMPRESSED_POSITION] < endPosition) {
       relevant.push([])
     }
     return relevant

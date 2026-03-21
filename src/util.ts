@@ -1,9 +1,9 @@
 function sum(array: Uint8Array[]) {
-  let sum = 0
+  let total = 0
   for (const entry of array) {
-    sum += entry.length
+    total += entry.length
   }
-  return sum
+  return total
 }
 
 export function concatUint8Array(args: Uint8Array[], totalLength?: number) {

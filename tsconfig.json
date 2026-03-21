@@ -2,16 +2,21 @@
   "include": ["src"],
   "compilerOptions": {
     "target": "es2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["dom", "esnext"],
     "types": ["node"],
+    "rootDir": "src",
     "outDir": "esm",
     "declaration": true,
-    "moduleResolution": "node",
     "sourceMap": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
     "allowImportingTsExtensions": true,
-    "allowJs": true,
     "rewriteRelativeImportExtensions": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "allowJs": true
   }
 }

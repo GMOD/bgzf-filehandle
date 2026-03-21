@@ -5,21 +5,6 @@ import {
   decompressChunkSlice,
 } from './wasm/bgzf-wasm-inlined.js'
 
-// Type for the block cache (kept for API compatibility but not used in fast path)
-export interface BlockCache {
-  get(key: string): { buffer: Uint8Array; bytesRead: number } | undefined
-  set(key: string, value: { buffer: Uint8Array; bytesRead: number }): void
-}
-
-// Minimal filehandle interface needed for decompressChunkCached
-export interface Filehandle {
-  read(
-    length: number,
-    position: number,
-    opts?: Record<string, unknown>,
-  ): Promise<Uint8Array>
-}
-
 interface VirtualOffset {
   blockPosition: number
   dataPosition: number
@@ -67,31 +52,29 @@ async function decompressGzip(inputData: Uint8Array) {
 export async function unzip(inputData: Uint8Array) {
   try {
     return await decompressAll(inputData)
-  } catch (e) {
-    if (/invalid bgzf header/.exec(`${e}`)) {
+  } catch (error) {
+    if (`${error}`.includes('invalid bgzf header')) {
       if (hasGzipHeader(inputData)) {
         return decompressGzip(inputData)
       }
       throw new Error(
         'problem decompressing block: not a valid bgzf or gzip block',
+        { cause: error },
       )
     }
-    if (/invalid gzip header/.exec(`${e}`)) {
+    if (`${error}`.includes('invalid gzip header')) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
+        { cause: error },
       )
     }
-    throw e
+    throw error
   }
 }
 
-export async function unzipChunkSlice(
-  inputData: Uint8Array,
-  chunk: Chunk,
-  _blockCache?: BlockCache,
-) {
+export async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
+  const { minv, maxv } = chunk
   try {
-    const { minv, maxv } = chunk
     const result = await decompressChunkSlice(
       inputData,
       minv.blockPosition,
@@ -104,24 +87,13 @@ export async function unzipChunkSlice(
       cpositions: result.cpositions,
       dpositions: result.dpositions,
     }
-  } catch (e) {
-    if (/invalid gzip header/.exec(`${e}`)) {
+  } catch (error) {
+    if (`${error}`.includes('invalid gzip header')) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
+        { cause: error },
       )
     }
-    throw e
+    throw error
   }
-}
-
-export interface DecompressedBlock {
-  blockPosition: number
-  data: Uint8Array
-  compressedSize: number
-}
-
-export interface BlockInfo {
-  blockPosition: number
-  compressedStart: number
-  compressedEnd: number
 }

@@ -8,16 +8,7 @@ as those created by bgzip, using coordinates from the uncompressed file. The
 module is used in @gmod/indexedfasta to read bgzip-indexed fasta files (with gzi
 index, fai index, and fa).
 
-From v7, we use WASM to decompress
-
-Users can also use the `unzip` function to unzip bgzip files whole (which pako
-has trouble with natively)
-
-You can also use the `unzipChunkSlice` function to unzip ranges given by BAI or
-TBI files for BAM or tabix file formats (which are bgzip based).
-
-The `unzip` utility function properly decompresses BGZF chunks in both node and
-the browser.
+Uses WASM (libdeflate) for decompression.
 
 ## Install
 
@@ -25,37 +16,50 @@ the browser.
 
 ## Usage
 
+### BgzfFilehandle
+
+Read from a bgzip-compressed file with a `.gzi` index as if it were
+uncompressed:
+
 ```typescript
-const { BgzfFilehandle, unzip } = require('@gmod/bgzf-filehandle')
+import { BgzfFilehandle } from '@gmod/bgzf-filehandle'
+import { LocalFile } from 'generic-filehandle2'
 
-const f = new BgzfFilehandle({ path: 'path/to/my_file.gz' })
-// assumes a .gzi index exists at path/to/my_file.gz.gzi. can also
-// pass `gziPath` to set it explicitly. Can also pass filehandles
-// for the files: `filehandle` and `gziFilehandle`
+const f = new BgzfFilehandle({
+  filehandle: new LocalFile('path/to/my_file.gz'),
+  gziFilehandle: new LocalFile('path/to/my_file.gz.gzi'),
+})
 
-// supports a subset of the NodeJS v10 filehandle API. currently
-// just read() and stat()
-const myBuf = Buffer.alloc(300)
-await f.read(myBuf, 0, 300, 23234)
-// now use the data in the buffer
+const data = await f.read(300, 0) // read(length, position) => Uint8Array
+```
 
-const { size } = f.stat() // stat gives the size as if the file were uncompressed
+### unzip
 
-// unzip takes a buffer and returns a promise for a new buffer
-const chunkDataBuffer = readDirectlyFromFile(someFile, 123, 456)
-const unzippedBuffer = await unzip(chunkDataBuffer)
+Decompress an entire BGZF-compressed buffer. Also handles plain gzip:
 
-// unzipChunkSlice unzips the buffer, and and slices out
-// (0,chunk.minv.dataPosition) and (chunk.maxv.dataPosition)
-//
-// the dpositions and cpositions indicate the block boundaries in compressed
-// and decompressed coordinates which can be used for generating stable feature
-// IDs across chunk boundaries
-const { buffer, dpositions, cpositions } = await unzipChunkSlice(
-  chunkDataBuffer,
-  chunk,
+```typescript
+import { unzip } from '@gmod/bgzf-filehandle'
+
+const decompressed = await unzip(compressedData)
+```
+
+### unzipChunkSlice
+
+Decompress a range of BGZF blocks and slice out a virtual file offset range
+(used by BAM/tabix readers with BAI/TBI indices):
+
+```typescript
+import { unzipChunkSlice } from '@gmod/bgzf-filehandle'
+
+const { buffer, cpositions, dpositions } = await unzipChunkSlice(
+  compressedData,
+  chunk, // { minv: { blockPosition, dataPosition }, maxv: { blockPosition, dataPosition } }
 )
 ```
+
+The returned `cpositions` and `dpositions` give the block boundaries in
+compressed and decompressed coordinates, which can be used for generating stable
+feature IDs across chunk boundaries.
 
 ## Academic Use
 
@@ -67,9 +71,3 @@ be linked from [jbrowse.org](http://jbrowse.org).
 ## License
 
 MIT © [Robert Buels](https://github.com/rbuels)
-
-## Note
-
-This repo is unable to be upgraded to pako v2 at this time due to removal of the
-Z_SYNC_FLUSH capability. It will produce "invalid distance too far back" errors
-with pako v2

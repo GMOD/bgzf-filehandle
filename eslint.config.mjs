@@ -43,53 +43,47 @@ export default defineConfig(
         },
       ],
 
-      'no-underscore-dangle': 0,
+      'no-underscore-dangle': 'off',
       curly: 'error',
-      '@typescript-eslint/no-explicit-any': 0,
-      '@typescript-eslint/explicit-module-boundary-types': 0,
-      '@typescript-eslint/ban-ts-comment': 0,
+      eqeqeq: 'error',
+      '@typescript-eslint/consistent-type-imports': 'error',
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/ban-ts-comment': [
+        'error',
+        { 'ts-expect-error': 'allow-with-description', 'ts-ignore': true },
+      ],
       semi: ['error', 'never'],
+
+      // keep off: new Array(n) pre-allocation is intentional for performance
       'unicorn/no-new-array': 'off',
       'unicorn/no-empty-file': 'off',
       'unicorn/prefer-type-error': 'off',
+      // keep off: bitwise ops in bgzfBlockScan.ts/long.ts are intentional 32-bit integer arithmetic
       'unicorn/prefer-modern-math-apis': 'off',
-      'unicorn/prefer-node-protocol': 'off',
-      'unicorn/no-unreadable-array-destructuring': 'off',
-      'unicorn/no-abusive-eslint-disable': 'off',
-      'unicorn/no-array-callback-reference': 'off',
-      'unicorn/number-literal-case': 'off',
+      'unicorn/prefer-math-trunc': 'off',
+      // keep off: (await x).property pattern used in bgzFilehandle.ts
+      'unicorn/no-await-expression-member': 'off',
+      // keep off: port.onmessage assignment used in workerPoolHost.ts
       'unicorn/prefer-add-event-listener': 'off',
+      // keep off: top-level await not applicable for library exports
       'unicorn/prefer-top-level-await': 'off',
       'unicorn/consistent-function-scoping': 'off',
-      'unicorn/no-await-expression-member': 'off',
       'unicorn/no-lonely-if': 'off',
       'unicorn/consistent-destructuring': 'off',
-      'unicorn/prefer-module': 'off',
-      'unicorn/prefer-optional-catch-binding': 'off',
       'unicorn/no-useless-undefined': 'off',
-      'unicorn/no-null': 'off',
-      'unicorn/no-nested-ternary': 'off',
+
+      // keep off: files use camelCase
       'unicorn/filename-case': 'off',
-      'unicorn/catch-error-name': 'off',
+      // keep off: codebase uses many abbreviations (fd, fh, buf, pos, etc.)
       'unicorn/prevent-abbreviations': 'off',
-      'unicorn/prefer-code-point': 'off',
       'unicorn/numeric-separators-style': 'off',
-      'unicorn/no-array-for-each': 'off',
-      'unicorn/prefer-spread': 'off',
-      'unicorn/explicit-length-check': 'off',
-      'unicorn/prefer-regexp-test': 'off',
-      'unicorn/relative-url-style': 'off',
-      'unicorn/prefer-math-trunc': 'off',
-      'unicorn/prefer-query-selector': 'off',
+      'unicorn/number-literal-case': 'off',
+      // keep off: primary code path in negated condition is more readable as-is
       'unicorn/no-negated-condition': 'off',
-      'unicorn/switch-case-braces': 'off',
-      'unicorn/prefer-switch': 'off',
-      'unicorn/better-regex': 'off',
+      // keep off: indexed for-loops that track index/position are intentional
       'unicorn/no-for-loop': 'off',
-      'unicorn/escape-case': 'off',
-      'unicorn/prefer-number-properties': 'off',
-      'unicorn/no-process-exit': 'off',
-      'unicorn/prefer-at': 'off',
+      'unicorn/explicit-length-check': 'off',
+      'unicorn/prefer-switch': 'off',
 
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
@@ -100,9 +94,9 @@ export default defineConfig(
       '@typescript-eslint/require-await': 'off',
       '@typescript-eslint/restrict-template-expressions': 'off',
       '@typescript-eslint/restrict-plus-operands': 'off',
-      '@typescript-eslint/no-deprecated': 'off',
+      '@typescript-eslint/no-deprecated': 'warn',
+      // keep off: non-null assertions are used intentionally on bounds-checked array access
       '@typescript-eslint/no-non-null-assertion': 'off',
-      'no-empty': 'off',
 
       'import/no-unresolved': 'off',
       'import/extensions': ['error', 'ignorePackages'],

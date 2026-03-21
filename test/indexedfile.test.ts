@@ -1,4 +1,4 @@
-import fs from 'fs'
+import fs from 'node:fs'
 
 import { LocalFile } from 'generic-filehandle2'
 import { expect, test } from 'vitest'
@@ -16,7 +16,7 @@ async function testRead(basename: string, length: number, position: number) {
   const fd = fs.openSync(require.resolve(`./data/${basename}`), 'r')
   fs.readSync(fd, buf2, 0, length, position)
   expect(buf.length).toEqual(buf2.length)
-  expect(Array.from(buf)).toEqual(Array.from(buf2))
+  expect([...buf]).toEqual([...buf2])
 }
 
 test('can read gff3_with_syncs.gff3.gz 1', async () => {
