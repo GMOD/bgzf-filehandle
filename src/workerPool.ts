@@ -44,13 +44,7 @@ interface RangeCallback {
 }
 
 function sharedArrayBufferAvailable() {
-  if (typeof SharedArrayBuffer === 'undefined') {
-    return false
-  }
-  if (globalThis.window !== undefined) {
-    return globalThis.crossOriginIsolated
-  }
-  return true
+  return typeof SharedArrayBuffer !== 'undefined'
 }
 
 class ManagedWorker {
@@ -175,7 +169,7 @@ export async function createBgzfWorkerPool(
   const url = workerUrl ?? getWorkerBlobUrl()
   const count =
     numWorkers ??
-    Math.min(globalThis.navigator?.hardwareConcurrency ?? 4, 4)
+    Math.min(navigator.hardwareConcurrency, 4)
   const workers: ManagedWorker[] = []
 
   for (let i = 0; i < count; i++) {

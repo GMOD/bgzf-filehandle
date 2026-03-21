@@ -2,7 +2,7 @@ import type { BgzfBlockInfo } from './bgzfBlockScan.ts'
 import type { BgzfWorkerPool, DecompressResult } from './workerPool.ts'
 
 interface HostResponse {
-  type: 'decompressResult' | 'error'
+  type: string
   requestId: number
   blockData?: Uint8Array[]
   message?: string
@@ -20,21 +20,21 @@ export class BgzfWorkerPoolClient implements BgzfWorkerPool {
 
   constructor(port: MessagePort) {
     this.port = port
-    this.port.onmessage = (e) => this.handleResponse(e.data)
+    this.port.onmessage = (e) => {
+      this.handleResponse(e.data)
+    }
     this.port.start()
   }
 
   private handleResponse(resp: HostResponse) {
     const cb = this.pending.get(resp.requestId)
-    if (!cb) {
-      return
-    }
-    this.pending.delete(resp.requestId)
-
-    if (resp.type === 'decompressResult') {
-      cb.resolve(resp.blockData!)
-    } else if (resp.type === 'error') {
-      cb.reject(new Error(resp.message ?? 'pool decompression failed'))
+    if (cb) {
+      this.pending.delete(resp.requestId)
+      if (resp.type === 'decompressResult') {
+        cb.resolve(resp.blockData!)
+      } else if (resp.type === 'error') {
+        cb.reject(new Error(resp.message ?? 'pool decompression failed'))
+      }
     }
   }
 
