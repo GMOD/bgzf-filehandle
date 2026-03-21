@@ -18,7 +18,7 @@ function assembleResult(decompressedBlocks, blockInfos, minv, maxv) {
     dpositions.push(dpos)
     const start = isFirst ? minv.dataPosition : 0
     const end = isLast ? Math.min(maxv.dataPosition + 1, block.length) : block.length
-    if (start < end) slices.push(block.subarray(start, end))
+    if (start < end) {slices.push(block.subarray(start, end))}
     dpos += block.length - start
     if (isLast) {
       cpositions.push(info.filePosition + info.compressedSize)
@@ -44,10 +44,10 @@ async function decompressViaPool(data, chunk, pool) {
   return assembleResult(result.blocks, blocks, minv, maxv)
 }
 
-self.onmessage = async (e) => {
+globalThis.onmessage = async (e) => {
   if (e.data.type === 'initPort') {
     client = new BgzfWorkerPoolClient(e.ports[0])
-    self.postMessage({ type: 'ready' })
+    globalThis.postMessage({ type: 'ready' })
     return
   }
 
@@ -66,15 +66,15 @@ self.onmessage = async (e) => {
       await decompressViaPool(data, chunk, client)
       await decompressViaPool(data, chunk, client)
 
-      const parStart = performance.now()
+      const parStart = globalThis.performance.now()
       for (let i = 0; i < iterations; i++) {
         await decompressViaPool(data, chunk, client)
       }
-      const parTime = performance.now() - parStart
+      const parTime = globalThis.performance.now() - parStart
 
-      self.postMessage({ type: 'benchResult', parTime, blocks: blocks.length })
+      globalThis.postMessage({ type: 'benchResult', parTime, blocks: blocks.length })
     } catch (err) {
-      self.postMessage({ type: 'error', message: err.message + '\n' + err.stack })
+      globalThis.postMessage({ type: 'error', message: err.message + '\n' + err.stack })
     }
   }
 }
