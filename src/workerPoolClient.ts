@@ -1,12 +1,9 @@
 import type { BgzfBlockInfo } from './bgzfBlockScan.ts'
 import type { BgzfWorkerPool, DecompressResult } from './workerPool.ts'
 
-interface HostResponse {
-  type: string
-  requestId: number
-  blockData?: Uint8Array[]
-  message?: string
-}
+type HostResponse =
+  | { type: 'decompressResult'; requestId: number; blockData: Uint8Array[] }
+  | { type: 'error'; requestId: number; message?: string }
 
 interface PendingRequest {
   resolve: (blocks: Uint8Array[]) => void
@@ -31,8 +28,8 @@ export class BgzfWorkerPoolClient implements BgzfWorkerPool {
     if (cb) {
       this.pending.delete(resp.requestId)
       if (resp.type === 'decompressResult') {
-        cb.resolve(resp.blockData!)
-      } else if (resp.type === 'error') {
+        cb.resolve(resp.blockData)
+      } else {
         cb.reject(new Error(resp.message ?? 'pool decompression failed'))
       }
     }

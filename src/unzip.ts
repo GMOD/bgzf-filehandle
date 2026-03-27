@@ -34,7 +34,7 @@ interface Chunk {
 }
 
 function hasGzipHeader(data: Uint8Array) {
-  return data.length >= 2 && data[0] === 0x1f && data[1] === 0x8b
+  return data.length >= 2 && data[0] === 0x1F && data[1] === 0x8B
 }
 
 async function decompressGzip(inputData: Uint8Array) {
@@ -139,7 +139,6 @@ function assembleChunkSliceResult(
 export async function unzipChunkSlice(
   inputData: Uint8Array,
   chunk: Chunk,
-  _blockCache?: BlockCache,
   workerPool?: BgzfWorkerPool,
 ) {
   const { minv, maxv } = chunk
@@ -153,7 +152,7 @@ export async function unzipChunkSlice(
 
     if (blocks.length > 1) {
       let sharedBuf: SharedArrayBuffer
-      if (inputData.buffer instanceof SharedArrayBuffer) {
+      if (inputData.buffer instanceof SharedArrayBuffer && inputData.byteOffset === 0) {
         sharedBuf = inputData.buffer
       } else {
         sharedBuf = new SharedArrayBuffer(inputData.byteLength)

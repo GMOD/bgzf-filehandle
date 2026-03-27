@@ -52,11 +52,11 @@ export class BgzfWorkerPoolHost {
           },
           transfer,
         )
-      } catch (e) {
+      } catch (error) {
         port.postMessage({
           type: 'error',
           requestId: req.requestId,
-          message: e instanceof Error ? e.message : String(e),
+          message: error instanceof Error ? error.message : String(error),
         })
       }
     }
