@@ -56,7 +56,7 @@ globalThis.onmessage = async (e) => {
       const { sharedData, iterations } = e.data
       const data = new Uint8Array(sharedData)
       const blocks = scanBgzfBlocks(data, 0, data.length)
-      const lastBlock = blocks[blocks.length - 1]
+      const lastBlock = blocks.at(-1)
       const chunk = {
         minv: { dataPosition: 0, blockPosition: 0 },
         maxv: { dataPosition: 65535, blockPosition: lastBlock.filePosition },
@@ -73,8 +73,8 @@ globalThis.onmessage = async (e) => {
       const parTime = globalThis.performance.now() - parStart
 
       globalThis.postMessage({ type: 'benchResult', parTime, blocks: blocks.length })
-    } catch (err) {
-      globalThis.postMessage({ type: 'error', message: err.message + '\n' + err.stack })
+    } catch (error) {
+      globalThis.postMessage({ type: 'error', message: error.message + '\n' + error.stack })
     }
   }
 }

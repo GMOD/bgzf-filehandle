@@ -24,14 +24,10 @@ export interface WorkerTiming {
   wasmMs: number
 }
 
-interface WorkerMessage {
-  type: 'ready' | 'rangeResult' | 'error'
-  batchId?: number
-  data?: Uint8Array
-  viewMs?: number
-  wasmMs?: number
-  message?: string
-}
+type WorkerMessage =
+  | { type: 'ready' }
+  | { type: 'rangeResult'; batchId: number; data: Uint8Array; viewMs: number; wasmMs: number }
+  | { type: 'error'; message?: string }
 
 interface RangeResult {
   data: Uint8Array
@@ -70,16 +66,16 @@ class ManagedWorker {
         this.readyResolve()
         this.readyResolve = undefined
       }
-    } else if (msg.type === 'rangeResult' && msg.batchId !== undefined) {
+    } else if (msg.type === 'rangeResult') {
       const cb = this.callbacks.get(msg.batchId)
       if (cb) {
         this.callbacks.delete(msg.batchId)
         cb.resolve({
-          data: msg.data!,
-          timing: { viewMs: msg.viewMs ?? 0, wasmMs: msg.wasmMs ?? 0 },
+          data: msg.data,
+          timing: { viewMs: msg.viewMs, wasmMs: msg.wasmMs },
         })
       }
-    } else if (msg.type === 'error') {
+    } else {
       const err = new Error(msg.message ?? 'worker decompression failed')
       for (const [key, cb] of this.callbacks) {
         this.callbacks.delete(key)
@@ -132,6 +128,7 @@ function getWorkerBlobUrl() {
 
 let sharedPool: BgzfWorkerPool | undefined
 let sharedPoolPromise: Promise<BgzfWorkerPool> | undefined
+let poolGeneration = 0
 
 export function getSharedWorkerPool(
   numWorkers?: number,
@@ -140,7 +137,12 @@ export function getSharedWorkerPool(
     return Promise.resolve(sharedPool)
   }
   if (!sharedPoolPromise) {
+    const gen = poolGeneration
     sharedPoolPromise = createBgzfWorkerPool(numWorkers).then((pool) => {
+      if (gen !== poolGeneration) {
+        pool.destroy()
+        throw new Error('Worker pool was destroyed during initialization')
+      }
       sharedPool = pool
       return pool
     })
@@ -149,11 +151,10 @@ export function getSharedWorkerPool(
 }
 
 export function destroySharedWorkerPool() {
-  if (sharedPool) {
-    sharedPool.destroy()
-    sharedPool = undefined
-    sharedPoolPromise = undefined
-  }
+  poolGeneration++
+  sharedPool?.destroy()
+  sharedPool = undefined
+  sharedPoolPromise = undefined
 }
 
 export async function createBgzfWorkerPool(
