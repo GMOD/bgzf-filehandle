@@ -20,8 +20,8 @@ export function scanBgzfBlocks(
 
   while (offset + BGZF_MIN_BLOCK_SIZE <= input.length) {
     if (
-      input[offset] !== 0x1F ||
-      input[offset + 1] !== 0x8B ||
+      input[offset] !== 0x1f ||
+      input[offset + 1] !== 0x8b ||
       input[offset + 2] !== 8 ||
       input[offset + 3] !== 4
     ) {
@@ -36,8 +36,7 @@ export function scanBgzfBlocks(
       break
     }
 
-    const bsize =
-      (input[offset + 16]! | (input[offset + 17]! << 8)) + 1
+    const bsize = (input[offset + 16]! | (input[offset + 17]! << 8)) + 1
 
     if (bsize < BGZF_MIN_BLOCK_SIZE || offset + bsize > input.length) {
       break

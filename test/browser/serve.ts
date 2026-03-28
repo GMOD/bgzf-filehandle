@@ -39,7 +39,7 @@ export function createServer(rootDir: string) {
 export function startServer(
   rootDir: string,
 ): Promise<{ server: http.Server; port: number }> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const server = createServer(rootDir)
     server.listen(0, '127.0.0.1', () => {
       const addr = server.address()

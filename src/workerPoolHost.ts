@@ -18,7 +18,7 @@ export class BgzfWorkerPoolHost {
 
   connectPort(port: MessagePort) {
     this.ports.add(port)
-    port.onmessage = (e) => {
+    port.onmessage = e => {
       void this.handleRequest(port, e.data)
     }
     port.start()

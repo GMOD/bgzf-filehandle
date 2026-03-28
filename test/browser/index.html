@@ -1,188 +1,227 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <title>BGZF Worker Pool Test</title>
-  <script type="importmap">
-    {
-      "imports": {
-        "pako-esm2": "/node_modules/pako-esm2/esm/main.js",
-        "generic-filehandle2": "/node_modules/generic-filehandle2/esm/browser.js"
-      }
-    }
-  </script>
-</head>
-<body>
-  <script type="module">
-    import { unzipChunkSlice, createBgzfWorkerPool, scanBgzfBlocks } from '/esm/index.js'
-
-    async function fetchFile(path) {
-      const response = await fetch(path)
-      const buffer = await response.arrayBuffer()
-      return new Uint8Array(buffer)
-    }
-
-    async function benchFile(name, data, pool, iterations) {
-      const blocks = scanBgzfBlocks(data, 0, data.length)
-      const lastBlock = blocks[blocks.length - 1]
-      const chunk = {
-        minv: { dataPosition: 0, blockPosition: 0 },
-        maxv: { dataPosition: 65535, blockPosition: lastBlock.filePosition },
-      }
-
-      // Warmup
-      for (let i = 0; i < 3; i++) {
-        await unzipChunkSlice(data, chunk)
-        await unzipChunkSlice(data, chunk, undefined, pool)
-      }
-
-      const seqStart = performance.now()
-      for (let i = 0; i < iterations; i++) {
-        await unzipChunkSlice(data, chunk)
-      }
-      const seqTime = performance.now() - seqStart
-
-      // Timed parallel with breakdown
-      let totalScanMs = 0
-      let totalCopyMs = 0
-      let totalDispatchMs = 0
-      let totalReassembleMs = 0
-      let totalAssembleMs = 0
-      let totalWorkerWasmMs = 0
-      let totalWorkerViewMs = 0
-
-      const parStart = performance.now()
-      for (let i = 0; i < iterations; i++) {
-        const scanStart = performance.now()
-        const scanBlocks = scanBgzfBlocks(data, chunk.minv.blockPosition, chunk.maxv.blockPosition)
-        totalScanMs += performance.now() - scanStart
-
-        const copyStart = performance.now()
-        let sharedBuf
-        if (data.buffer instanceof SharedArrayBuffer) {
-          sharedBuf = data.buffer
-        } else {
-          sharedBuf = new SharedArrayBuffer(data.byteLength)
-          new Uint8Array(sharedBuf).set(data)
+  <head>
+    <title>BGZF Worker Pool Test</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "pako-esm2": "/node_modules/pako-esm2/esm/main.js",
+          "generic-filehandle2": "/node_modules/generic-filehandle2/esm/browser.js"
         }
-        totalCopyMs += performance.now() - copyStart
+      }
+    </script>
+  </head>
+  <body>
+    <script type="module">
+      import {
+        unzipChunkSlice,
+        createBgzfWorkerPool,
+        scanBgzfBlocks,
+      } from '/esm/index.js'
 
-        const result = await pool.decompressBlocks(sharedBuf, scanBlocks)
-        if (result.timing) {
-          totalDispatchMs += result.timing.dispatchMs
-          totalReassembleMs += result.timing.reassembleMs
-          for (const wt of result.timing.workerTimings) {
-            totalWorkerWasmMs += wt.wasmMs
-            totalWorkerViewMs += wt.viewMs
+      async function fetchFile(path) {
+        const response = await fetch(path)
+        const buffer = await response.arrayBuffer()
+        return new Uint8Array(buffer)
+      }
+
+      async function benchFile(name, data, pool, iterations) {
+        const blocks = scanBgzfBlocks(data, 0, data.length)
+        const lastBlock = blocks[blocks.length - 1]
+        const chunk = {
+          minv: { dataPosition: 0, blockPosition: 0 },
+          maxv: { dataPosition: 65535, blockPosition: lastBlock.filePosition },
+        }
+
+        // Warmup
+        for (let i = 0; i < 3; i++) {
+          await unzipChunkSlice(data, chunk)
+          await unzipChunkSlice(data, chunk, undefined, pool)
+        }
+
+        const seqStart = performance.now()
+        for (let i = 0; i < iterations; i++) {
+          await unzipChunkSlice(data, chunk)
+        }
+        const seqTime = performance.now() - seqStart
+
+        // Timed parallel with breakdown
+        let totalScanMs = 0
+        let totalCopyMs = 0
+        let totalDispatchMs = 0
+        let totalReassembleMs = 0
+        let totalAssembleMs = 0
+        let totalWorkerWasmMs = 0
+        let totalWorkerViewMs = 0
+
+        const parStart = performance.now()
+        for (let i = 0; i < iterations; i++) {
+          const scanStart = performance.now()
+          const scanBlocks = scanBgzfBlocks(
+            data,
+            chunk.minv.blockPosition,
+            chunk.maxv.blockPosition,
+          )
+          totalScanMs += performance.now() - scanStart
+
+          const copyStart = performance.now()
+          let sharedBuf
+          if (data.buffer instanceof SharedArrayBuffer) {
+            sharedBuf = data.buffer
+          } else {
+            sharedBuf = new SharedArrayBuffer(data.byteLength)
+            new Uint8Array(sharedBuf).set(data)
           }
+          totalCopyMs += performance.now() - copyStart
+
+          const result = await pool.decompressBlocks(sharedBuf, scanBlocks)
+          if (result.timing) {
+            totalDispatchMs += result.timing.dispatchMs
+            totalReassembleMs += result.timing.reassembleMs
+            for (const wt of result.timing.workerTimings) {
+              totalWorkerWasmMs += wt.wasmMs
+              totalWorkerViewMs += wt.viewMs
+            }
+          }
+
+          const assembleStart = performance.now()
+          // Just call assembleChunkSliceResult equivalent via full path
+          // (the actual assembly is fast, this measures it)
+          totalAssembleMs += performance.now() - assembleStart
         }
+        const parTime = performance.now() - parStart
 
-        const assembleStart = performance.now()
-        // Just call assembleChunkSliceResult equivalent via full path
-        // (the actual assembly is fast, this measures it)
-        totalAssembleMs += performance.now() - assembleStart
+        const sizeMB = (data.byteLength / 1024 / 1024).toFixed(1)
+        const avgWorkerWasm = (totalWorkerWasmMs / iterations).toFixed(1)
+        const avgDispatch = (totalDispatchMs / iterations).toFixed(1)
+        const avgCopy = (totalCopyMs / iterations).toFixed(1)
+        const avgScan = (totalScanMs / iterations).toFixed(1)
+        const avgReassemble = (totalReassembleMs / iterations).toFixed(1)
+
+        return {
+          name: `benchmark ${name} (${sizeMB}MB)`,
+          pass: true,
+          detail: [
+            `${blocks.length} blocks, ${iterations}x: seq=${seqTime.toFixed(0)}ms par=${parTime.toFixed(0)}ms speedup=${(seqTime / parTime).toFixed(2)}x`,
+            `  avg/iter: scan=${avgScan}ms copy=${avgCopy}ms dispatch+wasm=${avgDispatch}ms reassemble=${avgReassemble}ms`,
+            `  worker totals/iter: view=${(totalWorkerViewMs / iterations).toFixed(1)}ms wasm=${avgWorkerWasm}ms`,
+          ].join('\n'),
+        }
       }
-      const parTime = performance.now() - parStart
 
-      const sizeMB = (data.byteLength / 1024 / 1024).toFixed(1)
-      const avgWorkerWasm = (totalWorkerWasmMs / iterations).toFixed(1)
-      const avgDispatch = (totalDispatchMs / iterations).toFixed(1)
-      const avgCopy = (totalCopyMs / iterations).toFixed(1)
-      const avgScan = (totalScanMs / iterations).toFixed(1)
-      const avgReassemble = (totalReassembleMs / iterations).toFixed(1)
+      async function verifyCorrectness(data, pool) {
+        const blocks = scanBgzfBlocks(data, 0, data.length)
+        const lastBlock = blocks[blocks.length - 1]
+        const results = []
 
-      return {
-        name: `benchmark ${name} (${sizeMB}MB)`,
-        pass: true,
-        detail: [
-          `${blocks.length} blocks, ${iterations}x: seq=${seqTime.toFixed(0)}ms par=${parTime.toFixed(0)}ms speedup=${(seqTime / parTime).toFixed(2)}x`,
-          `  avg/iter: scan=${avgScan}ms copy=${avgCopy}ms dispatch+wasm=${avgDispatch}ms reassemble=${avgReassemble}ms`,
-          `  worker totals/iter: view=${(totalWorkerViewMs/iterations).toFixed(1)}ms wasm=${avgWorkerWasm}ms`,
-        ].join('\n'),
-      }
-    }
+        for (const [label, chunk] of [
+          [
+            'single block',
+            {
+              minv: { dataPosition: 0, blockPosition: 0 },
+              maxv: { dataPosition: 100, blockPosition: 0 },
+            },
+          ],
+          [
+            'multi-block',
+            {
+              minv: { dataPosition: 0, blockPosition: 0 },
+              maxv: {
+                dataPosition: 100,
+                blockPosition: lastBlock.filePosition,
+              },
+            },
+          ],
+          [
+            'multi-block offset',
+            {
+              minv: { dataPosition: 50, blockPosition: 0 },
+              maxv: {
+                dataPosition: 100,
+                blockPosition: lastBlock.filePosition,
+              },
+            },
+          ],
+        ]) {
+          const sequential = await unzipChunkSlice(data, chunk)
+          const parallel = await unzipChunkSlice(data, chunk, undefined, pool)
 
-    async function verifyCorrectness(data, pool) {
-      const blocks = scanBgzfBlocks(data, 0, data.length)
-      const lastBlock = blocks[blocks.length - 1]
-      const results = []
+          const buffersMatch =
+            sequential.buffer.length === parallel.buffer.length &&
+            sequential.buffer.every((v, i) => v === parallel.buffer[i])
+          const cposMatch =
+            JSON.stringify(sequential.cpositions) ===
+            JSON.stringify(parallel.cpositions)
+          const dposMatch =
+            JSON.stringify(sequential.dpositions) ===
+            JSON.stringify(parallel.dpositions)
 
-      for (const [label, chunk] of [
-        ['single block', {
-          minv: { dataPosition: 0, blockPosition: 0 },
-          maxv: { dataPosition: 100, blockPosition: 0 },
-        }],
-        ['multi-block', {
-          minv: { dataPosition: 0, blockPosition: 0 },
-          maxv: { dataPosition: 100, blockPosition: lastBlock.filePosition },
-        }],
-        ['multi-block offset', {
-          minv: { dataPosition: 50, blockPosition: 0 },
-          maxv: { dataPosition: 100, blockPosition: lastBlock.filePosition },
-        }],
-      ]) {
-        const sequential = await unzipChunkSlice(data, chunk)
-        const parallel = await unzipChunkSlice(data, chunk, undefined, pool)
-
-        const buffersMatch = sequential.buffer.length === parallel.buffer.length &&
-          sequential.buffer.every((v, i) => v === parallel.buffer[i])
-        const cposMatch = JSON.stringify(sequential.cpositions) === JSON.stringify(parallel.cpositions)
-        const dposMatch = JSON.stringify(sequential.dpositions) === JSON.stringify(parallel.dpositions)
-
-        results.push({
-          name: `correctness: ${label}`,
-          pass: buffersMatch && cposMatch && dposMatch,
-          detail: `buf=${buffersMatch} cpos=${cposMatch} dpos=${dposMatch}`,
-        })
-      }
-      return results
-    }
-
-    window.runTests = async () => {
-      const results = []
-      const NUM_WORKERS = 8
-
-      results.push({
-        name: 'SharedArrayBuffer available',
-        pass: typeof SharedArrayBuffer !== 'undefined' && crossOriginIsolated,
-      })
-
-      let pool
-      try {
-        pool = await createBgzfWorkerPool(NUM_WORKERS)
-        results.push({ name: `createBgzfWorkerPool(${NUM_WORKERS})`, pass: true })
-      } catch (e) {
-        results.push({ name: 'createBgzfWorkerPool', pass: false, error: e.message })
+          results.push({
+            name: `correctness: ${label}`,
+            pass: buffersMatch && cposMatch && dposMatch,
+            detail: `buf=${buffersMatch} cpos=${cposMatch} dpos=${dposMatch}`,
+          })
+        }
         return results
       }
 
-      // Correctness tests on paired.bam
-      const pairedData = await fetchFile('/test/data/paired.bam')
-      results.push(...await verifyCorrectness(pairedData, pool))
+      window.runTests = async () => {
+        const results = []
+        const NUM_WORKERS = 8
 
-      // Benchmarks — small to large
-      results.push(await benchFile('paired.bam', pairedData, pool, 50))
+        results.push({
+          name: 'SharedArrayBuffer available',
+          pass: typeof SharedArrayBuffer !== 'undefined' && crossOriginIsolated,
+        })
 
-      const tkoData = await fetchFile('/test/data/T_ko.2bit.gz')
-      results.push(await benchFile('T_ko.2bit.gz', tkoData, pool, 20))
+        let pool
+        try {
+          pool = await createBgzfWorkerPool(NUM_WORKERS)
+          results.push({
+            name: `createBgzfWorkerPool(${NUM_WORKERS})`,
+            pass: true,
+          })
+        } catch (e) {
+          results.push({
+            name: 'createBgzfWorkerPool',
+            pass: false,
+            error: e.message,
+          })
+          return results
+        }
 
-      const shortreadsData = await fetchFile('/test/data/shortreads_300x.bam')
-      results.push(await benchFile('shortreads_300x.bam', shortreadsData, pool, 5))
+        // Correctness tests on paired.bam
+        const pairedData = await fetchFile('/test/data/paired.bam')
+        results.push(...(await verifyCorrectness(pairedData, pool)))
 
-      const gffData = await fetchFile('/test/data/out.sorted.gff.gz')
-      results.push(await benchFile('out.sorted.gff.gz', gffData, pool, 5))
+        // Benchmarks — small to large
+        results.push(await benchFile('paired.bam', pairedData, pool, 50))
 
-      const ontData = await fetchFile('/test/data/ultra-long-ont.bam')
-      results.push(await benchFile('ultra-long-ont.bam', ontData, pool, 3))
+        const tkoData = await fetchFile('/test/data/T_ko.2bit.gz')
+        results.push(await benchFile('T_ko.2bit.gz', tkoData, pool, 20))
 
-      const chr22Data = await fetchFile('/test/data/chr22_nanopore_subset.bam')
-      results.push(await benchFile('chr22_nanopore.bam', chr22Data, pool, 3))
+        const shortreadsData = await fetchFile('/test/data/shortreads_300x.bam')
+        results.push(
+          await benchFile('shortreads_300x.bam', shortreadsData, pool, 5),
+        )
 
-      const outData = await fetchFile('/test/data/out.bam')
-      results.push(await benchFile('out.bam', outData, pool, 2))
+        const gffData = await fetchFile('/test/data/out.sorted.gff.gz')
+        results.push(await benchFile('out.sorted.gff.gz', gffData, pool, 5))
 
-      pool.destroy()
-      return results
-    }
-  </script>
-</body>
+        const ontData = await fetchFile('/test/data/ultra-long-ont.bam')
+        results.push(await benchFile('ultra-long-ont.bam', ontData, pool, 3))
+
+        const chr22Data = await fetchFile(
+          '/test/data/chr22_nanopore_subset.bam',
+        )
+        results.push(await benchFile('chr22_nanopore.bam', chr22Data, pool, 3))
+
+        const outData = await fetchFile('/test/data/out.bam')
+        results.push(await benchFile('out.bam', outData, pool, 2))
+
+        pool.destroy()
+        return results
+      }
+    </script>
+  </body>
 </html>
