@@ -187,11 +187,11 @@ export function decompress_chunk_slice(input, min_block_position, min_data_posit
         wasm.__wbindgen_add_to_stack_pointer(16);
     }
 }
-export function __wbg_Error_8c4e43fe74559d73(arg0, arg1) {
+export function __wbg_Error_55538483de6e3abe(arg0, arg1) {
     const ret = Error(getStringFromWasm0(arg0, arg1));
     return addHeapObject(ret);
 }
-export function __wbg___wbindgen_throw_be289d5034ed271b(arg0, arg1) {
+export function __wbg___wbindgen_throw_5549492daedad139(arg0, arg1) {
     throw new Error(getStringFromWasm0(arg0, arg1));
 }
 const ChunkSliceResultFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -211,7 +211,7 @@ function addHeapObject(obj) {
 }
 
 function dropObject(idx) {
-    if (idx < 132) return;
+    if (idx < 1028) return;
     heap[idx] = heap_next;
     heap_next = idx;
 }
@@ -257,7 +257,7 @@ function getUint8ArrayMemory0() {
 
 function getObject(idx) { return heap[idx]; }
 
-let heap = new Array(128).fill(undefined);
+let heap = new Array(1024).fill(undefined);
 heap.push(undefined, null, true, false);
 
 let heap_next = heap.length;

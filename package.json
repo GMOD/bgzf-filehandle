@@ -28,14 +28,14 @@
     "benchonly": "vitest bench",
     "bench": "./scripts/build-both-branches.sh \"$BRANCH1\" \"$BRANCH2\" && vitest bench",
     "clean": "rimraf dist esm",
-    "prebuild": "yarn clean",
+    "prebuild": "pnpm clean",
     "format": "prettier --write .",
-    "build:wasm": "./scripts/build-wasm.sh",
+    "build:wasm": "pnpm --filter bgzf-wasm-build build",
     "build:esm": "tsc --outDir esm",
     "build:es5": "tsc --module commonjs --moduleResolution bundler --outDir dist",
-    "build": "yarn build:wasm && yarn build:esm && yarn build:es5",
+    "build": "pnpm build:wasm && pnpm build:esm && pnpm build:es5",
     "postbuild:es5": "echo '{\"type\": \"commonjs\"}' > dist/package.json",
-    "preversion": "yarn test --run && yarn build",
+    "preversion": "pnpm test --run && pnpm build",
     "postversion": "git push --follow-tags"
   },
   "keywords": [
