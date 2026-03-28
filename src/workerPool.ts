@@ -197,8 +197,6 @@ export async function createBgzfWorkerPool(
       const numW = workers.length
       const blocksPerWorker = Math.ceil(blocks.length / numW)
 
-      // Dispatch contiguous byte ranges — each worker calls decompressAll
-      // on its slice (single WASM call, single Decompressor, single output Vec)
       const rangeInfos: { startBlock: number; endBlock: number }[] = []
       const promises: Promise<RangeResult>[] = []
 

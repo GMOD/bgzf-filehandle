@@ -36,7 +36,7 @@
         // Warmup
         for (let i = 0; i < 3; i++) {
           await unzipChunkSlice(data, chunk)
-          await unzipChunkSlice(data, chunk, undefined, pool)
+          await unzipChunkSlice(data, chunk, pool)
         }
 
         const seqStart = performance.now()
@@ -144,7 +144,7 @@
           ],
         ]) {
           const sequential = await unzipChunkSlice(data, chunk)
-          const parallel = await unzipChunkSlice(data, chunk, undefined, pool)
+          const parallel = await unzipChunkSlice(data, chunk, pool)
 
           const buffersMatch =
             sequential.buffer.length === parallel.buffer.length &&
