@@ -6,20 +6,8 @@ import {
   decompressAll,
   decompressChunkSlice,
 } from './wasm/bgzf-wasm-inlined.js'
+
 import type { BgzfWorkerPool } from './workerPool.ts'
-
-export interface BlockCache {
-  get(key: string): { buffer: Uint8Array; bytesRead: number } | undefined
-  set(key: string, value: { buffer: Uint8Array; bytesRead: number }): void
-}
-
-export interface Filehandle {
-  read(
-    length: number,
-    position: number,
-    opts?: Record<string, unknown>,
-  ): Promise<Uint8Array>
-}
 
 interface VirtualOffset {
   blockPosition: number
@@ -31,7 +19,7 @@ interface Chunk {
 }
 
 function hasGzipHeader(data: Uint8Array) {
-  return data.length >= 2 && data[0] === 0x1f && data[1] === 0x8b
+  return data.length >= 2 && data[0] === 0x1F && data[1] === 0x8B
 }
 
 async function decompressGzip(inputData: Uint8Array) {

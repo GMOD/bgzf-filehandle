@@ -20,8 +20,8 @@ export function scanBgzfBlocks(
 
   while (offset + BGZF_MIN_BLOCK_SIZE <= input.length) {
     if (
-      input[offset] !== 0x1f ||
-      input[offset + 1] !== 0x8b ||
+      input[offset] !== 0x1F ||
+      input[offset + 1] !== 0x8B ||
       input[offset + 2] !== 8 ||
       input[offset + 3] !== 4
     ) {
