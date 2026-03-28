@@ -23,6 +23,10 @@ jobs:
           cache: pnpm
           registry-url: 'https://registry.npmjs.org'
           token: ''
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - run: cargo install wasm-bindgen-cli
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: npm publish --provenance --access public
