@@ -1,12 +1,11 @@
-import { decompressBlock, decompressAll } from './wrapper.js'
+import * as bg from '../../src/wasm/bgzf_wasm_bg.js'
 
 async function handleMessage(data) {
   if (data.type === 'init') {
-    try {
-      await decompressBlock(new Uint8Array(0))
-    } catch {
-      // expected to fail on empty input, but WASM is now initialized
-    }
+    const instance = await WebAssembly.instantiate(data.wasmModule, {
+      './bgzf_wasm_bg.js': bg,
+    })
+    bg.__wbg_set_wasm(instance.exports)
     return { type: 'ready' }
   }
 
@@ -15,7 +14,7 @@ async function handleMessage(data) {
     const t0 = performance.now()
     const input = new Uint8Array(sharedInput, inputOffset, inputLength)
     const t1 = performance.now()
-    const decompressed = await decompressAll(input)
+    const decompressed = bg.decompress_all(input)
     const t2 = performance.now()
     return {
       type: 'rangeResult',

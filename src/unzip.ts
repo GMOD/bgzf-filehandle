@@ -5,7 +5,7 @@ import { concatUint8Array } from './util.ts'
 import {
   decompressAll,
   decompressChunkSlice,
-} from './wasm/bgzf-wasm-inlined.js'
+} from './wasm/loadWasm.ts'
 
 import type { BgzfWorkerPool } from './workerPool.ts'
 

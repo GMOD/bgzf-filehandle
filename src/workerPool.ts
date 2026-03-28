@@ -1,4 +1,5 @@
 import workerSource from './wasm/bgzf-worker-source.ts'
+import { getCompiledWasmModule } from './wasm/loadWasm.ts'
 
 import type { BgzfBlockInfo } from './bgzfBlockScan.ts'
 
@@ -109,8 +110,8 @@ class ManagedWorker {
     return promise
   }
 
-  init() {
-    this.worker.postMessage({ type: 'init' })
+  init(wasmModule: WebAssembly.Module) {
+    this.worker.postMessage({ type: 'init', wasmModule })
   }
 
   terminate() {
@@ -181,8 +182,9 @@ export async function createBgzfWorkerPool(
     workers.push(new ManagedWorker(url))
   }
 
+  const wasmModule = await getCompiledWasmModule()
   for (const w of workers) {
-    w.init()
+    w.init(wasmModule)
   }
   await Promise.all(workers.map(w => w.readyPromise))
 

@@ -9,14 +9,11 @@ cargo build --release --target wasm32-unknown-unknown
 echo "Generating JS bindings..."
 wasm-bindgen --target bundler --out-dir ../src/wasm target/wasm32-unknown-unknown/release/bgzf_wasm.wasm
 
-echo "Bundling with webpack..."
+echo "Bundling worker with esbuild..."
 cd ..
-npx webpack --config crate/webpack.config.js
-
-echo "Bundling worker with webpack..."
-npx webpack --config crate/webpack.worker.config.js
+npx esbuild crate/src/worker-entry.js --bundle --format=iife --outfile=src/wasm/bgzf-worker-bundle.js
 
 echo "Inlining worker source..."
-bash "$(dirname "$0")/inline-worker.sh"
+bash scripts/inline-worker.sh
 
 echo "WASM build complete!"
