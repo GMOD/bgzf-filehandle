@@ -17,7 +17,7 @@ export class BgzfWorkerPoolClient implements BgzfWorkerPool {
 
   constructor(port: MessagePort) {
     this.port = port
-    this.port.onmessage = (e) => {
+    this.port.onmessage = e => {
       this.handleResponse(e.data)
     }
     this.port.start()

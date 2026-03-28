@@ -1,9 +1,6 @@
 import { ungzip } from 'pako-esm2'
 
-import {
-  type BgzfBlockInfo,
-  scanBgzfBlocks,
-} from './bgzfBlockScan.ts'
+import { type BgzfBlockInfo, scanBgzfBlocks } from './bgzfBlockScan.ts'
 import { concatUint8Array } from './util.ts'
 import {
   decompressAll,
@@ -34,7 +31,7 @@ interface Chunk {
 }
 
 function hasGzipHeader(data: Uint8Array) {
-  return data.length >= 2 && data[0] === 0x1F && data[1] === 0x8B
+  return data.length >= 2 && data[0] === 0x1f && data[1] === 0x8b
 }
 
 async function decompressGzip(inputData: Uint8Array) {
@@ -152,7 +149,10 @@ export async function unzipChunkSlice(
 
     if (blocks.length > 1) {
       let sharedBuf: SharedArrayBuffer
-      if (inputData.buffer instanceof SharedArrayBuffer && inputData.byteOffset === 0) {
+      if (
+        inputData.buffer instanceof SharedArrayBuffer &&
+        inputData.byteOffset === 0
+      ) {
         sharedBuf = inputData.buffer
       } else {
         sharedBuf = new SharedArrayBuffer(inputData.byteLength)
@@ -164,7 +164,12 @@ export async function unzipChunkSlice(
         blocks,
       )
       return {
-        ...assembleChunkSliceResult(decompressResult.blocks, blocks, minv, maxv),
+        ...assembleChunkSliceResult(
+          decompressResult.blocks,
+          blocks,
+          minv,
+          maxv,
+        ),
         timing: decompressResult.timing,
       }
     }

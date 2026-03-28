@@ -26,7 +26,13 @@ export interface WorkerTiming {
 
 type WorkerMessage =
   | { type: 'ready' }
-  | { type: 'rangeResult'; batchId: number; data: Uint8Array; viewMs: number; wasmMs: number }
+  | {
+      type: 'rangeResult'
+      batchId: number
+      data: Uint8Array
+      viewMs: number
+      wasmMs: number
+    }
   | { type: 'error'; message?: string }
 
 interface RangeResult {
@@ -52,10 +58,10 @@ class ManagedWorker {
 
   constructor(workerUrl: string | URL) {
     this.worker = new Worker(workerUrl)
-    this.readyPromise = new Promise<void>((resolve) => {
+    this.readyPromise = new Promise<void>(resolve => {
       this.readyResolve = resolve
     })
-    this.worker.onmessage = (e) => {
+    this.worker.onmessage = e => {
       this.handleMessage(e.data)
     }
   }
@@ -138,7 +144,7 @@ export function getSharedWorkerPool(
   }
   if (!sharedPoolPromise) {
     const gen = poolGeneration
-    sharedPoolPromise = createBgzfWorkerPool(numWorkers).then((pool) => {
+    sharedPoolPromise = createBgzfWorkerPool(numWorkers).then(pool => {
       if (gen !== poolGeneration) {
         pool.destroy()
         throw new Error('Worker pool was destroyed during initialization')
@@ -168,9 +174,7 @@ export async function createBgzfWorkerPool(
   }
 
   const url = workerUrl ?? getWorkerBlobUrl()
-  const count =
-    numWorkers ??
-    Math.min(navigator.hardwareConcurrency, 4)
+  const count = numWorkers ?? Math.min(navigator.hardwareConcurrency, 4)
   const workers: ManagedWorker[] = []
 
   for (let i = 0; i < count; i++) {
@@ -180,7 +184,7 @@ export async function createBgzfWorkerPool(
   for (const w of workers) {
     w.init()
   }
-  await Promise.all(workers.map((w) => w.readyPromise))
+  await Promise.all(workers.map(w => w.readyPromise))
 
   let destroyed = false
 

@@ -25,11 +25,7 @@ test('scanBgzfBlocks finds correct block boundaries in paired.bam', () => {
 test('scanBgzfBlocks respects maxBlockPosition', () => {
   const testData = fs.readFileSync(require.resolve('./data/paired.bam'))
   const allBlocks = scanBgzfBlocks(testData, 0, testData.length)
-  const firstTwoBlocks = scanBgzfBlocks(
-    testData,
-    0,
-    allBlocks[1]!.filePosition,
-  )
+  const firstTwoBlocks = scanBgzfBlocks(testData, 0, allBlocks[1]!.filePosition)
   expect(firstTwoBlocks.length).toBe(2)
 })
 
