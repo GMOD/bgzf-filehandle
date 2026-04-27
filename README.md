@@ -1,6 +1,6 @@
 [![NPM version](https://img.shields.io/npm/v/@gmod/bgzf-filehandle.svg?style=flat-square)](https://npmjs.org/package/@gmod/bgzf-filehandle)
-[![Coverage Status](https://img.shields.io/codecov/c/github/GMOD/bgzf-filehandle/master.svg?style=flat-square)](https://codecov.io/gh/GMOD/bgzf-filehandle/branch/master)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/GMOD/bgzf-filehandle/push.yml?branch=master)](https://github.com/GMOD/bgzf-filehandle/actions)
+[![Coverage Status](https://img.shields.io/codecov/c/github/GMOD/bgzf-filehandle/main.svg?style=flat-square)](https://codecov.io/gh/GMOD/bgzf-filehandle/branch/main)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/GMOD/bgzf-filehandle/push.yml?branch=main)](https://github.com/GMOD/bgzf-filehandle/actions)
 
 Transparently read
 [indexed block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such
@@ -67,6 +67,10 @@ This package was written with funding from the [NHGRI](http://genome.gov) as
 part of the [JBrowse](http://jbrowse.org) project. If you use it in an academic
 project that you publish, please cite the most recent JBrowse paper, which will
 be linked from [jbrowse.org](http://jbrowse.org).
+
+## Publishing
+
+Releases are published to npm automatically via GitHub Actions using [npm trusted publishing](https://docs.npmjs.com/generating-provenance-statements) (OIDC-based provenance), triggered on version tags.
 
 ## License
 
