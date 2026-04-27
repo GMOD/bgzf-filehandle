@@ -93,7 +93,7 @@ export default class GziIndex {
 
     let comparison = compare(
       position,
-      entries[searchPosition]!,
+      entries[searchPosition],
       entries[searchPosition + 1],
     )
     while (comparison !== 0) {
@@ -105,17 +105,17 @@ export default class GziIndex {
       searchPosition = Math.ceil((upperBound - lowerBound) / 2) + lowerBound
       comparison = compare(
         position,
-        entries[searchPosition]!,
+        entries[searchPosition],
         entries[searchPosition + 1],
       )
     }
 
     // here's where we read forward
-    relevant.push(entries[searchPosition]!)
+    relevant.push(entries[searchPosition])
     let i = searchPosition + 1
     for (; i < entries.length; i += 1) {
-      relevant.push(entries[i]!)
-      if (entries[i]![UNCOMPRESSED_POSITION] >= endPosition) {
+      relevant.push(entries[i])
+      if (entries[i][UNCOMPRESSED_POSITION] >= endPosition) {
         break
       }
     }

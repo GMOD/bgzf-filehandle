@@ -171,7 +171,7 @@ test('cpositions increment correctly from large starting position', async () => 
 
   // Subsequent positions should be increasing
   for (let i = 1; i < cpositions.length; i++) {
-    expect(cpositions[i]).toBeGreaterThan(cpositions[i - 1]!)
+    expect(cpositions[i]).toBeGreaterThan(cpositions[i - 1])
   }
 
   // All positions should be large (>5TB)
