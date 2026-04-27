@@ -4,15 +4,13 @@
 
 Transparently read
 [indexed block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such
-as those created by bgzip, using coordinates from the uncompressed file. The
-module is used in @gmod/indexedfasta to read bgzip-indexed fasta files (with gzi
-index, fai index, and fa).
+as those created by bgzip, using coordinates from the uncompressed file.
 
-Uses WASM (libdeflate) for decompression.
+Uses WASM (libdeflate) for decompression. Used by [@gmod/indexedfasta](https://github.com/GMOD/indexedfasta) for bgzip-indexed FASTA files and [@gmod/bam](https://github.com/GMOD/bam-js) for BAM file decoding.
 
 ## Install
 
-    $ npm install --save @gmod/bgzf-filehandle
+    $ npm install @gmod/bgzf-filehandle
 
 ## Usage
 
@@ -30,7 +28,8 @@ const f = new BgzfFilehandle({
   gziFilehandle: new LocalFile('path/to/my_file.gz.gzi'),
 })
 
-const data = await f.read(300, 0) // read(length, position) => Uint8Array
+// note: read(length, position) — matches generic-filehandle2 convention
+const data = await f.read(300, 0) // => Uint8Array
 ```
 
 ### unzip
