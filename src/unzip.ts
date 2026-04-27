@@ -72,7 +72,11 @@ export async function unzip(inputData: Uint8Array) {
   }
 }
 
-export async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk, _blockCache?: unknown) {
+export async function unzipChunkSlice(
+  inputData: Uint8Array,
+  chunk: Chunk,
+  _blockCache?: unknown,
+) {
   const { minv, maxv } = chunk
   try {
     const result = await decompressChunkSlice(

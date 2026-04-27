@@ -2,11 +2,13 @@
 [![Coverage Status](https://img.shields.io/codecov/c/github/GMOD/bgzf-filehandle/main.svg?style=flat-square)](https://codecov.io/gh/GMOD/bgzf-filehandle/branch/main)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/GMOD/bgzf-filehandle/push.yml?branch=main)](https://github.com/GMOD/bgzf-filehandle/actions)
 
-Transparently read
-[indexed block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such
+Reads [block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such
 as those created by bgzip, using coordinates from the uncompressed file.
 
-Uses WASM (libdeflate) for decompression. Used by [@gmod/indexedfasta](https://github.com/GMOD/indexedfasta) for bgzip-indexed FASTA files and [@gmod/bam](https://github.com/GMOD/bam-js) for BAM file decoding.
+Uses WASM (libdeflate) for decompression. Used by
+[@gmod/indexedfasta](https://github.com/GMOD/indexedfasta) for bgzip-indexed
+FASTA files with gzi index, and also [@gmod/bam](https://github.com/GMOD/bam-js)
+and [@gmod/tabix](https://github.com/GMOD/tabix-js) for block decoding.
 
 ## Install
 
@@ -69,7 +71,8 @@ be linked from [jbrowse.org](http://jbrowse.org).
 
 ## Publishing
 
-[Trusted publishing](https://docs.npmjs.com/about-trusted-publishing) via GitHub Actions.
+[Trusted publishing](https://docs.npmjs.com/about-trusted-publishing) via GitHub
+Actions.
 
 ```bash
 npm version patch  # or minor/major
