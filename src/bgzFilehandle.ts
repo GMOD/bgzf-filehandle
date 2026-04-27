@@ -55,10 +55,10 @@ export default class BgzFilehandle {
       blockNum += 1
     ) {
       const uncompressedBuffer = await this._readAndUncompressBlock(
-        blockPositions[blockNum][0],
-        blockPositions[blockNum + 1][0],
+        blockPositions[blockNum]![0],
+        blockPositions[blockNum + 1]![0],
       )
-      const [, uncompressedPosition] = blockPositions[blockNum]
+      const [, uncompressedPosition] = blockPositions[blockNum]!
       const sourceOffset =
         uncompressedPosition >= position ? 0 : position - uncompressedPosition
       const sourceEnd =
