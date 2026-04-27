@@ -69,7 +69,11 @@ be linked from [jbrowse.org](http://jbrowse.org).
 
 ## Publishing
 
-Releases are published to npm automatically via GitHub Actions using [npm trusted publishing](https://docs.npmjs.com/generating-provenance-statements) (OIDC-based provenance), triggered on version tags.
+[Trusted publishing](https://docs.npmjs.com/about-trusted-publishing) via GitHub Actions.
+
+```bash
+npm version patch  # or minor/major
+```
 
 ## License
 

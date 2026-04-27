@@ -8,14 +8,10 @@
     "url": "https://github.com/GMOD/bgzf-filehandle.git"
   },
   "type": "module",
-  "types": "./dist/index.d.ts",
+  "main": "dist/index.js",
   "exports": {
-    "import": {
-      "import": "./esm/index.js"
-    },
-    "require": {
-      "require": "./dist/index.js"
-    }
+    "import": "./esm/index.js",
+    "require": "./dist/index.js"
   },
   "files": [
     "dist",
@@ -24,19 +20,19 @@
   ],
   "scripts": {
     "test": "vitest",
-    "lint": "eslint --report-unused-disable-directives --max-warnings 0",
-    "benchonly": "vitest bench",
-    "bench": "./scripts/build-both-branches.sh \"$BRANCH1\" \"$BRANCH2\" && vitest bench",
     "clean": "rimraf dist esm",
-    "prebuild": "pnpm clean",
     "format": "prettier --write .",
-    "build:wasm": "pnpm --filter bgzf-wasm-build build",
+    "lint": "eslint --report-unused-disable-directives --max-warnings 0",
+    "prebuild": "pnpm clean",
     "build:esm": "tsc --outDir esm",
     "build:es5": "tsc --module commonjs --moduleResolution bundler --outDir dist",
-    "build": "pnpm build:wasm && pnpm build:esm && pnpm build:es5",
     "postbuild:es5": "echo '{\"type\": \"commonjs\"}' > dist/package.json",
-    "preversion": "pnpm test --run && pnpm build",
-    "postversion": "git push --follow-tags"
+    "preversion": "pnpm lint && pnpm test --run && pnpm build",
+    "postversion": "git push --follow-tags",
+    "build": "pnpm build:wasm && pnpm build:esm && pnpm build:es5",
+    "benchonly": "vitest bench",
+    "bench": "./scripts/build-both-branches.sh \"$BRANCH1\" \"$BRANCH2\" && vitest bench",
+    "build:wasm": "pnpm --filter bgzf-wasm-build build"
   },
   "keywords": [
     "bionode",
@@ -49,23 +45,27 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^25.5.0",
-    "@typescript-eslint/eslint-plugin": "^8.57.2",
-    "@typescript-eslint/parser": "^8.57.2",
-    "@vitest/coverage-v8": "^4.1.2",
-    "eslint": "^9.39.4",
+    "@types/node": "^25.6.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.0",
+    "@typescript-eslint/parser": "^8.59.0",
+    "@vitest/coverage-v8": "^4.1.5",
+    "eslint": "^10.2.1",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-unicorn": "^64.0.0",
-    "prettier": "^3.8.1",
-    "puppeteer": "^24.40.0",
+    "prettier": "^3.8.3",
+    "puppeteer": "^24.42.0",
     "rimraf": "^6.1.3",
-    "typescript": "^6.0.2",
-    "typescript-eslint": "^8.57.2",
-    "vitest": "^4.1.2",
-    "webpack": "^5.105.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.0",
+    "vitest": "^4.1.5",
+    "webpack": "^5.106.2",
     "webpack-cli": "^7.0.2"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "author": {
+    "name": "Colin Diesh",
+    "email": "colin.diesh@gmail.com"
   }
 }
