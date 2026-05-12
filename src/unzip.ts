@@ -58,19 +58,22 @@ export async function unzip(inputData: Uint8Array) {
         return decompressGzip(inputData)
       }
       throw new Error(
-        'problem decompressing block: not a valid bgzf or gzip block',
+        `problem decompressing block: not a valid bgzf or gzip block. ${corsGzipHint}`,
         { cause: error },
       )
     }
     if (`${error}`.includes('invalid gzip header')) {
       throw new Error(
-        'problem decompressing block: incorrect gzip header check',
+        `problem decompressing block: incorrect gzip header check. ${corsGzipHint}`,
         { cause: error },
       )
     }
     throw error
   }
 }
+
+const corsGzipHint =
+  'This can happen if the server returns "Content-Encoding: gzip" on range requests, which causes the browser to silently decompress the response and invalidate the requested byte offsets. Check the server configuration.'
 
 export async function unzipChunkSlice(
   inputData: Uint8Array,
@@ -94,7 +97,7 @@ export async function unzipChunkSlice(
   } catch (error) {
     if (`${error}`.includes('invalid gzip header')) {
       throw new Error(
-        'problem decompressing block: incorrect gzip header check',
+        `problem decompressing block: incorrect gzip header check. ${corsGzipHint}`,
         { cause: error },
       )
     }
