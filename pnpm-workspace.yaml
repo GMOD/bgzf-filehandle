@@ -1,2 +1,5 @@
 packages:
   - crate
+allowBuilds:
+  puppeteer: true
+  unrs-resolver: true

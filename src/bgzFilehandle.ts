@@ -26,51 +26,39 @@ export default class BgzFilehandle {
     compressedPosition: number,
     nextCompressedPosition: number,
   ) {
-    let next = nextCompressedPosition
-    if (!next) {
-      next = (await this.filehandle.stat()).size
-    }
-
-    // read the compressed data into the block buffer
-    const blockCompressedLength = next - compressedPosition
-
     const blockBuffer = await this.filehandle.read(
-      blockCompressedLength,
+      nextCompressedPosition - compressedPosition,
       compressedPosition,
     )
-
-    // uncompress it
     return unzip(blockBuffer)
   }
 
   async read(length: number, position: number) {
-    const blockPositions = await this.gzi.getRelevantBlocksForRead(
-      length,
-      position,
-    )
-    const blocks = [] as Uint8Array[]
-    for (
-      let blockNum = 0;
-      blockNum < blockPositions.length - 1;
-      blockNum += 1
-    ) {
+    const { blocks: blockPositions, nextCompressedPosition } =
+      await this.gzi.getRelevantBlocksForRead(length, position)
+    const decompressed: Uint8Array[] = []
+    for (let blockNum = 0; blockNum < blockPositions.length; blockNum += 1) {
+      const [compressedPosition, uncompressedPosition] =
+        blockPositions[blockNum]!
+      const nextBlock = blockPositions[blockNum + 1]
+      const nextCompressed = nextBlock
+        ? nextBlock[0]
+        : (nextCompressedPosition ?? (await this.filehandle.stat()).size)
       const uncompressedBuffer = await this._readAndUncompressBlock(
-        blockPositions[blockNum]![0],
-        blockPositions[blockNum + 1]![0],
+        compressedPosition,
+        nextCompressed,
       )
-      const [, uncompressedPosition] = blockPositions[blockNum]!
-      const sourceOffset =
-        uncompressedPosition >= position ? 0 : position - uncompressedPosition
+      const sourceOffset = Math.max(0, position - uncompressedPosition)
       const sourceEnd =
         Math.min(
           position + length,
           uncompressedPosition + uncompressedBuffer.length,
         ) - uncompressedPosition
-      if (sourceOffset >= 0 && sourceOffset < uncompressedBuffer.length) {
-        blocks.push(uncompressedBuffer.subarray(sourceOffset, sourceEnd))
+      if (sourceOffset < uncompressedBuffer.length) {
+        decompressed.push(uncompressedBuffer.subarray(sourceOffset, sourceEnd))
       }
     }
 
-    return concatUint8Array(blocks)
+    return concatUint8Array(decompressed)
   }
 }

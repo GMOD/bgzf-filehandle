@@ -27,31 +27,38 @@ describe('gzi objects', () => {
       [453884, 456960],
     ])
 
-    expect(await idx.getRelevantBlocksForRead(100000, 0)).toEqual([
-      [0, 0],
-      [64791, 65280],
-      [129553, 130560],
-    ])
+    expect(await idx.getRelevantBlocksForRead(100000, 0)).toEqual({
+      blocks: [
+        [0, 0],
+        [64791, 65280],
+      ],
+      nextCompressedPosition: 129553,
+    })
 
-    expect(await idx.getRelevantBlocksForRead(1, 100000)).toEqual([
-      [64791, 65280],
-      [129553, 130560],
-    ])
+    expect(await idx.getRelevantBlocksForRead(1, 100000)).toEqual({
+      blocks: [[64791, 65280]],
+      nextCompressedPosition: 129553,
+    })
 
-    expect(await idx.getRelevantBlocksForRead(0, 100000)).toEqual([])
+    expect(await idx.getRelevantBlocksForRead(0, 100000)).toEqual({
+      blocks: [],
+      nextCompressedPosition: undefined,
+    })
 
-    expect(await idx.getRelevantBlocksForRead(500000, 300000)).toEqual([
-      [259166, 261120],
-      [324086, 326400],
-      [389021, 391680],
-      [453884, 456960],
-      [],
-    ])
+    expect(await idx.getRelevantBlocksForRead(500000, 300000)).toEqual({
+      blocks: [
+        [259166, 261120],
+        [324086, 326400],
+        [389021, 391680],
+        [453884, 456960],
+      ],
+      nextCompressedPosition: undefined,
+    })
 
-    expect(await idx.getRelevantBlocksForRead(10, 500000)).toEqual([
-      [453884, 456960],
-      [],
-    ])
+    expect(await idx.getRelevantBlocksForRead(10, 500000)).toEqual({
+      blocks: [[453884, 456960]],
+      nextCompressedPosition: undefined,
+    })
 
     expect(await idx.getLastBlock()).toEqual([453884, 456960])
   })

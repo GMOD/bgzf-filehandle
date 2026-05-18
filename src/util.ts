@@ -1,13 +1,9 @@
-function sum(array: Uint8Array[]) {
+export function concatUint8Array(args: Uint8Array[]) {
   let total = 0
-  for (const entry of array) {
+  for (const entry of args) {
     total += entry.length
   }
-  return total
-}
-
-export function concatUint8Array(args: Uint8Array[], totalLength?: number) {
-  const mergedArray = new Uint8Array(totalLength ?? sum(args))
+  const mergedArray = new Uint8Array(total)
   let offset = 0
   for (const entry of args) {
     mergedArray.set(entry, offset)

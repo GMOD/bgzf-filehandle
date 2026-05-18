@@ -18,32 +18,16 @@ function hasGzipHeader(data: Uint8Array) {
   return data.length >= 2 && data[0] === 0x1f && data[1] === 0x8b
 }
 
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : `${error}`
+}
+
 async function decompressGzip(inputData: Uint8Array) {
   if (typeof DecompressionStream !== 'undefined') {
-    const ds = new DecompressionStream('gzip')
-    const writer = ds.writable.getWriter()
-    const writePromise = writer
-      .write(inputData as Uint8Array<ArrayBuffer>)
-      .then(() => writer.close())
-    const chunks: Uint8Array[] = []
-    const reader = ds.readable.getReader()
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) {
-        break
-      }
-      chunks.push(value)
-    }
-    await writePromise
-    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
-    const result = new Uint8Array(totalLength)
-    let offset = 0
-    for (const chunk of chunks) {
-      result.set(chunk, offset)
-      offset += chunk.length
-    }
-    return result
+    const stream = new Blob([inputData as Uint8Array<ArrayBuffer>])
+      .stream()
+      .pipeThrough(new DecompressionStream('gzip'))
+    return new Uint8Array(await new Response(stream).arrayBuffer())
   } else {
     return ungzip(inputData, undefined)
   }
@@ -53,7 +37,8 @@ export async function unzip(inputData: Uint8Array) {
   try {
     return await decompressAll(inputData)
   } catch (error) {
-    if (`${error}`.includes('invalid bgzf header')) {
+    const message = errorMessage(error)
+    if (message.includes('invalid bgzf header')) {
       if (hasGzipHeader(inputData)) {
         return decompressGzip(inputData)
       }
@@ -62,7 +47,7 @@ export async function unzip(inputData: Uint8Array) {
         { cause: error },
       )
     }
-    if (`${error}`.includes('invalid gzip header')) {
+    if (message.includes('invalid gzip header')) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
         { cause: error },
@@ -72,11 +57,7 @@ export async function unzip(inputData: Uint8Array) {
   }
 }
 
-export async function unzipChunkSlice(
-  inputData: Uint8Array,
-  chunk: Chunk,
-  _blockCache?: unknown,
-) {
+export async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
   const { minv, maxv } = chunk
   try {
     const result = await decompressChunkSlice(
@@ -92,7 +73,7 @@ export async function unzipChunkSlice(
       dpositions: result.dpositions,
     }
   } catch (error) {
-    if (`${error}`.includes('invalid gzip header')) {
+    if (errorMessage(error).includes('invalid gzip header')) {
       throw new Error(
         'problem decompressing block: incorrect gzip header check',
         { cause: error },
