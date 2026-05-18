@@ -6,29 +6,8 @@ on:
       - 'v*'
 
 jobs:
-  build:
-    name: Build and test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-      - run: cargo install wasm-bindgen-cli
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24.x
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm test
-
   publish:
-    name: Publish to npm
-    needs: build
+    name: Build, test, and publish to npm
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -38,7 +17,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
-      - run: cargo install wasm-bindgen-cli
+      - name: Install wasm-bindgen-cli matching Cargo.lock
+        run: |
+          VERSION=$(cargo metadata --format-version 1 --manifest-path crate/Cargo.toml \
+            | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')
+          cargo install wasm-bindgen-cli --version "$VERSION"
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -49,4 +32,5 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - run: pnpm test
       - run: npm publish --access public
