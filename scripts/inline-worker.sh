@@ -1,12 +1,14 @@
 #!/bin/bash
 set -e
 
-WORKER_FILE="src/wasm/bgzf-worker-inlined.js"
-OUTPUT_FILE="src/wasm/bgzf-worker-source.ts"
+# Resolve repo root from script location so this works no matter the cwd.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+WORKER_FILE="$ROOT_DIR/src/wasm/bgzf-worker-inlined.js"
+OUTPUT_FILE="$ROOT_DIR/src/wasm/bgzf-worker-source.ts"
 
 echo "Inlining worker source into TypeScript module..."
 
-# Read the worker source, escape backticks, and wrap as a TS export
 echo "// Auto-generated - do not edit. Run scripts/inline-worker.sh to regenerate." > "$OUTPUT_FILE"
 echo "// eslint-disable-next-line" >> "$OUTPUT_FILE"
 echo -n "export default " >> "$OUTPUT_FILE"

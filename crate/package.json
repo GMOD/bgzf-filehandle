@@ -5,7 +5,8 @@
   "scripts": {
     "build:wasm": "cargo build --release --target wasm32-unknown-unknown && wasm-bindgen --target bundler --out-dir ../src/wasm target/wasm32-unknown-unknown/release/bgzf_wasm.wasm",
     "build:bundle": "webpack --config webpack.config.js",
-    "build": "pnpm build:wasm && pnpm build:bundle"
+    "build:worker-bundle": "webpack --config webpack.worker.config.js && bash ../scripts/inline-worker.sh",
+    "build": "pnpm build:wasm && pnpm build:bundle && pnpm build:worker-bundle"
   },
   "devDependencies": {
     "webpack": "^5.0.0",
