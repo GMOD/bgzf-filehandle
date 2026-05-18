@@ -33,7 +33,7 @@ type WorkerMessage =
       viewMs: number
       wasmMs: number
     }
-  | { type: 'error'; message?: string }
+  | { type: 'error'; batchId?: number; message?: string }
 
 interface RangeResult {
   data: Uint8Array
@@ -83,9 +83,19 @@ class ManagedWorker {
       }
     } else {
       const err = new Error(msg.message ?? 'worker decompression failed')
-      for (const [key, cb] of this.callbacks) {
-        this.callbacks.delete(key)
-        cb.reject(err)
+      if (msg.batchId !== undefined) {
+        const cb = this.callbacks.get(msg.batchId)
+        if (cb) {
+          this.callbacks.delete(msg.batchId)
+          cb.reject(err)
+        }
+      } else {
+        // No batchId — error wasn't tied to a specific request (e.g. the
+        // worker died mid-init). Fail every in-flight callback.
+        for (const [key, cb] of this.callbacks) {
+          this.callbacks.delete(key)
+          cb.reject(err)
+        }
       }
     }
   }
@@ -133,25 +143,43 @@ function getWorkerBlobUrl() {
 }
 
 let sharedPool: BgzfWorkerPool | undefined
-let sharedPoolPromise: Promise<BgzfWorkerPool> | undefined
+let sharedPoolPromise: Promise<BgzfWorkerPool | undefined> | undefined
 let poolGeneration = 0
 
+// Returns undefined when SharedArrayBuffer is unavailable (e.g. a JBrowse
+// install without cross-origin isolation), so callers can pass the result
+// straight to unzipChunkSlice and get the sequential fallback path.
 export function getSharedWorkerPool(
   numWorkers?: number,
-): Promise<BgzfWorkerPool> {
+): Promise<BgzfWorkerPool | undefined> {
   if (sharedPool) {
     return Promise.resolve(sharedPool)
   }
+  if (!sharedArrayBufferAvailable()) {
+    return Promise.resolve(undefined)
+  }
   if (!sharedPoolPromise) {
     const gen = poolGeneration
-    sharedPoolPromise = createBgzfWorkerPool(numWorkers).then(pool => {
-      if (gen !== poolGeneration) {
-        pool.destroy()
-        throw new Error('Worker pool was destroyed during initialization')
-      }
-      sharedPool = pool
-      return pool
-    })
+    const promise: Promise<BgzfWorkerPool | undefined> = createBgzfWorkerPool(
+      numWorkers,
+    ).then(
+      pool => {
+        if (gen !== poolGeneration) {
+          pool.destroy()
+          throw new Error('Worker pool was destroyed during initialization')
+        }
+        sharedPool = pool
+        return pool
+      },
+      (error: unknown) => {
+        // Clear the cached rejected promise so a later call can retry.
+        if (sharedPoolPromise === promise) {
+          sharedPoolPromise = undefined
+        }
+        throw error
+      },
+    )
+    sharedPoolPromise = promise
   }
   return sharedPoolPromise
 }

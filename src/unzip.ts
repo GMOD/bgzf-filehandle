@@ -138,6 +138,7 @@ export async function unzipChunkSlice(
     if (blocks.length > 1) {
       let sharedBuf: SharedArrayBuffer
       if (
+        typeof SharedArrayBuffer !== 'undefined' &&
         inputData.buffer instanceof SharedArrayBuffer &&
         inputData.byteOffset === 0
       ) {

@@ -61,6 +61,29 @@ The returned `cpositions` and `dpositions` give the block boundaries in
 compressed and decompressed coordinates, which can be used for generating stable
 feature IDs across chunk boundaries.
 
+### Parallel decompression (optional)
+
+`unzipChunkSlice` accepts an optional worker pool that parallelizes BGZF block
+decompression across Web Workers using `SharedArrayBuffer` for zero-copy input
+sharing. The pool is only usable in cross-origin-isolated browser contexts
+(`Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp`).
+
+The recommended pattern uses `getSharedWorkerPool`, which resolves to
+`undefined` when `SharedArrayBuffer` is unavailable so the same call site works
+in both isolated and non-isolated environments — non-isolated installs
+transparently fall back to the sequential WASM path:
+
+```typescript
+import { getSharedWorkerPool, unzipChunkSlice } from '@gmod/bgzf-filehandle'
+
+const pool = await getSharedWorkerPool() // undefined if SAB is unavailable
+const result = await unzipChunkSlice(compressedData, chunk, pool)
+```
+
+For more control (e.g. picking the worker count or owning the lifecycle),
+`createBgzfWorkerPool(numWorkers)` returns a pool directly and throws if SAB is
+unavailable.
+
 ## Academic Use
 
 This package was written with funding from the [NHGRI](http://genome.gov) as
