@@ -31,12 +31,16 @@ async function handleMessage(data) {
 }
 
 globalThis.onmessage = async (e) => {
-  const result = await handleMessage(e.data)
-  const transfer = result.transfer
-  delete result.transfer
-  if (transfer) {
-    globalThis.postMessage(result, transfer)
-  } else {
-    globalThis.postMessage(result)
+  try {
+    const { transfer, ...result } = await handleMessage(e.data)
+    globalThis.postMessage(result, transfer ?? [])
+  } catch (error) {
+    // Surface failures back to the host so the caller's promise rejects
+    // instead of hanging forever.
+    globalThis.postMessage({
+      type: 'error',
+      batchId: e.data && e.data.batchId,
+      message: error && error.message ? error.message : String(error),
+    })
   }
 }
