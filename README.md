@@ -75,7 +75,7 @@ be linked from [jbrowse.org](http://jbrowse.org).
 Actions.
 
 ```bash
-npm version patch  # or minor/major
+pnpm version patch  # or minor/major
 ```
 
 ## License
