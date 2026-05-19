@@ -1,3 +1,6 @@
 src/wasm/
 crate/
+dist/
+esm/
+coverage/
 pnpm-lock.yaml
