@@ -1,6 +1,5 @@
 export class ChunkSliceResult {
     static __wrap(ptr) {
-        ptr = ptr >>> 0;
         const obj = Object.create(ChunkSliceResult.prototype);
         obj.__wbg_ptr = ptr;
         ChunkSliceResultFinalization.register(obj, obj.__wbg_ptr, obj);
@@ -69,7 +68,6 @@ if (Symbol.dispose) ChunkSliceResult.prototype[Symbol.dispose] = ChunkSliceResul
 
 export class DecompressResult {
     static __wrap(ptr) {
-        ptr = ptr >>> 0;
         const obj = Object.create(DecompressResult.prototype);
         obj.__wbg_ptr = ptr;
         DecompressResultFinalization.register(obj, obj.__wbg_ptr, obj);
@@ -187,19 +185,19 @@ export function decompress_chunk_slice(input, min_block_position, min_data_posit
         wasm.__wbindgen_add_to_stack_pointer(16);
     }
 }
-export function __wbg_Error_960c155d3d49e4c2(arg0, arg1) {
+export function __wbg_Error_bce6d499ff0a4aff(arg0, arg1) {
     const ret = Error(getStringFromWasm0(arg0, arg1));
     return addHeapObject(ret);
 }
-export function __wbg___wbindgen_throw_6b64449b9b9ed33c(arg0, arg1) {
+export function __wbg___wbindgen_throw_9c31b086c2b26051(arg0, arg1) {
     throw new Error(getStringFromWasm0(arg0, arg1));
 }
 const ChunkSliceResultFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_chunksliceresult_free(ptr >>> 0, 1));
+    : new FinalizationRegistry(ptr => wasm.__wbg_chunksliceresult_free(ptr, 1));
 const DecompressResultFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_decompressresult_free(ptr >>> 0, 1));
+    : new FinalizationRegistry(ptr => wasm.__wbg_decompressresult_free(ptr, 1));
 
 function addHeapObject(obj) {
     if (heap_next === heap.length) heap.push(heap.length + 1);
@@ -243,8 +241,7 @@ function getFloat64ArrayMemory0() {
 }
 
 function getStringFromWasm0(ptr, len) {
-    ptr = ptr >>> 0;
-    return decodeText(ptr, len);
+    return decodeText(ptr >>> 0, len);
 }
 
 let cachedUint8ArrayMemory0 = null;
