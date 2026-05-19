@@ -42,7 +42,6 @@
   "dependencies": {
     "@jbrowse/quick-lru": "^7.3.5",
     "generic-filehandle2": "^2.1.4",
-    "p-limit": "^7.3.0",
     "pako-esm2": "^2.0.2"
   },
   "devDependencies": {

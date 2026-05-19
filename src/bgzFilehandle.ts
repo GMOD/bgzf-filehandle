@@ -1,13 +1,35 @@
-import pLimit from 'p-limit'
-
 import GziIndex from './gziIndex.ts'
 import { unzip } from './unzip.ts'
 import { concatUint8Array } from './util.ts'
 
 import type { GenericFilehandle } from 'generic-filehandle2'
-import type { LimitFunction } from 'p-limit'
 
 const DEFAULT_BLOCK_CONCURRENCY = 10
+
+// Small fixed-concurrency limiter to replace p-limit (which is pure ESM in
+// v7+ and breaks downstream Jest/CJS consumers). Tasks beyond the limit
+// queue until a slot frees.
+function createLimit(concurrency: number) {
+  let active = 0
+  const queue: (() => void)[] = []
+  const next = () => {
+    active--
+    queue.shift()?.()
+  }
+  return async <T>(task: () => Promise<T> | T): Promise<T> => {
+    if (active >= concurrency) {
+      await new Promise<void>(resolve => {
+        queue.push(resolve)
+      })
+    }
+    active++
+    try {
+      return await task()
+    } finally {
+      next()
+    }
+  }
+}
 
 function sliceBlock(
   uncompressedBuffer: Uint8Array,
@@ -26,7 +48,7 @@ function sliceBlock(
 export default class BgzFilehandle {
   filehandle: GenericFilehandle
   gzi: GziIndex
-  limit: LimitFunction
+  limit: ReturnType<typeof createLimit>
 
   constructor({
     filehandle,
@@ -41,7 +63,7 @@ export default class BgzFilehandle {
     this.gzi = new GziIndex({
       filehandle: gziFilehandle,
     })
-    this.limit = pLimit(blockConcurrency)
+    this.limit = createLimit(blockConcurrency)
   }
 
   private async _readAndUncompressBlock(
