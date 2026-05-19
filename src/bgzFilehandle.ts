@@ -60,16 +60,16 @@ export default class BgzFilehandle {
     const lastBlockEnd = nextCompressedPosition ?? (await this._getFileSize())
     const readEnd = position + length
 
-    const decompressed = await Promise.all(
-      blocks.map(async ([compressedPos, uncompressedPos], i) => {
-        const nextCompressed = blocks[i + 1]?.[0] ?? lastBlockEnd
-        const buffer = await this._readAndUncompressBlock(
-          compressedPos,
-          nextCompressed,
-        )
-        return sliceBlock(buffer, uncompressedPos, position, readEnd)
-      }),
-    )
+    const decompressed: Uint8Array[] = []
+    for (let i = 0; i < blocks.length; i += 1) {
+      const [compressedPos, uncompressedPos] = blocks[i]!
+      const nextCompressed = blocks[i + 1]?.[0] ?? lastBlockEnd
+      const buffer = await this._readAndUncompressBlock(
+        compressedPos,
+        nextCompressed,
+      )
+      decompressed.push(sliceBlock(buffer, uncompressedPos, position, readEnd))
+    }
 
     return concatUint8Array(decompressed)
   }
