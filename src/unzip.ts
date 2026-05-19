@@ -3,7 +3,7 @@ import { ungzip } from 'pako-esm2'
 import {
   decompressAll,
   decompressChunkSlice,
-} from './wasm/bgzf-wasm-inlined.mjs'
+} from './wasm/bgzf-wasm-inlined.js'
 
 interface VirtualOffset {
   blockPosition: number

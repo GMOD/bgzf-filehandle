@@ -5,7 +5,7 @@ module.exports = {
   entry: path.resolve(__dirname, 'src/wrapper.js'),
   output: {
     path: path.resolve(__dirname, '../src/wasm'),
-    filename: 'bgzf-wasm-inlined.mjs',
+    filename: 'bgzf-wasm-inlined.js',
     library: {
       type: 'module',
     },
