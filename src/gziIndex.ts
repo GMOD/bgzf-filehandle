@@ -2,6 +2,36 @@ import { longFromBytesToUnsigned } from './long.ts'
 
 import type { GenericFilehandle } from 'generic-filehandle2'
 
+const ENTRY_SIZE = 16
+
+function parseEntries(buf: Uint8Array, numEntries: number) {
+  const entries: [number, number][] = new Array(numEntries + 1)
+  entries[0] = [0, 0]
+  for (let i = 0; i < numEntries; i += 1) {
+    const offset = i * ENTRY_SIZE
+    entries[i + 1] = [
+      longFromBytesToUnsigned(buf, offset),
+      longFromBytesToUnsigned(buf, offset + 8),
+    ]
+  }
+  return entries
+}
+
+// lower-bound binary search: first index whose uncompressed start > position
+function findUpperBound(entries: [number, number][], position: number) {
+  let lo = 0
+  let hi = entries.length
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1
+    if (entries[mid]![1] <= position) {
+      lo = mid + 1
+    } else {
+      hi = mid
+    }
+  }
+  return lo
+}
+
 export default class GziIndex {
   filehandle: GenericFilehandle
 
@@ -22,27 +52,16 @@ export default class GziIndex {
   }
 
   async _readIndex(): Promise<[number, number][]> {
-    const buf = await this.filehandle.read(8, 0)
-    const numEntries = longFromBytesToUnsigned(buf)
+    const header = await this.filehandle.read(8, 0)
+    const numEntries = longFromBytesToUnsigned(header)
     if (numEntries === 0) {
       return [[0, 0]]
     }
-    if (numEntries > Number.MAX_SAFE_INTEGER / 16) {
+    if (numEntries > Number.MAX_SAFE_INTEGER / ENTRY_SIZE) {
       throw new TypeError('integer overflow')
     }
-
-    const entries: [number, number][] = new Array(numEntries + 1)
-    entries[0] = [0, 0]
-
-    const b2 = await this.filehandle.read(16 * numEntries, 8)
-    for (let entryNumber = 0; entryNumber < numEntries; entryNumber += 1) {
-      entries[entryNumber + 1] = [
-        longFromBytesToUnsigned(b2, entryNumber * 16),
-        longFromBytesToUnsigned(b2, entryNumber * 16 + 8),
-      ]
-    }
-
-    return entries
+    const body = await this.filehandle.read(ENTRY_SIZE * numEntries, 8)
+    return parseEntries(body, numEntries)
   }
 
   async getLastBlock() {
@@ -61,24 +80,11 @@ export default class GziIndex {
       return { blocks: [], nextCompressedPosition: undefined }
     }
     const entries = await this._getIndex()
-    const endPosition = position + length
+    const readEnd = position + length
 
-    // find the first block whose uncompressed start is > position; the
-    // block before it is the one containing position
-    let lo = 0
-    let hi = entries.length
-    while (lo < hi) {
-      const mid = (lo + hi) >>> 1
-      if (entries[mid]![1] <= position) {
-        lo = mid + 1
-      } else {
-        hi = mid
-      }
-    }
-    const startBlock = lo - 1
-
+    const startBlock = findUpperBound(entries, position) - 1
     let endBlock = startBlock + 1
-    while (endBlock < entries.length && entries[endBlock]![1] < endPosition) {
+    while (endBlock < entries.length && entries[endBlock]![1] < readEnd) {
       endBlock += 1
     }
     return {

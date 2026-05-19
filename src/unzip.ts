@@ -15,7 +15,7 @@ interface Chunk {
 }
 
 function hasGzipHeader(data: Uint8Array) {
-  return data.length >= 2 && data[0] === 0x1f && data[1] === 0x8b
+  return data[0] === 0x1f && data[1] === 0x8b
 }
 
 function errorMessage(error: unknown) {
@@ -33,6 +33,16 @@ async function decompressGzip(inputData: Uint8Array) {
   }
 }
 
+function wrapGzipHeaderError(error: unknown) {
+  if (errorMessage(error).includes('invalid gzip header')) {
+    return new Error(
+      'problem decompressing block: incorrect gzip header check',
+      { cause: error },
+    )
+  }
+  return error
+}
+
 export async function unzip(inputData: Uint8Array) {
   try {
     return await decompressAll(inputData)
@@ -47,13 +57,7 @@ export async function unzip(inputData: Uint8Array) {
         { cause: error },
       )
     }
-    if (message.includes('invalid gzip header')) {
-      throw new Error(
-        'problem decompressing block: incorrect gzip header check',
-        { cause: error },
-      )
-    }
-    throw error
+    throw wrapGzipHeaderError(error)
   }
 }
 
@@ -73,12 +77,6 @@ export async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
       dpositions: result.dpositions,
     }
   } catch (error) {
-    if (errorMessage(error).includes('invalid gzip header')) {
-      throw new Error(
-        'problem decompressing block: incorrect gzip header check',
-        { cause: error },
-      )
-    }
-    throw error
+    throw wrapGzipHeaderError(error)
   }
 }

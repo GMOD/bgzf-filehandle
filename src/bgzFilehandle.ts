@@ -4,6 +4,20 @@ import { concatUint8Array } from './util.ts'
 
 import type { GenericFilehandle } from 'generic-filehandle2'
 
+function sliceBlock(
+  uncompressedBuffer: Uint8Array,
+  blockStart: number,
+  readStart: number,
+  readEnd: number,
+) {
+  const sourceOffset = Math.max(0, readStart - blockStart)
+  const sourceEnd =
+    Math.min(readEnd, blockStart + uncompressedBuffer.length) - blockStart
+  return sourceOffset < uncompressedBuffer.length
+    ? uncompressedBuffer.subarray(sourceOffset, sourceEnd)
+    : new Uint8Array(0)
+}
+
 export default class BgzFilehandle {
   filehandle: GenericFilehandle
   gzi: GziIndex
@@ -33,31 +47,29 @@ export default class BgzFilehandle {
     return unzip(blockBuffer)
   }
 
+  async _getFileSize() {
+    return (await this.filehandle.stat()).size
+  }
+
   async read(length: number, position: number) {
-    const { blocks: blockPositions, nextCompressedPosition } =
+    const { blocks, nextCompressedPosition } =
       await this.gzi.getRelevantBlocksForRead(length, position)
-    const decompressed: Uint8Array[] = []
-    for (let blockNum = 0; blockNum < blockPositions.length; blockNum += 1) {
-      const [compressedPosition, uncompressedPosition] =
-        blockPositions[blockNum]!
-      const nextBlock = blockPositions[blockNum + 1]
-      const nextCompressed = nextBlock
-        ? nextBlock[0]
-        : (nextCompressedPosition ?? (await this.filehandle.stat()).size)
-      const uncompressedBuffer = await this._readAndUncompressBlock(
-        compressedPosition,
-        nextCompressed,
-      )
-      const sourceOffset = Math.max(0, position - uncompressedPosition)
-      const sourceEnd =
-        Math.min(
-          position + length,
-          uncompressedPosition + uncompressedBuffer.length,
-        ) - uncompressedPosition
-      if (sourceOffset < uncompressedBuffer.length) {
-        decompressed.push(uncompressedBuffer.subarray(sourceOffset, sourceEnd))
-      }
+    if (blocks.length === 0) {
+      return new Uint8Array(0)
     }
+    const lastBlockEnd = nextCompressedPosition ?? (await this._getFileSize())
+    const readEnd = position + length
+
+    const decompressed = await Promise.all(
+      blocks.map(async ([compressedPos, uncompressedPos], i) => {
+        const nextCompressed = blocks[i + 1]?.[0] ?? lastBlockEnd
+        const buffer = await this._readAndUncompressBlock(
+          compressedPos,
+          nextCompressed,
+        )
+        return sliceBlock(buffer, uncompressedPos, position, readEnd)
+      }),
+    )
 
     return concatUint8Array(decompressed)
   }
