@@ -51,7 +51,7 @@ export default class GziIndex {
     return this.index
   }
 
-  async _readIndex(): Promise<[number, number][]> {
+  private async _readIndex(): Promise<[number, number][]> {
     const header = await this.filehandle.read(8, 0)
     const numEntries = longFromBytesToUnsigned(header)
     if (numEntries === 0) {
@@ -62,11 +62,6 @@ export default class GziIndex {
     }
     const body = await this.filehandle.read(ENTRY_SIZE * numEntries, 8)
     return parseEntries(body, numEntries)
-  }
-
-  async getLastBlock() {
-    const entries = await this._getIndex()
-    return entries.at(-1)
   }
 
   async getRelevantBlocksForRead(

@@ -62,9 +62,8 @@ pub struct DecompressResult {
 
 #[wasm_bindgen]
 impl DecompressResult {
-    #[wasm_bindgen(getter)]
-    pub fn data(&self) -> Vec<u8> {
-        self.data.clone()
+    pub fn take_data(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.data)
     }
 
     #[wasm_bindgen(getter)]
@@ -133,19 +132,16 @@ pub struct ChunkSliceResult {
 
 #[wasm_bindgen]
 impl ChunkSliceResult {
-    #[wasm_bindgen(getter)]
-    pub fn buffer(&self) -> Vec<u8> {
-        self.buffer.clone()
+    pub fn take_buffer(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.buffer)
     }
 
-    #[wasm_bindgen(getter)]
-    pub fn cpositions(&self) -> Vec<f64> {
-        self.cpositions.clone()
+    pub fn take_cpositions(&mut self) -> Vec<f64> {
+        std::mem::take(&mut self.cpositions)
     }
 
-    #[wasm_bindgen(getter)]
-    pub fn dpositions(&self) -> Vec<f64> {
-        self.dpositions.clone()
+    pub fn take_dpositions(&mut self) -> Vec<f64> {
+        std::mem::take(&mut self.dpositions)
     }
 }
 
@@ -182,21 +178,17 @@ pub fn decompress_chunk_slice(
         let input_offset = (cpos - min_block_position) as usize;
         let remaining = &input[input_offset..];
 
-        // Check if we have a valid complete block
-        match parse_bgzf_header(remaining) {
-            Some(_) => {}
-            None => {
-                // If this is the first block and it's invalid, throw an error
-                // If we've already processed blocks, just stop (truncated input)
+        let (block_data, bytes_read) = match decompress_block_into(remaining, &mut decompressor) {
+            Ok(v) => v,
+            Err(e) => {
+                // first block invalid: surface the error; later block invalid
+                // (truncated input): stop cleanly with what we have so far.
                 if cpos == min_block_position {
-                    return Err(JsError::new("invalid bgzf header"));
+                    return Err(JsError::new(e));
                 }
                 break;
             }
-        }
-
-        let (block_data, bytes_read) =
-            decompress_block_into(remaining, &mut decompressor).map_err(JsError::new)?;
+        };
 
         if bytes_read == 0 {
             break;

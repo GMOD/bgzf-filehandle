@@ -29,7 +29,7 @@ export async function decompressBlock(input, offset = 0) {
   await init()
   const subarray = offset > 0 ? input.subarray(offset) : input
   const result = bg.decompress_block(subarray)
-  const data = result.data
+  const data = result.take_data()
   const bytesRead = result.bytes_read
   result.free()
   return { data, bytesRead }
@@ -55,9 +55,9 @@ export async function decompressChunkSlice(
     maxBlockPosition,
     maxDataPosition,
   )
-  const buffer = result.buffer
-  const cpositions = [...result.cpositions]
-  const dpositions = [...result.dpositions]
+  const buffer = result.take_buffer()
+  const cpositions = [...result.take_cpositions()]
+  const dpositions = [...result.take_dpositions()]
   result.free()
   return { buffer, cpositions, dpositions }
 }

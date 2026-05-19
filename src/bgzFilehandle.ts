@@ -44,7 +44,7 @@ export default class BgzFilehandle {
     this.limit = pLimit(blockConcurrency)
   }
 
-  async _readAndUncompressBlock(
+  private async _readAndUncompressBlock(
     compressedPosition: number,
     nextCompressedPosition: number,
   ) {
@@ -55,7 +55,7 @@ export default class BgzFilehandle {
     return unzip(blockBuffer)
   }
 
-  async _getFileSize() {
+  private async _getFileSize() {
     return (await this.filehandle.stat()).size
   }
 

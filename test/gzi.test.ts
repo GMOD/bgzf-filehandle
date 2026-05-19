@@ -59,7 +59,5 @@ describe('gzi objects', () => {
       blocks: [[453884, 456960]],
       nextCompressedPosition: undefined,
     })
-
-    expect(await idx.getLastBlock()).toEqual([453884, 456960])
   })
 })

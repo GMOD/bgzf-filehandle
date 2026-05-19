@@ -18,10 +18,10 @@ export class ChunkSliceResult {
     /**
      * @returns {Uint8Array}
      */
-    get buffer() {
+    take_buffer() {
         try {
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.chunksliceresult_buffer(retptr, this.__wbg_ptr);
+            wasm.chunksliceresult_take_buffer(retptr, this.__wbg_ptr);
             var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
             var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
             var v1 = getArrayU8FromWasm0(r0, r1).slice();
@@ -34,10 +34,10 @@ export class ChunkSliceResult {
     /**
      * @returns {Float64Array}
      */
-    get cpositions() {
+    take_cpositions() {
         try {
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.chunksliceresult_cpositions(retptr, this.__wbg_ptr);
+            wasm.chunksliceresult_take_cpositions(retptr, this.__wbg_ptr);
             var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
             var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
             var v1 = getArrayF64FromWasm0(r0, r1).slice();
@@ -50,10 +50,10 @@ export class ChunkSliceResult {
     /**
      * @returns {Float64Array}
      */
-    get dpositions() {
+    take_dpositions() {
         try {
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.chunksliceresult_dpositions(retptr, this.__wbg_ptr);
+            wasm.chunksliceresult_take_dpositions(retptr, this.__wbg_ptr);
             var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
             var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
             var v1 = getArrayF64FromWasm0(r0, r1).slice();
@@ -93,10 +93,10 @@ export class DecompressResult {
     /**
      * @returns {Uint8Array}
      */
-    get data() {
+    take_data() {
         try {
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.decompressresult_data(retptr, this.__wbg_ptr);
+            wasm.decompressresult_take_data(retptr, this.__wbg_ptr);
             var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
             var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
             var v1 = getArrayU8FromWasm0(r0, r1).slice();
