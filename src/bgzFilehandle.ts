@@ -1,8 +1,13 @@
+import pLimit from 'p-limit'
+
 import GziIndex from './gziIndex.ts'
 import { unzip } from './unzip.ts'
 import { concatUint8Array } from './util.ts'
 
 import type { GenericFilehandle } from 'generic-filehandle2'
+import type { LimitFunction } from 'p-limit'
+
+const DEFAULT_BLOCK_CONCURRENCY = 10
 
 function sliceBlock(
   uncompressedBuffer: Uint8Array,
@@ -21,19 +26,22 @@ function sliceBlock(
 export default class BgzFilehandle {
   filehandle: GenericFilehandle
   gzi: GziIndex
+  limit: LimitFunction
 
   constructor({
     filehandle,
     gziFilehandle,
+    blockConcurrency = DEFAULT_BLOCK_CONCURRENCY,
   }: {
     filehandle: GenericFilehandle
     gziFilehandle: GenericFilehandle
+    blockConcurrency?: number
   }) {
     this.filehandle = filehandle
-
     this.gzi = new GziIndex({
       filehandle: gziFilehandle,
     })
+    this.limit = pLimit(blockConcurrency)
   }
 
   async _readAndUncompressBlock(
@@ -60,16 +68,18 @@ export default class BgzFilehandle {
     const lastBlockEnd = nextCompressedPosition ?? (await this._getFileSize())
     const readEnd = position + length
 
-    const decompressed: Uint8Array[] = []
-    for (let i = 0; i < blocks.length; i += 1) {
-      const [compressedPos, uncompressedPos] = blocks[i]!
-      const nextCompressed = blocks[i + 1]?.[0] ?? lastBlockEnd
-      const buffer = await this._readAndUncompressBlock(
-        compressedPos,
-        nextCompressed,
-      )
-      decompressed.push(sliceBlock(buffer, uncompressedPos, position, readEnd))
-    }
+    const decompressed = await Promise.all(
+      blocks.map(([compressedPos, uncompressedPos], i) =>
+        this.limit(async () => {
+          const nextCompressed = blocks[i + 1]?.[0] ?? lastBlockEnd
+          const buffer = await this._readAndUncompressBlock(
+            compressedPos,
+            nextCompressed,
+          )
+          return sliceBlock(buffer, uncompressedPos, position, readEnd)
+        }),
+      ),
+    )
 
     return concatUint8Array(decompressed)
   }
