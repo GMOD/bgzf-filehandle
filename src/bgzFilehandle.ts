@@ -6,6 +6,12 @@ import type { GenericFilehandle } from 'generic-filehandle2'
 
 const DEFAULT_BLOCK_CONCURRENCY = 10
 
+// BGZF blocks are bounded by a 16-bit BSIZE field in the gzip extra subfield —
+// the compressed size of a single block can never exceed 65 536 bytes. Used as
+// an upper bound for over-reading the trailing block whose end offset isn't
+// recorded in the gzi index, so we can drop the stat() dependency.
+const MAX_BGZF_BLOCK_SIZE = 1 << 16
+
 // Small fixed-concurrency limiter to replace p-limit (which is pure ESM in
 // v7+ and breaks downstream Jest/CJS consumers). Tasks beyond the limit
 // queue until a slot frees.
@@ -68,17 +74,10 @@ export default class BgzFilehandle {
 
   private async _readAndUncompressBlock(
     compressedPosition: number,
-    nextCompressedPosition: number,
+    length: number,
   ) {
-    const blockBuffer = await this.filehandle.read(
-      nextCompressedPosition - compressedPosition,
-      compressedPosition,
-    )
+    const blockBuffer = await this.filehandle.read(length, compressedPosition)
     return unzip(blockBuffer)
-  }
-
-  private async _getFileSize() {
-    return (await this.filehandle.stat()).size
   }
 
   async read(length: number, position: number) {
@@ -87,16 +86,23 @@ export default class BgzFilehandle {
     if (blocks.length === 0) {
       return new Uint8Array(0)
     }
-    const lastBlockEnd = nextCompressedPosition ?? (await this._getFileSize())
     const readEnd = position + length
 
     const decompressed = await Promise.all(
       blocks.map(([compressedPos, uncompressedPos], i) =>
         this.limit(async () => {
-          const nextCompressed = blocks[i + 1]?.[0] ?? lastBlockEnd
+          // For the trailing block whose end isn't pinned by the next gzi entry
+          // or the next-read-position hint, over-read by the max BGZF block
+          // size. `compressedPos` is always a valid gzi offset (start within
+          // file); the server clips the request to actual file size, and
+          // unzip handles whatever bytes come back.
+          const nextCompressed =
+            blocks[i + 1]?.[0] ??
+            nextCompressedPosition ??
+            compressedPos + MAX_BGZF_BLOCK_SIZE
           const buffer = await this._readAndUncompressBlock(
             compressedPos,
-            nextCompressed,
+            nextCompressed - compressedPos,
           )
           return sliceBlock(buffer, uncompressedPos, position, readEnd)
         }),
