@@ -185,11 +185,11 @@ export function decompress_chunk_slice(input, min_block_position, min_data_posit
         wasm.__wbindgen_add_to_stack_pointer(16);
     }
 }
-export function __wbg_Error_bce6d499ff0a4aff(arg0, arg1) {
+export function __wbg_Error_ef53bc310eb298a0(arg0, arg1) {
     const ret = Error(getStringFromWasm0(arg0, arg1));
     return addHeapObject(ret);
 }
-export function __wbg___wbindgen_throw_9c31b086c2b26051(arg0, arg1) {
+export function __wbg___wbindgen_throw_1506f2235d1bdba0(arg0, arg1) {
     throw new Error(getStringFromWasm0(arg0, arg1));
 }
 const ChunkSliceResultFinalization = (typeof FinalizationRegistry === 'undefined')
