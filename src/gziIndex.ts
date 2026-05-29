@@ -1,4 +1,4 @@
-import { longFromBytesToUnsigned } from './long.ts'
+import { readUint64LE } from './long.ts'
 
 import type { GenericFilehandle } from 'generic-filehandle2'
 
@@ -7,12 +7,10 @@ const ENTRY_SIZE = 16
 function parseEntries(buf: Uint8Array, numEntries: number) {
   const entries: [number, number][] = new Array(numEntries + 1)
   entries[0] = [0, 0]
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
   for (let i = 0; i < numEntries; i += 1) {
     const offset = i * ENTRY_SIZE
-    entries[i + 1] = [
-      longFromBytesToUnsigned(buf, offset),
-      longFromBytesToUnsigned(buf, offset + 8),
-    ]
+    entries[i + 1] = [readUint64LE(view, offset), readUint64LE(view, offset + 8)]
   }
   return entries
 }
@@ -53,7 +51,9 @@ export default class GziIndex {
 
   private async _readIndex(): Promise<[number, number][]> {
     const header = await this.filehandle.read(8, 0)
-    const numEntries = longFromBytesToUnsigned(header)
+    const numEntries = readUint64LE(
+      new DataView(header.buffer, header.byteOffset, header.byteLength),
+    )
     if (numEntries === 0) {
       return [[0, 0]]
     }

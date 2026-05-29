@@ -25,16 +25,6 @@ async function init() {
   return initPromise
 }
 
-export async function decompressBlock(input, offset = 0) {
-  await init()
-  const subarray = offset > 0 ? input.subarray(offset) : input
-  const result = bg.decompress_block(subarray)
-  const data = result.take_data()
-  const bytesRead = result.bytes_read
-  result.free()
-  return { data, bytesRead }
-}
-
 export async function decompressAll(input) {
   await init()
   return bg.decompress_all(input)

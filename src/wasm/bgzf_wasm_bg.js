@@ -66,49 +66,6 @@ export class ChunkSliceResult {
 }
 if (Symbol.dispose) ChunkSliceResult.prototype[Symbol.dispose] = ChunkSliceResult.prototype.free;
 
-export class DecompressResult {
-    static __wrap(ptr) {
-        const obj = Object.create(DecompressResult.prototype);
-        obj.__wbg_ptr = ptr;
-        DecompressResultFinalization.register(obj, obj.__wbg_ptr, obj);
-        return obj;
-    }
-    __destroy_into_raw() {
-        const ptr = this.__wbg_ptr;
-        this.__wbg_ptr = 0;
-        DecompressResultFinalization.unregister(this);
-        return ptr;
-    }
-    free() {
-        const ptr = this.__destroy_into_raw();
-        wasm.__wbg_decompressresult_free(ptr, 0);
-    }
-    /**
-     * @returns {number}
-     */
-    get bytes_read() {
-        const ret = wasm.decompressresult_bytes_read(this.__wbg_ptr);
-        return ret >>> 0;
-    }
-    /**
-     * @returns {Uint8Array}
-     */
-    take_data() {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.decompressresult_take_data(retptr, this.__wbg_ptr);
-            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-            var v1 = getArrayU8FromWasm0(r0, r1).slice();
-            wasm.__wbindgen_export(r0, r1 * 1, 1);
-            return v1;
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-}
-if (Symbol.dispose) DecompressResult.prototype[Symbol.dispose] = DecompressResult.prototype.free;
-
 /**
  * @param {Uint8Array} input
  * @returns {Uint8Array}
@@ -129,28 +86,6 @@ export function decompress_all(input) {
         var v2 = getArrayU8FromWasm0(r0, r1).slice();
         wasm.__wbindgen_export(r0, r1 * 1, 1);
         return v2;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-    }
-}
-
-/**
- * @param {Uint8Array} input
- * @returns {DecompressResult}
- */
-export function decompress_block(input) {
-    try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArray8ToWasm0(input, wasm.__wbindgen_export2);
-        const len0 = WASM_VECTOR_LEN;
-        wasm.decompress_block(retptr, ptr0, len0);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
-        if (r2) {
-            throw takeObject(r1);
-        }
-        return DecompressResult.__wrap(r0);
     } finally {
         wasm.__wbindgen_add_to_stack_pointer(16);
     }
@@ -195,9 +130,6 @@ export function __wbg___wbindgen_throw_1506f2235d1bdba0(arg0, arg1) {
 const ChunkSliceResultFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_chunksliceresult_free(ptr, 1));
-const DecompressResultFinalization = (typeof FinalizationRegistry === 'undefined')
-    ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_decompressresult_free(ptr, 1));
 
 function addHeapObject(obj) {
     if (heap_next === heap.length) heap.push(heap.length + 1);

@@ -10,17 +10,7 @@ export class ChunkSliceResult {
     take_dpositions(): Float64Array;
 }
 
-export class DecompressResult {
-    private constructor();
-    free(): void;
-    [Symbol.dispose](): void;
-    take_data(): Uint8Array;
-    readonly bytes_read: number;
-}
-
 export function decompress_all(input: Uint8Array): Uint8Array;
-
-export function decompress_block(input: Uint8Array): DecompressResult;
 
 /**
  * Decompress a slice of BGZF data between two virtual offsets.
