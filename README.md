@@ -28,20 +28,22 @@ import { LocalFile } from 'generic-filehandle2'
 const f = new BgzfFilehandle({
   filehandle: new LocalFile('path/to/my_file.gz'),
   gziFilehandle: new LocalFile('path/to/my_file.gz.gzi'),
+  blockConcurrency: 10, // optional, default 10
 })
 
-// note: read(length, position) — matches generic-filehandle2 convention
-const data = await f.read(300, 0) // => Uint8Array
+// read(length, position) — matches generic-filehandle2 convention
+const data: Uint8Array = await f.read(300, 0)
 ```
 
 ### unzip
 
-Decompress an entire BGZF-compressed buffer. Also handles plain gzip:
+Decompress a BGZF or plain gzip buffer. Falls back to plain gzip automatically
+if the input is not a valid BGZF stream:
 
 ```typescript
 import { unzip } from '@gmod/bgzf-filehandle'
 
-const decompressed = await unzip(compressedData)
+const decompressed: Uint8Array = await unzip(compressedData)
 ```
 
 ### unzipChunkSlice
@@ -52,15 +54,20 @@ Decompress a range of BGZF blocks and slice out a virtual file offset range
 ```typescript
 import { unzipChunkSlice } from '@gmod/bgzf-filehandle'
 
+interface VirtualOffset {
+  blockPosition: number
+  dataPosition: number
+}
+
 const { buffer, cpositions, dpositions } = await unzipChunkSlice(
   compressedData,
-  chunk, // { minv: { blockPosition, dataPosition }, maxv: { blockPosition, dataPosition } }
+  { minv: VirtualOffset, maxv: VirtualOffset },
 )
 ```
 
 The returned `cpositions` and `dpositions` give the block boundaries in
-compressed and decompressed coordinates, which can be used for generating stable
-feature IDs across chunk boundaries.
+compressed and decompressed coordinates, useful for generating stable feature
+IDs across chunk boundaries.
 
 ## Academic Use
 
