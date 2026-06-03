@@ -1,5 +1,4 @@
 [![NPM version](https://img.shields.io/npm/v/@gmod/bgzf-filehandle.svg?style=flat-square)](https://npmjs.org/package/@gmod/bgzf-filehandle)
-[![Coverage Status](https://img.shields.io/codecov/c/github/GMOD/bgzf-filehandle/main.svg?style=flat-square)](https://codecov.io/gh/GMOD/bgzf-filehandle/branch/main)
 ![Build Status](https://img.shields.io/github/actions/workflow/status/GMOD/bgzf-filehandle/publish.yml?branch=main)
 
 Reads [block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such
