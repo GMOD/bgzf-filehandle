@@ -28,7 +28,7 @@ import { LocalFile } from 'generic-filehandle2'
 const f = new BgzfFilehandle({
   filehandle: new LocalFile('path/to/my_file.gz'),
   gziFilehandle: new LocalFile('path/to/my_file.gz.gzi'),
-  blockConcurrency: 10, // optional, default 10
+  blockConcurrency: 10, // max in-flight async block reads (not threads), default 10
 })
 
 // read(length, position) — matches generic-filehandle2 convention
