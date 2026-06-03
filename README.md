@@ -86,4 +86,5 @@ pnpm version patch  # or minor/major
 
 ## License
 
-MIT © [Robert Buels](https://github.com/rbuels)
+MIT © [Robert Buels](https://github.com/rbuels),
+[Colin Diesh](https://github.com/cmdcolin)
