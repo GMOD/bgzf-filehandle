@@ -16,8 +16,11 @@ import type { FilehandleOptions, Stats } from 'generic-filehandle2'
 class StatWatcher {
   public statCalls = 0
   public statBehavior: 'throw' | 'lie-zero' | 'lie-huge' | 'lie-small' = 'throw'
+  private inner: LocalFile
 
-  constructor(private inner: LocalFile) {}
+  constructor(inner: LocalFile) {
+    this.inner = inner
+  }
 
   read(length: number, position: number, opts?: FilehandleOptions) {
     return this.inner.read(length, position, opts)
