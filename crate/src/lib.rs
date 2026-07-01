@@ -30,6 +30,34 @@ fn parse_bgzf_header(input: &[u8]) -> Option<usize> {
     }
 }
 
+// Sum the uncompressed sizes (ISIZE, last 4 bytes of each BGZF block trailer)
+// so callers can allocate the output buffer exactly once. Avoids the old
+// `input.len() * 4` guess, which over-allocated the grow-only WASM heap by
+// hundreds of MB on deep-coverage regions (and could double-realloc when the
+// guess was low). Stops at the first block whose header/trailer doesn't fit,
+// matching the truncated-input handling in the decompress loops.
+fn total_uncompressed_size(input: &[u8]) -> usize {
+    let mut total = 0;
+    let mut offset = 0;
+    while let Some(block_size) = parse_bgzf_header(&input[offset..]) {
+        let trailer_pos = offset + block_size - BGZF_TRAILER_SIZE;
+        if trailer_pos + 8 > input.len() {
+            break;
+        }
+        total += u32::from_le_bytes([
+            input[trailer_pos + 4],
+            input[trailer_pos + 5],
+            input[trailer_pos + 6],
+            input[trailer_pos + 7],
+        ]) as usize;
+        offset += block_size;
+        if offset + BGZF_MIN_BLOCK_SIZE > input.len() {
+            break;
+        }
+    }
+    total
+}
+
 fn decompress_block_into(
     input: &[u8],
     decompressor: &mut Decompressor,
@@ -57,7 +85,7 @@ fn decompress_block_into(
 #[wasm_bindgen]
 pub fn decompress_all(input: &[u8]) -> Result<Vec<u8>, JsError> {
     let mut decompressor = Decompressor::new();
-    let mut output = Vec::with_capacity(input.len() * 4);
+    let mut output = Vec::with_capacity(total_uncompressed_size(input));
     let mut offset = 0;
 
     while offset < input.len() {
@@ -121,7 +149,9 @@ pub fn decompress_chunk_slice(
     let mut decompressor = Decompressor::new();
     let mut cpositions: Vec<f64> = Vec::with_capacity(16);
     let mut dpositions: Vec<f64> = Vec::with_capacity(16);
-    let mut buffer = Vec::with_capacity(input.len() * 4);
+    // Upper bound: full uncompressed size of the sliced blocks. The first/last
+    // block trims reduce actual output slightly, so this never re-allocates.
+    let mut buffer = Vec::with_capacity(total_uncompressed_size(input));
 
     // Track positions as f64 to preserve precision for large files
     let mut cpos = min_block_position;
