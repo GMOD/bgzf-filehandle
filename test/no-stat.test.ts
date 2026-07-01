@@ -77,7 +77,7 @@ describe('BgzfFilehandle no-stat trailing-block reads', () => {
     // last 100 bytes of the uncompressed file
     const buf = await f.read(100, truth.length - 100)
     expect(buf.length).toBe(100)
-    expect([...buf]).toEqual([...truth.subarray(- 100)])
+    expect([...buf]).toEqual([...truth.subarray(-100)])
     expect(watcher.statCalls).toBe(0)
   })
 
@@ -119,7 +119,7 @@ describe('BgzfFilehandle no-stat trailing-block reads', () => {
     // though there are many gzi entries before it
     const buf = await f.read(8192, truth.length - 8192)
     expect(buf.length).toBe(8192)
-    expect([...buf]).toEqual([...truth.subarray(- 8192)])
+    expect([...buf]).toEqual([...truth.subarray(-8192)])
     expect(watcher.statCalls).toBe(0)
   })
 
@@ -169,7 +169,7 @@ describe('BgzfFilehandle no-stat trailing-block reads', () => {
     const b = await f.read(50, 1000)
     expect([...b]).toEqual([...truth.subarray(1000, 1050)])
     const c = await f.read(50, truth.length - 50)
-    expect([...c]).toEqual([...truth.subarray(- 50)])
+    expect([...c]).toEqual([...truth.subarray(-50)])
     expect(watcher.statCalls).toBe(0)
   })
 })
@@ -183,20 +183,26 @@ describe('BgzfFilehandle generated fixtures', () => {
 
   beforeAll(() => {
     const probe = spawnSync('bgzip', ['--version'])
-    if (probe.error || probe.status !== 0) {return}
+    if (probe.error || probe.status !== 0) {
+      return
+    }
     available = true
     tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), 'bgzf-test-'))
   })
 
   afterAll(() => {
-    if (tmpdir) {fs.rmSync(tmpdir, { recursive: true, force: true })}
+    if (tmpdir) {
+      fs.rmSync(tmpdir, { recursive: true, force: true })
+    }
   })
 
   function bgzipFile(name: string, contents: Uint8Array | string) {
     const raw = path.join(tmpdir, name)
     fs.writeFileSync(raw, contents)
     const r = spawnSync('bgzip', ['-i', '-f', raw])
-    if (r.status !== 0) {throw new Error(`bgzip failed: ${r.stderr}`)}
+    if (r.status !== 0) {
+      throw new Error(`bgzip failed: ${r.stderr}`)
+    }
     return { raw, gz: `${raw}.gz`, gzi: `${raw}.gz.gzi` }
   }
 
@@ -204,14 +210,18 @@ describe('BgzfFilehandle generated fixtures', () => {
   // multiple BGZF blocks (each block holds up to ~64 KiB uncompressed)
   function makeBlob(length: number) {
     const out = new Uint8Array(length)
-    for (let i = 0; i < length; i++) {out[i] = i % 256}
+    for (let i = 0; i < length; i++) {
+      out[i] = i % 256
+    }
     return out
   }
 
   test.runIf(() => available)(
     'fresh multi-block file: read last byte without stat',
     async () => {
-      if (!available) {return}
+      if (!available) {
+        return
+      }
       const total = 500_000 // ~8 BGZF blocks
       const truth = makeBlob(total)
       const fx = bgzipFile('multiblock.bin', truth)
@@ -236,7 +246,9 @@ describe('BgzfFilehandle generated fixtures', () => {
   test.runIf(() => available)(
     'fresh file sized at exact 64 KiB boundary: trailing read is correct',
     async () => {
-      if (!available) {return}
+      if (!available) {
+        return
+      }
       const total = 65536 // exactly one BGZF uncompressed block worth
       const truth = makeBlob(total)
       const fx = bgzipFile('boundary.bin', truth)
@@ -254,7 +266,9 @@ describe('BgzfFilehandle generated fixtures', () => {
   test.runIf(() => available)(
     'fresh 1-byte file: trailing read of single byte works',
     async () => {
-      if (!available) {return}
+      if (!available) {
+        return
+      }
       const truth = new Uint8Array([0x42])
       const fx = bgzipFile('tiny.bin', truth)
 

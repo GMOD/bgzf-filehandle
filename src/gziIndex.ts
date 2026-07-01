@@ -10,7 +10,10 @@ function parseEntries(buf: Uint8Array, numEntries: number) {
   const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
   for (let i = 0; i < numEntries; i += 1) {
     const offset = i * ENTRY_SIZE
-    entries[i + 1] = [readUint64LE(view, offset), readUint64LE(view, offset + 8)]
+    entries[i + 1] = [
+      readUint64LE(view, offset),
+      readUint64LE(view, offset + 8),
+    ]
   }
   return entries
 }

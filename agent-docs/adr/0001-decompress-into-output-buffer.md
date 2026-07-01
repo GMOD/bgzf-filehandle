@@ -7,7 +7,7 @@ Status: Accepted (rejected the optimization)
 `crate/src/lib.rs` `decompress_all` decompresses each BGZF block into a
 freshly-allocated `Vec` via the shared helper `decompress_block_into`, then
 copies it into the output with `output.extend_from_slice(&data)`. The same
-helper is reused by `decompress_chunk_slice`, which only appends a *slice* of
+helper is reused by `decompress_chunk_slice`, which only appends a _slice_ of
 each block (it trims the first/last block to the requested virtual offsets).
 
 The obvious optimization: in `decompress_all`, `resize` the output buffer and
@@ -35,7 +35,7 @@ Do **not** apply it. Keep the single shared `decompress_block_into` helper.
 
 ## Benchmarking lesson
 
-The first measurement showed "26% faster" — a pure artifact. The bundle that
-ran first hit a cold CPU (frequency scaling not ramped) and clocked ~100 ms vs
-~74 ms warm. **Always alternate run order** when comparing bundles; a sequential
+The first measurement showed "26% faster" — a pure artifact. The bundle that ran
+first hit a cold CPU (frequency scaling not ramped) and clocked ~100 ms vs ~74
+ms warm. **Always alternate run order** when comparing bundles; a sequential
 cold→warm A/B measures warmup, not the code.
