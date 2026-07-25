@@ -10,6 +10,9 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
         with:
+          # required when the action is pinned by sha — the @stable ref form
+          # would otherwise supply it from the branch name
+          toolchain: stable
           targets: wasm32-unknown-unknown
       - name: Install wasm-bindgen-cli matching Cargo.lock
         run: |
@@ -41,6 +44,9 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
         with:
+          # required when the action is pinned by sha — the @stable ref form
+          # would otherwise supply it from the branch name
+          toolchain: stable
           targets: wasm32-unknown-unknown
       - name: Install wasm-bindgen-cli matching Cargo.lock
         run: |
