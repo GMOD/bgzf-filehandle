@@ -179,3 +179,22 @@ test('cpositions increment correctly from large starting position', async () => 
     expect(pos).toBeGreaterThan(startPosition - 1)
   }
 })
+
+// A minv.dataPosition past the end of the first block used to underflow the
+// usize subtraction in the wasm chunk loop, poisoning every subsequent
+// dposition with a value wrapped past 2^32 (e.g. 4294969842). Callers turn
+// dpositions into feature file offsets, so the garbage propagated silently.
+test('minv.dataPosition beyond the block length does not wrap dpositions', async () => {
+  const testData = fs.readFileSync(
+    require.resolve('./data/gff3_with_syncs.gff3.gz'),
+  )
+  const { dpositions, cpositions } = await unzipChunkSlice(testData, {
+    minv: { dataPosition: 65535, blockPosition: 0 },
+    maxv: { dataPosition: 0, blockPosition: 500000 },
+  })
+  expect([...cpositions]).toEqual([0, 528])
+  expect([...dpositions]).toEqual([65535, 65535])
+  for (const pos of dpositions) {
+    expect(pos).toBeLessThan(2 ** 32)
+  }
+})

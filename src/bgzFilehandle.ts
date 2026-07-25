@@ -12,6 +12,13 @@ const DEFAULT_BLOCK_CONCURRENCY = 10
 // recorded in the gzi index, so we can drop the stat() dependency.
 const MAX_BGZF_BLOCK_SIZE = 1 << 16
 
+// Blocks are adjacent in the file, so every block a read touches can be
+// fetched as one contiguous byte range and handed to a single decompress call.
+// Batches are capped by uncompressed size so an enormous read still streams
+// through in pieces rather than materializing at once in the wasm heap, which
+// only ever grows.
+const MAX_BATCH_UNCOMPRESSED_SIZE = 32 * 1024 * 1024
+
 // Small fixed-concurrency limiter to replace p-limit (which is pure ESM in
 // v7+ and breaks downstream Jest/CJS consumers). Tasks beyond the limit
 // queue until a slot frees.
@@ -37,15 +44,55 @@ function createLimit(concurrency: number) {
   }
 }
 
-function sliceBlock(
+interface Batch {
+  compressedStart: number
+  compressedEnd: number
+  uncompressedStart: number
+}
+
+function makeBatches(
+  compressed: Float64Array,
+  uncompressed: Float64Array,
+  nextCompressedPosition: number | undefined,
+) {
+  const batches: Batch[] = []
+  const numBlocks = compressed.length
+  let start = 0
+  while (start < numBlocks) {
+    let end = start + 1
+    while (
+      end < numBlocks &&
+      uncompressed[end]! - uncompressed[start]! < MAX_BATCH_UNCOMPRESSED_SIZE
+    ) {
+      end += 1
+    }
+    // `end` is the first block past this batch, so its compressed offset is
+    // where the batch stops. Past the last relevant block that offset comes
+    // from the next gzi entry — and when there is none, from over-reading by
+    // one maximum-size block, which keeps this off of stat().
+    batches.push({
+      compressedStart: compressed[start]!,
+      compressedEnd:
+        end < numBlocks
+          ? compressed[end]!
+          : (nextCompressedPosition ??
+            compressed[numBlocks - 1]! + MAX_BGZF_BLOCK_SIZE),
+      uncompressedStart: uncompressed[start]!,
+    })
+    start = end
+  }
+  return batches
+}
+
+function sliceBatch(
   uncompressedBuffer: Uint8Array,
-  blockStart: number,
+  batchStart: number,
   readStart: number,
   readEnd: number,
 ) {
-  const sourceOffset = Math.max(0, readStart - blockStart)
+  const sourceOffset = Math.max(0, readStart - batchStart)
   const sourceEnd =
-    Math.min(readEnd, blockStart + uncompressedBuffer.length) - blockStart
+    Math.min(readEnd, batchStart + uncompressedBuffer.length) - batchStart
   return sourceOffset < uncompressedBuffer.length
     ? uncompressedBuffer.subarray(sourceOffset, sourceEnd)
     : new Uint8Array(0)
@@ -72,43 +119,39 @@ export default class BgzFilehandle {
     this.limit = createLimit(blockConcurrency)
   }
 
-  private async _readAndUncompressBlock(
-    compressedPosition: number,
-    length: number,
-  ) {
-    const blockBuffer = await this.filehandle.read(length, compressedPosition)
-    return unzip(blockBuffer)
-  }
-
   async read(length: number, position: number) {
-    const { blocks, nextCompressedPosition } =
+    const { compressed, uncompressed, nextCompressedPosition } =
       await this.gzi.getRelevantBlocksForRead(length, position)
-    if (blocks.length === 0) {
+    if (compressed.length === 0) {
       return new Uint8Array(0)
     }
     const readEnd = position + length
+    const batches = makeBatches(
+      compressed,
+      uncompressed,
+      nextCompressedPosition,
+    )
 
     const decompressed = await Promise.all(
-      blocks.map(([compressedPos, uncompressedPos], i) =>
+      batches.map(batch =>
         this.limit(async () => {
-          // For the trailing block whose end isn't pinned by the next gzi entry
-          // or the next-read-position hint, over-read by the max BGZF block
-          // size. `compressedPos` is always a valid gzi offset (start within
-          // file); the server clips the request to actual file size, and
-          // unzip handles whatever bytes come back.
-          const nextCompressed =
-            blocks[i + 1]?.[0] ??
-            nextCompressedPosition ??
-            compressedPos + MAX_BGZF_BLOCK_SIZE
-          const buffer = await this._readAndUncompressBlock(
-            compressedPos,
-            nextCompressed - compressedPos,
+          const buffer = await this.filehandle.read(
+            batch.compressedEnd - batch.compressedStart,
+            batch.compressedStart,
           )
-          return sliceBlock(buffer, uncompressedPos, position, readEnd)
+          return sliceBatch(
+            await unzip(buffer),
+            batch.uncompressedStart,
+            position,
+            readEnd,
+          )
         }),
       ),
     )
 
+    // Always copy, even for a single batch: the pieces are subarray views of a
+    // whole decompressed batch, so returning one directly would hand back a
+    // buffer whose `.buffer` is larger than the requested read.
     return concatUint8Array(decompressed)
   }
 }

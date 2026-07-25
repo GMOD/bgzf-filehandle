@@ -27,12 +27,18 @@ import { LocalFile } from 'generic-filehandle2'
 const f = new BgzfFilehandle({
   filehandle: new LocalFile('path/to/my_file.gz'),
   gziFilehandle: new LocalFile('path/to/my_file.gz.gzi'),
-  blockConcurrency: 10, // max in-flight async block reads (not threads), default 10
+  blockConcurrency: 10, // max in-flight async batch reads (not threads), default 10
 })
 
 // read(length, position) — matches generic-filehandle2 convention
 const data: Uint8Array = await f.read(300, 0)
 ```
+
+BGZF blocks are adjacent in the file, so every block a read touches is fetched
+as one contiguous range and decompressed in a single call — a read spanning 300
+blocks is one request, not 300. Reads large enough to be split (over 32 MB
+uncompressed) produce several batches, and `blockConcurrency` caps how many of
+those are in flight at once.
 
 ### unzip
 

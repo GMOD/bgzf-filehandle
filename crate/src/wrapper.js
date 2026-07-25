@@ -26,7 +26,9 @@ async function init() {
 }
 
 export async function decompressAll(input) {
-  await init()
+  if (!wasm) {
+    await init()
+  }
   return bg.decompress_all(input)
 }
 
@@ -37,7 +39,9 @@ export async function decompressChunkSlice(
   maxBlockPosition,
   maxDataPosition,
 ) {
-  await init()
+  if (!wasm) {
+    await init()
+  }
   const result = bg.decompress_chunk_slice(
     input,
     minBlockPosition,
