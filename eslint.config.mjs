@@ -57,37 +57,75 @@ export default defineConfig(
       ],
       semi: ['error', 'never'],
 
-      // keep off: new Array(n) pre-allocation is intentional for performance
-      'unicorn/no-new-array': 'off',
-      'unicorn/no-empty-file': 'off',
-      'unicorn/prefer-type-error': 'off',
-      // keep off: bitwise ops in bgzfBlockScan.ts/long.ts are intentional 32-bit integer arithmetic
-      'unicorn/prefer-modern-math-apis': 'off',
-      'unicorn/prefer-math-trunc': 'off',
-      // keep off: (await x).property pattern used in bgzFilehandle.ts
-      'unicorn/no-await-expression-member': 'off',
-      // keep off: port.onmessage assignment used in workerPoolHost.ts
-      'unicorn/prefer-add-event-listener': 'off',
-      // keep off: top-level await not applicable for library exports
-      'unicorn/prefer-top-level-await': 'off',
-      'unicorn/consistent-function-scoping': 'off',
-      'unicorn/no-lonely-if': 'off',
+      // unicorn rules we do not want; shared across the gmod repos
+      'unicorn/better-regex': 'off',
+      'unicorn/catch-error-name': 'off',
+      'unicorn/consistent-boolean-name': 'off',
+      'unicorn/consistent-class-member-order': 'off',
       'unicorn/consistent-destructuring': 'off',
-      'unicorn/no-useless-undefined': 'off',
-
+      'unicorn/consistent-function-scoping': 'off',
+      'unicorn/escape-case': 'off',
+      'unicorn/expiring-todo-comments': 'off',
+      'unicorn/explicit-length-check': 'off',
       // keep off: files use camelCase
       'unicorn/filename-case': 'off',
       // keep off: codebase uses many abbreviations (fd, fh, buf, pos, etc.)
-      'unicorn/prevent-abbreviations': 'off',
-      'unicorn/numeric-separators-style': 'off',
-      'unicorn/number-literal-case': 'off',
-      // keep off: primary code path in negated condition is more readable as-is
-      'unicorn/no-negated-condition': 'off',
+      'unicorn/name-replacements': 'off',
+      'unicorn/no-abusive-eslint-disable': 'off',
+      'unicorn/no-array-callback-reference': 'off',
+      'unicorn/no-array-for-each': 'off',
+      'unicorn/no-array-reduce': 'off',
+      'unicorn/no-array-sort': 'off',
+      // keep off: (await x).property pattern used in bgzFilehandle.ts
+      'unicorn/no-await-expression-member': 'off',
+      'unicorn/no-break-in-nested-loop': 'off',
+      'unicorn/no-empty-file': 'off',
       // keep off: indexed for-loops that track index/position are intentional
       'unicorn/no-for-loop': 'off',
-      'unicorn/explicit-length-check': 'off',
+      'unicorn/no-lonely-if': 'off',
+      // keep off: primary code path in negated condition is more readable as-is
+      'unicorn/no-negated-condition': 'off',
+      'unicorn/no-nested-ternary': 'off',
+      // keep off: new Array(n) pre-allocation is intentional for performance
+      'unicorn/no-new-array': 'off',
+      'unicorn/no-null': 'off',
+      'unicorn/no-process-exit': 'off',
+      'unicorn/no-unreadable-array-destructuring': 'off',
+      'unicorn/no-useless-else': 'off',
+      'unicorn/no-useless-undefined': 'off',
+      'unicorn/number-literal-case': 'off',
+      'unicorn/numeric-separators-style': 'off',
+      // keep off: port.onmessage assignment used in workerPoolHost.ts
+      'unicorn/prefer-add-event-listener': 'off',
+      'unicorn/prefer-at': 'off',
+      'unicorn/prefer-await': 'off',
+      'unicorn/prefer-bigint-literals': 'off',
+      'unicorn/prefer-blob-reading-methods': 'off',
+      'unicorn/prefer-code-point': 'off',
+      'unicorn/prefer-continue': 'off',
+      'unicorn/prefer-includes-over-repeated-comparisons': 'off',
+      'unicorn/prefer-math-trunc': 'off',
+      // keep off: bitwise ops in bgzfBlockScan.ts/long.ts are intentional 32-bit integer arithmetic
+      'unicorn/prefer-modern-math-apis': 'off',
+      'unicorn/prefer-module': 'off',
+      'unicorn/prefer-node-protocol': 'off',
+      'unicorn/prefer-number-properties': 'off',
+      'unicorn/prefer-optional-catch-binding': 'off',
+      'unicorn/prefer-private-class-fields': 'off',
+      'unicorn/prefer-query-selector': 'off',
+      'unicorn/prefer-regexp-test': 'off',
+      'unicorn/prefer-simple-condition-first': 'off',
+      'unicorn/prefer-spread': 'off',
+      'unicorn/prefer-string-replace-all': 'off',
+      'unicorn/prefer-structured-clone': 'off',
       'unicorn/prefer-switch': 'off',
-
+      // keep off: top-level await not applicable for library exports
+      'unicorn/prefer-top-level-await': 'off',
+      'unicorn/prefer-type-error': 'off',
+      'unicorn/prevent-abbreviations': 'off',
+      'unicorn/relative-url-style': 'off',
+      'unicorn/switch-case-braces': 'off',
+      'unicorn/text-encoding-identifier-case': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
