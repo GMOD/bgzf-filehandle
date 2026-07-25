@@ -1,6 +1,7 @@
 {
   "name": "@gmod/bgzf-filehandle",
   "version": "6.3.0",
+  "packageManager": "pnpm@11.15.1",
   "description": "read from a compressed bgzip file (with .gzi) as if it were uncompressed",
   "license": "MIT",
   "repository": {
@@ -8,6 +9,9 @@
     "url": "https://github.com/GMOD/bgzf-filehandle.git"
   },
   "type": "module",
+  "sideEffects": [
+    "./*/wasm/**"
+  ],
   "main": "dist/index.js",
   "exports": {
     "import": "./esm/index.js",
