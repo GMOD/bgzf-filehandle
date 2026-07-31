@@ -103,6 +103,7 @@ export default defineConfig(
       'unicorn/prefer-blob-reading-methods': 'off',
       'unicorn/prefer-code-point': 'off',
       'unicorn/prefer-continue': 'off',
+      'unicorn/prefer-early-return': 'off',
       'unicorn/prefer-includes-over-repeated-comparisons': 'off',
       'unicorn/prefer-math-trunc': 'off',
       // keep off: bitwise ops in bgzfBlockScan.ts/long.ts are intentional 32-bit integer arithmetic
