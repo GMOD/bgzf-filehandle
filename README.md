@@ -1,3 +1,5 @@
+# @gmod/bgzf-filehandle
+
 [![NPM version](https://img.shields.io/npm/v/@gmod/bgzf-filehandle.svg?style=flat-square)](https://npmjs.org/package/@gmod/bgzf-filehandle)
 ![Build Status](https://img.shields.io/github/actions/workflow/status/GMOD/bgzf-filehandle/publish.yml?branch=main)
 
@@ -11,7 +13,9 @@ and [@gmod/tabix](https://github.com/GMOD/tabix-js) for block decoding.
 
 ## Install
 
-    $ npm install @gmod/bgzf-filehandle
+```sh
+npm install @gmod/bgzf-filehandle
+```
 
 ## Usage
 
@@ -33,6 +37,9 @@ const f = new BgzfFilehandle({
 // read(length, position) — matches generic-filehandle2 convention
 const data: Uint8Array = await f.read(300, 0)
 ```
+
+The `.gzi` index maps uncompressed offsets to block starts; create one with
+`bgzip -i my_file` (or `bgzip -r my_file.gz` for an already-compressed file).
 
 BGZF blocks are adjacent in the file, so every block a read touches is fetched
 as one contiguous range and decompressed in a single call — a read spanning 300
@@ -59,20 +66,27 @@ Decompress a range of BGZF blocks and slice out a virtual file offset range
 ```typescript
 import { unzipChunkSlice } from '@gmod/bgzf-filehandle'
 
-interface VirtualOffset {
-  blockPosition: number
-  dataPosition: number
-}
+const minv = { blockPosition: 1234, dataPosition: 56 }
+const maxv = { blockPosition: 9876, dataPosition: 78 }
+
+// input must be the bytes starting at minv.blockPosition, through the end of
+// the block at maxv.blockPosition (a BGZF block is at most 64KB compressed)
+const MAX_BLOCK_SIZE = 1 << 16
+const compressedData = await filehandle.read(
+  maxv.blockPosition + MAX_BLOCK_SIZE - minv.blockPosition,
+  minv.blockPosition,
+)
 
 const { buffer, cpositions, dpositions } = await unzipChunkSlice(
   compressedData,
-  { minv: VirtualOffset, maxv: VirtualOffset },
+  { minv, maxv },
 )
 ```
 
-The returned `cpositions` and `dpositions` give the block boundaries in
-compressed and decompressed coordinates, useful for generating stable feature
-IDs across chunk boundaries.
+`buffer` is a `Uint8Array` of the decompressed bytes between the two virtual
+offsets. `cpositions` and `dpositions` are `number[]` block boundaries in
+compressed (absolute file offset) and decompressed coordinates, useful for
+generating stable feature IDs across chunk boundaries.
 
 ## Academic Use
 
@@ -81,14 +95,9 @@ part of the [JBrowse](http://jbrowse.org) project. If you use it in an academic
 project that you publish, please cite the most recent JBrowse paper, which will
 be linked from [jbrowse.org](http://jbrowse.org).
 
-## Publishing
+## Contributing
 
-[Trusted publishing](https://docs.npmjs.com/about-trusted-publishing) via GitHub
-Actions.
-
-```bash
-pnpm version patch  # or minor/major
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and release steps.
 
 ## License
 
