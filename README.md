@@ -64,16 +64,16 @@ Decompress a range of BGZF blocks and slice out a virtual file offset range
 (used by BAM/tabix readers with BAI/TBI indices):
 
 ```typescript
-import { unzipChunkSlice } from '@gmod/bgzf-filehandle'
+import { MAX_BGZF_BLOCK_SIZE, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 
 const minv = { blockPosition: 1234, dataPosition: 56 }
 const maxv = { blockPosition: 9876, dataPosition: 78 }
 
 // input must be the bytes starting at minv.blockPosition, through the end of
-// the block at maxv.blockPosition (a BGZF block is at most 64KB compressed)
-const MAX_BLOCK_SIZE = 1 << 16
+// the block at maxv.blockPosition. That block's compressed length isn't
+// recorded anywhere, so over-read by one maximum-size block to cover it
 const compressedData = await filehandle.read(
-  maxv.blockPosition + MAX_BLOCK_SIZE - minv.blockPosition,
+  maxv.blockPosition + MAX_BGZF_BLOCK_SIZE - minv.blockPosition,
   minv.blockPosition,
 )
 
@@ -84,9 +84,11 @@ const { buffer, cpositions, dpositions } = await unzipChunkSlice(
 ```
 
 `buffer` is a `Uint8Array` of the decompressed bytes between the two virtual
-offsets. `cpositions` and `dpositions` are `number[]` block boundaries in
+offsets. `cpositions` and `dpositions` are `Float64Array` block boundaries in
 compressed (absolute file offset) and decompressed coordinates, useful for
-generating stable feature IDs across chunk boundaries.
+generating stable feature IDs across chunk boundaries. They come back as the
+typed arrays wasm produced — indexed reads and `.length` are all a consumer
+needs, so they are not copied into plain arrays on the way out.
 
 ## Academic Use
 

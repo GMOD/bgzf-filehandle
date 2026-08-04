@@ -328,9 +328,14 @@ async function decompressChunkSlice(
     maxBlockPosition,
     maxDataPosition,
   )
+  // The take_* accessors already copy out of the wasm heap — wasm-bindgen
+  // emits `getArrayF64FromWasm0(...).slice()` — so the returned typed arrays
+  // own their bytes and stay valid after free() and after the heap grows.
+  // Spreading them into plain arrays was therefore a second copy of every
+  // block offset, for consumers (tabix-js, bam-js) that only index them.
   const buffer = result.take_buffer()
-  const cpositions = [...result.take_cpositions()]
-  const dpositions = [...result.take_dpositions()]
+  const cpositions = result.take_cpositions()
+  const dpositions = result.take_dpositions()
   result.free()
   return { buffer, cpositions, dpositions }
 }

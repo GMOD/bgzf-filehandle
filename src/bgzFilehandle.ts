@@ -1,3 +1,4 @@
+import { MAX_BGZF_BLOCK_SIZE } from './constants.ts'
 import GziIndex from './gziIndex.ts'
 import { unzip } from './unzip.ts'
 import { concatUint8Array } from './util.ts'
@@ -5,12 +6,6 @@ import { concatUint8Array } from './util.ts'
 import type { GenericFilehandle } from 'generic-filehandle2'
 
 const DEFAULT_BLOCK_CONCURRENCY = 10
-
-// BGZF blocks are bounded by a 16-bit BSIZE field in the gzip extra subfield —
-// the compressed size of a single block can never exceed 65 536 bytes. Used as
-// an upper bound for over-reading the trailing block whose end offset isn't
-// recorded in the gzi index, so we can drop the stat() dependency.
-const MAX_BGZF_BLOCK_SIZE = 1 << 16
 
 // Blocks are adjacent in the file, so every block a read touches can be
 // fetched as one contiguous byte range and handed to a single decompress call.

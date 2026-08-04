@@ -73,9 +73,11 @@ test('cpositions preserve precision for values that would overflow u32', async (
     maxv: { dataPosition: 100, blockPosition: 0 },
   })
 
-  // Verify cpositions and dpositions are arrays of numbers (from Float64Array)
-  expect(Array.isArray(cpositions)).toBe(true)
-  expect(Array.isArray(dpositions)).toBe(true)
+  // Handed back as the Float64Arrays wasm produced, not copied into plain
+  // arrays: consumers only index them, so the copy was one wasted allocation
+  // per chunk read
+  expect(cpositions).toBeInstanceOf(Float64Array)
+  expect(dpositions).toBeInstanceOf(Float64Array)
   expect(cpositions.length).toBeGreaterThan(0)
   expect(dpositions.length).toBeGreaterThan(0)
 

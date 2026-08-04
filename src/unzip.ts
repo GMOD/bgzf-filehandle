@@ -95,7 +95,26 @@ export async function unzip(inputData: Uint8Array): Promise<Uint8Array> {
   }
 }
 
-export async function unzipChunkSlice(inputData: Uint8Array, chunk: Chunk) {
+/**
+ * A decompressed BGZF chunk plus, per block it spans, that block's compressed
+ * offset in the file (`cpositions`) and its uncompressed offset within the
+ * chunk (`dpositions`). Together they let a caller turn a byte offset in
+ * `buffer` back into a virtual file offset — see @gmod/tabix and @gmod/bam.
+ *
+ * Annotated rather than inferred, for the same reason as {@link unzip}: it is
+ * derived from the untyped inlined-wasm bundle, and whatever tsc makes of that
+ * is what gets published in the .d.ts.
+ */
+export interface ChunkSlice {
+  buffer: Uint8Array
+  cpositions: Float64Array
+  dpositions: Float64Array
+}
+
+export async function unzipChunkSlice(
+  inputData: Uint8Array,
+  chunk: Chunk,
+): Promise<ChunkSlice> {
   const { minv, maxv } = chunk
   try {
     const result = await decompressChunkSlice(
