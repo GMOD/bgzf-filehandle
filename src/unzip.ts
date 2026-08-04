@@ -60,7 +60,12 @@ function wrapGzipHeaderError(error: unknown) {
   return error
 }
 
-export async function unzip(inputData: Uint8Array) {
+// The return type is annotated rather than inferred. `decompressAll` comes from
+// the inlined wasm bundle, which is untyped JS, so inference makes this
+// `Promise<any>` — and that `any` is published in the .d.ts and flows straight
+// into consumers (@gmod/bam's csi.ts reads .buffer/.byteOffset/.subarray off it
+// completely unchecked). The Rust returns `Vec<u8>`, i.e. a Uint8Array.
+export async function unzip(inputData: Uint8Array): Promise<Uint8Array> {
   // Reading past EOF yields an empty buffer; decompressing nothing is nothing
   // rather than an error.
   if (inputData.length === 0) {
