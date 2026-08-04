@@ -1,3 +1,26 @@
+## [6.3.2](https://github.com/GMOD/bgzf-filehandle/compare/v6.3.1...v6.3.2) (2026-08-04)
+
+### Bug Fixes
+
+- Annotate unzip()'s return type instead of inferring any
+
+### Chores
+
+- Share one eslint-plugin-unicorn opt-out list across the repos
+- Drop redundant @typescript-eslint/{eslint-plugin,parser}
+- Turn off unicorn/prefer-early-return across the repos
+- Add git-cliff for changelog generation
+
+### Documentation
+
+- Fix unzipChunkSlice example and tighten README
+- Backfill CHANGELOG.md from v1.5.5 through v6.3.1
+- Mark breaking changes in the generated changelog
+
+### Performance Improvements
+
+- Hand back cpositions/dpositions as the Float64Arrays wasm produced
+
 # v6.3.1
 
 - Declare `sideEffects` for the wasm bundle path so bundlers don't tree-shake it away
