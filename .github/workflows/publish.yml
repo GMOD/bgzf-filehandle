@@ -16,11 +16,16 @@ jobs:
           # would otherwise supply it from the branch name
           toolchain: stable
           targets: wasm32-unknown-unknown
+      - uses: cargo-bins/cargo-binstall@e00d2c94cc0067b77737821097a62d91c0301baa # v1.21.1
+      # binstall fetches the prebuilt binary; `cargo install` would build the
+      # CLI from source on every run, which is minutes of runner time for a
+      # binary upstream already publishes.
       - name: Install wasm-bindgen-cli matching Cargo.lock
         run: |
           VERSION=$(cargo metadata --format-version 1 --manifest-path crate/Cargo.toml \
             | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')
-          cargo install wasm-bindgen-cli --version "$VERSION"
+          echo "Installing wasm-bindgen-cli@$VERSION"
+          cargo binstall wasm-bindgen-cli@$VERSION --no-confirm
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -56,11 +61,16 @@ jobs:
           # would otherwise supply it from the branch name
           toolchain: stable
           targets: wasm32-unknown-unknown
+      - uses: cargo-bins/cargo-binstall@e00d2c94cc0067b77737821097a62d91c0301baa # v1.21.1
+      # binstall fetches the prebuilt binary; `cargo install` would build the
+      # CLI from source on every run, which is minutes of runner time for a
+      # binary upstream already publishes.
       - name: Install wasm-bindgen-cli matching Cargo.lock
         run: |
           VERSION=$(cargo metadata --format-version 1 --manifest-path crate/Cargo.toml \
             | jq -r '.packages[] | select(.name=="wasm-bindgen") | .version')
-          cargo install wasm-bindgen-cli --version "$VERSION"
+          echo "Installing wasm-bindgen-cli@$VERSION"
+          cargo binstall wasm-bindgen-cli@$VERSION --no-confirm
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:

@@ -120,11 +120,11 @@ export function decompress_chunk_slice(input, min_block_position, min_data_posit
         wasm.__wbindgen_add_to_stack_pointer(16);
     }
 }
-export function __wbg_Error_ef53bc310eb298a0(arg0, arg1) {
+export function __wbg_Error_92b29b0548f8b746(arg0, arg1) {
     const ret = Error(getStringFromWasm0(arg0, arg1));
     return addHeapObject(ret);
 }
-export function __wbg___wbindgen_throw_1506f2235d1bdba0(arg0, arg1) {
+export function __wbg___wbindgen_throw_344f42d3211c4765(arg0, arg1) {
     throw new Error(getStringFromWasm0(arg0, arg1));
 }
 const ChunkSliceResultFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -215,12 +215,6 @@ function decodeText(ptr, len) {
         cachedTextDecoder.decode();
         numBytesDecoded = len;
     }
-    // .slice() is load-bearing: getUint8ArrayMemory0() is a view over
-    // WebAssembly.Memory, whose buffer is a RESIZABLE ArrayBuffer, and
-    // TextDecoder.decode rejects those in browsers. Without the copy this
-    // throws for every string leaving Rust -- which is every error message,
-    // so the module could not report its own errors. The Vec<u8> return path
-    // already slices; this is the same rule for strings.
     return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len).slice());
 }
 
