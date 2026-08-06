@@ -5,7 +5,11 @@ import { describe, expect, test } from 'vitest'
 
 import { BgzfFilehandle } from '../src/index.ts'
 
-import type { FilehandleOptions, Stats } from 'generic-filehandle2'
+import type {
+  BufferEncoding,
+  FilehandleOptions,
+  Stats,
+} from 'generic-filehandle2'
 
 // Counts calls to the underlying filehandle. Blocks are adjacent in the file,
 // so a read spanning N blocks must still be one contiguous fetch — over HTTP
@@ -22,9 +26,24 @@ class CountingFile {
   read(length: number, position: number, opts?: FilehandleOptions) {
     this.reads++
     this.bytes += length
-    return this.inner.read(length, position, opts)
+    // opts is accepted to satisfy GenericFilehandle, but LocalFile.read takes
+    // no options argument at all -- it cannot honour a signal.
+    void opts
+    return this.inner.read(length, position)
   }
-  readFile() {
+  // The overload pair rather than one signature, because GenericFilehandle's
+  // readFile is overloaded on `encoding` and a single-signature override does
+  // not satisfy it. `pnpm typecheck` covers test/ where `pnpm build` does not,
+  // so this is caught here rather than in CI.
+  readFile(
+    options?: Omit<FilehandleOptions, 'encoding'>,
+  ): Promise<Uint8Array<ArrayBuffer>>
+  readFile(
+    options:
+      | BufferEncoding
+      | (Omit<FilehandleOptions, 'encoding'> & { encoding: BufferEncoding }),
+  ): Promise<string>
+  readFile(): Promise<Uint8Array<ArrayBuffer> | string> {
     return this.inner.readFile()
   }
   stat(): Promise<Stats> {

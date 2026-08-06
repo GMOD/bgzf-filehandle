@@ -8,7 +8,12 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 
 import { BgzfFilehandle } from '../src/index.ts'
 
-import type { FilehandleOptions, Stats } from 'generic-filehandle2'
+import type {
+  BufferEncoding,
+  FilehandleOptions,
+  GenericFilehandle,
+  Stats,
+} from 'generic-filehandle2'
 
 // Wraps a real LocalFile but tracks/intercepts stat() calls. Used to prove
 // the trailing-block read path never depends on stat() — and continues to
@@ -23,9 +28,24 @@ class StatWatcher {
   }
 
   read(length: number, position: number, opts?: FilehandleOptions) {
-    return this.inner.read(length, position, opts)
+    // opts is accepted to satisfy GenericFilehandle, but LocalFile.read takes
+    // no options argument at all -- it cannot honour a signal.
+    void opts
+    return this.inner.read(length, position)
   }
-  readFile() {
+  // The overload pair rather than one signature, because GenericFilehandle's
+  // readFile is overloaded on `encoding` and a single-signature override does
+  // not satisfy it. `pnpm typecheck` covers test/ where `pnpm build` does not,
+  // so this is caught here rather than in CI.
+  readFile(
+    options?: Omit<FilehandleOptions, 'encoding'>,
+  ): Promise<Uint8Array<ArrayBuffer>>
+  readFile(
+    options:
+      | BufferEncoding
+      | (Omit<FilehandleOptions, 'encoding'> & { encoding: BufferEncoding }),
+  ): Promise<string>
+  readFile(): Promise<Uint8Array<ArrayBuffer> | string> {
     return this.inner.readFile()
   }
   async stat(): Promise<Stats> {
