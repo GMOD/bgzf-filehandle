@@ -90,20 +90,11 @@ generating stable feature IDs across chunk boundaries. They come back as the
 typed arrays wasm produced — indexed reads and `.length` are all a consumer
 needs, so they are not copied into plain arrays on the way out.
 
-### Parallel decompression (optional)
+## Decompressing on a worker pool
 
-`unzipChunkSlice` accepts an optional worker pool that spreads a chunk's BGZF
-blocks across Web Workers. BGZF blocks are independently inflatable, so this
-scales close to linearly up to about four workers.
-
-**No cross-origin isolation is required.** Each worker's range is transferred to
-it as an `ArrayBuffer` — a zero-copy move — so the pool works on an ordinary
-page.
-
-The recommended pattern uses `getSharedWorkerPool`, which resolves to
-`undefined` only where Workers cannot be created at all (node, say), so the same
-call site works everywhere and falls back to the sequential wasm path when there
-is no pool:
+`unzipChunkSlice` takes an optional pool that spreads a chunk's BGZF blocks
+across Web Workers — close to linear speedup up to about four workers, and no
+cross-origin isolation required:
 
 ```typescript
 import { getSharedWorkerPool, unzipChunkSlice } from '@gmod/bgzf-filehandle'
@@ -112,15 +103,13 @@ const pool = await getSharedWorkerPool() // undefined if workers are unavailable
 const result = await unzipChunkSlice(compressedData, chunk, pool)
 ```
 
-For more control (e.g. picking the worker count or owning the lifecycle),
-`createBgzfWorkerPool(numWorkers)` returns a pool directly.
+`getSharedWorkerPool()` is `undefined` only where Workers cannot be created at
+all (node, say), so the same call site works everywhere and falls back to the
+sequential wasm path. Readers that take a pool of their own — `@gmod/bam`'s
+`bgzfWorkerPool` option — accept the same value.
 
-`SharedArrayBuffer` is deliberately not used. It was the original design and was
-measured out: it needs COOP/COEP, which most installs cannot set, and it buys
-nothing when they can — `decompressAll` copies its input into the wasm heap
-either way, so shared memory removes the host-side slice rather than the
-boundary copy. Head to head in Chrome at 4 workers, a pooled SAB was at parity
-with transferring and a freshly allocated one was slower.
+Worker counts, cross-thread sharing, lifecycle, and why `SharedArrayBuffer` is
+deliberately not used: [docs/worker-pool.md](docs/worker-pool.md).
 
 ## Academic Use
 
