@@ -12,12 +12,21 @@ const rootDir = path.resolve(import.meta.dirname, '../..')
 
 let server: http.Server
 let port: number
+// A second origin served WITHOUT COOP/COEP, so `SharedArrayBuffer` does not
+// exist in pages loaded from it — the condition most JBrowse installs run
+// under, and the one the transferable path has to work in.
+let plainServer: http.Server
+let plainPort: number
 let browser: Browser
 
 beforeAll(async () => {
   const result = await startServer(rootDir)
   server = result.server
   port = result.port
+
+  const plain = await startServer(rootDir, false)
+  plainServer = plain.server
+  plainPort = plain.port
 
   browser = await launch({
     headless: true,
@@ -28,12 +37,13 @@ beforeAll(async () => {
 afterAll(async () => {
   await browser.close()
   server.close()
+  plainServer.close()
 })
 
 async function runBrowserTest(
   pagePath: string,
   testName: string,
-  _timeout = 60000,
+  pagePort = port,
 ) {
   const page = await browser.newPage()
 
@@ -44,7 +54,7 @@ async function runBrowserTest(
     console.error(`[browser error]: ${err.message}`)
   })
 
-  await page.goto(`http://127.0.0.1:${port}${pagePath}`, {
+  await page.goto(`http://127.0.0.1:${pagePort}${pagePath}`, {
     waitUntil: 'networkidle0',
   })
 
@@ -83,5 +93,16 @@ test(
   'MessagePort shared pool across simulated RPC workers',
   () =>
     runBrowserTest('/test/browser/messageport-test.html', 'MessagePort pool'),
+  120000,
+)
+
+test(
+  'parallel decompression on a page with no cross-origin isolation',
+  () =>
+    runBrowserTest(
+      '/test/browser/transferable-test.html',
+      'Transferable path (no COOP/COEP)',
+      plainPort,
+    ),
   120000,
 )

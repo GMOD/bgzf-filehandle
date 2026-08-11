@@ -1,5 +1,9 @@
 import type { BgzfBlockInfo } from './bgzfBlockScan.ts'
-import type { BgzfWorkerPool, DecompressResult } from './workerPool.ts'
+import type {
+  BgzfWorkerPool,
+  DecompressResult,
+  PoolInput,
+} from './workerPool.ts'
 
 type HostResponse =
   | { type: 'decompressResult'; requestId: number; blockData: Uint8Array[] }
@@ -36,7 +40,7 @@ export class BgzfWorkerPoolClient implements BgzfWorkerPool {
   }
 
   async decompressBlocks(
-    sharedInput: SharedArrayBuffer,
+    input: PoolInput,
     blocks: BgzfBlockInfo[],
   ): Promise<DecompressResult> {
     const requestId = this.nextRequestId++
@@ -44,12 +48,33 @@ export class BgzfWorkerPoolClient implements BgzfWorkerPool {
       this.pending.set(requestId, { resolve, reject })
     })
 
-    this.port.postMessage({
-      type: 'decompressBlocks',
-      requestId,
-      sharedInput,
-      blocks,
-    })
+    if (
+      typeof SharedArrayBuffer !== 'undefined' &&
+      input instanceof SharedArrayBuffer
+    ) {
+      // shared memory crosses a port by reference; nothing to transfer
+      this.port.postMessage({
+        type: 'decompressBlocks',
+        requestId,
+        sharedInput: input,
+        blocks,
+      })
+    } else {
+      // One copy so the transfer detaches a buffer we own rather than the
+      // caller's, then the host's pool slices per worker. That is a second
+      // pass over the compressed bytes that the direct (non-port) pool does
+      // not pay — the price of the hop, and still small against the inflate.
+      const owned = new Uint8Array(input as Uint8Array)
+      this.port.postMessage(
+        {
+          type: 'decompressBlocks',
+          requestId,
+          inputBuffer: owned.buffer,
+          blocks,
+        },
+        [owned.buffer],
+      )
+    }
 
     const resultBlocks = await promise
     return { blocks: resultBlocks }

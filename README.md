@@ -63,26 +63,36 @@ feature IDs across chunk boundaries.
 
 ### Parallel decompression (optional)
 
-`unzipChunkSlice` accepts an optional worker pool that parallelizes BGZF block
-decompression across Web Workers using `SharedArrayBuffer` for zero-copy input
-sharing. The pool is only usable in cross-origin-isolated browser contexts
-(`Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp`).
+`unzipChunkSlice` accepts an optional worker pool that spreads a chunk's BGZF
+blocks across Web Workers. BGZF blocks are independently inflatable, so this
+scales close to linearly up to about four workers.
+
+**No cross-origin isolation is required.** Each worker's range is transferred to
+it as an `ArrayBuffer` — a zero-copy move — so the pool works on an ordinary
+page. A `SharedArrayBuffer` is used instead, with no per-worker slice at all,
+only when the caller already hands one in.
 
 The recommended pattern uses `getSharedWorkerPool`, which resolves to
-`undefined` when `SharedArrayBuffer` is unavailable so the same call site works
-in both isolated and non-isolated environments — non-isolated installs
-transparently fall back to the sequential WASM path:
+`undefined` only where Workers cannot be created at all (node, say), so the same
+call site works everywhere and falls back to the sequential wasm path when there
+is no pool:
 
 ```typescript
 import { getSharedWorkerPool, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 
-const pool = await getSharedWorkerPool() // undefined if SAB is unavailable
+const pool = await getSharedWorkerPool() // undefined if workers are unavailable
 const result = await unzipChunkSlice(compressedData, chunk, pool)
 ```
 
 For more control (e.g. picking the worker count or owning the lifecycle),
-`createBgzfWorkerPool(numWorkers)` returns a pool directly and throws if SAB is
-unavailable.
+`createBgzfWorkerPool(numWorkers)` returns a pool directly.
+
+Note that manufacturing a `SharedArrayBuffer` to reach the shared path is not
+worth it, and this package deliberately does not: `decompressAll` copies its
+input into the wasm heap either way, so shared memory removes the host-side
+slice rather than the boundary copy. Measured head to head in Chrome, copying a
+`Uint8Array` into a fresh SAB was _slower_ than transferring. Shared memory only
+pays when the compressed bytes are already in it.
 
 ## Academic Use
 

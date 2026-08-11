@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+  <head>
+    <title>
+      BGZF Worker Pool — transferable path (no cross-origin isolation)
+    </title>
+    <script type="importmap">
+      {
+        "imports": {
+          "pako-esm2": "/node_modules/pako-esm2/esm/main.js",
+          "generic-filehandle2": "/node_modules/generic-filehandle2/esm/browser.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <script type="module">
+      import {
+        unzipChunkSlice,
+        createBgzfWorkerPool,
+        getSharedWorkerPool,
+        destroySharedWorkerPool,
+        scanBgzfBlocks,
+      } from '/esm/index.js'
+
+      // Served WITHOUT COOP/COEP, so SharedArrayBuffer does not exist here.
+      // Everything below therefore exercises the transferable path, which is
+      // the whole point: the pool has to work on an ordinary page.
+
+      async function fetchFile(path) {
+        const res = await fetch(path)
+        return new Uint8Array(await res.arrayBuffer())
+      }
+
+      function chunkFor(data) {
+        const blocks = scanBgzfBlocks(data, 0, data.length)
+        return {
+          minv: { dataPosition: 0, blockPosition: 0 },
+          maxv: {
+            dataPosition: 65535,
+            blockPosition: blocks[blocks.length - 1].filePosition,
+          },
+        }
+      }
+
+      function sameBytes(a, b) {
+        if (a.length !== b.length) {
+          return false
+        }
+        for (let i = 0; i < a.length; i++) {
+          if (a[i] !== b[i]) {
+            return false
+          }
+        }
+        return true
+      }
+
+      globalThis.runTests = async () => {
+        const results = []
+        const check = (name, pass, detail) =>
+          results.push({ name, pass, detail })
+
+        try {
+          check(
+            'page is not cross-origin isolated',
+            self.crossOriginIsolated === false,
+            `crossOriginIsolated=${self.crossOriginIsolated}`,
+          )
+          check(
+            'SharedArrayBuffer is genuinely unavailable',
+            typeof SharedArrayBuffer === 'undefined',
+            `typeof SharedArrayBuffer=${typeof SharedArrayBuffer}`,
+          )
+
+          // The regression this PR exists to prevent: the pool used to refuse
+          // to start at all without SharedArrayBuffer.
+          const pool = await createBgzfWorkerPool(4)
+          check('createBgzfWorkerPool resolves without SAB', !!pool)
+
+          const shared = await getSharedWorkerPool(4)
+          check('getSharedWorkerPool returns a pool without SAB', !!shared)
+
+          const files = [
+            '/test/data/shortreads_300x.bam',
+            '/test/data/ultra-long-ont.bam',
+            '/test/data/paired.bam',
+          ]
+
+          for (const f of files) {
+            const data = await fetchFile(f)
+            const chunk = chunkFor(data)
+            const sequential = await unzipChunkSlice(data, chunk)
+            const viaPool = await unzipChunkSlice(data, chunk, pool)
+
+            const name = f.split('/').pop()
+            check(
+              `${name}: parallel output is byte-identical to sequential`,
+              sameBytes(sequential.buffer, viaPool.buffer),
+              `${sequential.buffer.length} vs ${viaPool.buffer.length} bytes`,
+            )
+            check(
+              `${name}: cpositions match`,
+              JSON.stringify([...sequential.cpositions]) ===
+                JSON.stringify([...viaPool.cpositions]),
+            )
+            check(
+              `${name}: dpositions match`,
+              JSON.stringify([...sequential.dpositions]) ===
+                JSON.stringify([...viaPool.dpositions]),
+            )
+          }
+
+          // The input must survive the call: the pool copies each worker's
+          // range out rather than transferring the caller's buffer, so a
+          // caller can still read what it handed over. bam-js relies on this.
+          const data = await fetchFile('/test/data/paired.bam')
+          const chunk = chunkFor(data)
+          const before = data.byteLength
+          await unzipChunkSlice(data, chunk, pool)
+          check(
+            "caller's input buffer is not detached by the pool",
+            data.byteLength === before && before > 0,
+            `byteLength ${before} -> ${data.byteLength}`,
+          )
+
+          // A pool used twice must keep working; a transferred buffer that
+          // leaked into worker-side state would break the second call.
+          const a = await unzipChunkSlice(data, chunk, pool)
+          const b = await unzipChunkSlice(data, chunk, pool)
+          check(
+            'pool is reusable across calls',
+            sameBytes(a.buffer, b.buffer) && a.buffer.length > 0,
+          )
+
+          pool.destroy()
+          destroySharedWorkerPool()
+        } catch (error) {
+          results.push({
+            name: 'unexpected error',
+            pass: false,
+            error: error && error.message ? error.message : String(error),
+          })
+        }
+        return results
+      }
+    </script>
+  </body>
+</html>

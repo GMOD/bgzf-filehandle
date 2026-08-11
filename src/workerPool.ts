@@ -11,9 +11,33 @@ export interface DecompressResult {
   }
 }
 
+/**
+ * Compressed bytes handed to the pool, in one of two forms.
+ *
+ * A `Uint8Array` is sliced per worker and each slice **transferred** — a
+ * zero-copy move of the slice, which every browser allows. This is the default
+ * because it needs nothing of the host page.
+ *
+ * A `SharedArrayBuffer` is read in place by every worker with no slice at all,
+ * but only exists on a cross-origin-isolated page (COOP/COEP). It is worth
+ * taking when the caller *already* holds one — see `unzipChunkSlice` — and is
+ * not worth manufacturing: copying a `Uint8Array` into a fresh SAB to get here
+ * measured slower than transferring, because `decompressAll` copies the input
+ * into the wasm heap either way. What SAB removes is the host-side slice, not
+ * the wasm boundary copy.
+ */
+export type PoolInput = Uint8Array | SharedArrayBuffer
+
+function isShared(input: PoolInput): input is SharedArrayBuffer {
+  return (
+    typeof SharedArrayBuffer !== 'undefined' &&
+    input instanceof SharedArrayBuffer
+  )
+}
+
 export interface BgzfWorkerPool {
   decompressBlocks(
-    sharedInput: SharedArrayBuffer,
+    input: PoolInput,
     blocks: BgzfBlockInfo[],
   ): Promise<DecompressResult>
   destroy(): void
@@ -45,8 +69,22 @@ interface RangeCallback {
   reject: (err: Error) => void
 }
 
-function sharedArrayBufferAvailable() {
-  return typeof SharedArrayBuffer !== 'undefined'
+/**
+ * Whether this context can host the pool at all.
+ *
+ * This used to test for `SharedArrayBuffer`, which made the whole feature
+ * conditional on cross-origin isolation. The transferable path needs no such
+ * thing, so the real requirement is a Worker and a Blob URL to launch it from
+ * — absent under node/vitest, which is what keeps `getSharedWorkerPool`
+ * returning undefined there rather than throwing.
+ */
+function workersAvailable() {
+  return (
+    typeof Worker !== 'undefined' &&
+    typeof Blob !== 'undefined' &&
+    typeof URL !== 'undefined' &&
+    typeof URL.createObjectURL === 'function'
+  )
 }
 
 class ManagedWorker {
@@ -100,22 +138,37 @@ class ManagedWorker {
     }
   }
 
-  decompressRange(
-    sharedInput: SharedArrayBuffer,
-    inputOffset: number,
-    inputLength: number,
-  ) {
+  decompressRange(input: PoolInput, inputOffset: number, inputLength: number) {
     const batchId = this.nextBatchId++
     const promise = new Promise<RangeResult>((resolve, reject) => {
       this.callbacks.set(batchId, { resolve, reject })
     })
-    this.worker.postMessage({
-      type: 'decompressRange',
-      batchId,
-      sharedInput,
-      inputOffset,
-      inputLength,
-    })
+    if (isShared(input)) {
+      this.worker.postMessage({
+        type: 'decompressRange',
+        batchId,
+        sharedInput: input,
+        inputOffset,
+        inputLength,
+      })
+    } else {
+      // `slice`, not `subarray`: transferring detaches the buffer it is taken
+      // from, and that buffer belongs to the caller — bam-js hands us the
+      // filehandle read it is still holding. Copying this worker's range out
+      // first keeps the transfer to bytes we own. One pass over the compressed
+      // input, which is the smaller side of the operation.
+      const piece = input.slice(inputOffset, inputOffset + inputLength)
+      this.worker.postMessage(
+        {
+          type: 'decompressRange',
+          batchId,
+          inputBuffer: piece.buffer,
+          inputOffset: 0,
+          inputLength,
+        },
+        [piece.buffer],
+      )
+    }
     return promise
   }
 
@@ -146,16 +199,18 @@ let sharedPool: BgzfWorkerPool | undefined
 let sharedPoolPromise: Promise<BgzfWorkerPool | undefined> | undefined
 let poolGeneration = 0
 
-// Returns undefined when SharedArrayBuffer is unavailable (e.g. a JBrowse
-// install without cross-origin isolation), so callers can pass the result
-// straight to unzipChunkSlice and get the sequential fallback path.
+// Returns undefined where workers cannot be launched at all (node, or a host
+// with no Blob URLs), so callers can pass the result straight to
+// unzipChunkSlice and get the sequential fallback path. A browser without
+// cross-origin isolation is NOT such a host — it gets a working pool over the
+// transferable path.
 export function getSharedWorkerPool(
   numWorkers?: number,
 ): Promise<BgzfWorkerPool | undefined> {
   if (sharedPool) {
     return Promise.resolve(sharedPool)
   }
-  if (!sharedArrayBufferAvailable()) {
+  if (!workersAvailable()) {
     return Promise.resolve(undefined)
   }
   if (!sharedPoolPromise) {
@@ -195,9 +250,9 @@ export async function createBgzfWorkerPool(
   numWorkers?: number,
   workerUrl?: string | URL,
 ): Promise<BgzfWorkerPool> {
-  if (!sharedArrayBufferAvailable()) {
+  if (!workersAvailable()) {
     throw new Error(
-      'SharedArrayBuffer is not available. In browsers, set Cross-Origin-Opener-Policy: same-origin and Cross-Origin-Embedder-Policy: require-corp headers.',
+      'cannot create a bgzf worker pool: this context has no Worker and Blob URL support',
     )
   }
 
@@ -217,7 +272,7 @@ export async function createBgzfWorkerPool(
   let destroyed = false
 
   return {
-    async decompressBlocks(sharedInput, blocks) {
+    async decompressBlocks(input, blocks) {
       if (destroyed) {
         throw new Error('Worker pool has been destroyed')
       }
@@ -244,7 +299,7 @@ export async function createBgzfWorkerPool(
 
         rangeInfos.push({ startBlock, endBlock })
         promises.push(
-          workers[w]!.decompressRange(sharedInput, inputOffset, inputLength),
+          workers[w]!.decompressRange(input, inputOffset, inputLength),
         )
       }
 

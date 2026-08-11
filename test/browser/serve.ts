@@ -12,10 +12,18 @@ const MIME_TYPES: Record<string, string> = {
   '.json': 'application/json',
 }
 
-export function createServer(rootDir: string) {
+/**
+ * @param crossOriginIsolated send COOP/COEP, which is what makes
+ * `SharedArrayBuffer` exist in the page. Pass `false` to serve a page like the
+ * majority of JBrowse installs — no isolation, no SAB — which is the condition
+ * the transferable path has to work under.
+ */
+export function createServer(rootDir: string, crossOriginIsolated = true) {
   const server = http.createServer((req, res) => {
-    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
-    res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
+    if (crossOriginIsolated) {
+      res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
+      res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
+    }
 
     const urlPath = decodeURIComponent(req.url ?? '/')
     const filePath = path.join(rootDir, urlPath)
@@ -38,9 +46,10 @@ export function createServer(rootDir: string) {
 
 export function startServer(
   rootDir: string,
+  crossOriginIsolated = true,
 ): Promise<{ server: http.Server; port: number }> {
   return new Promise(resolve => {
-    const server = createServer(rootDir)
+    const server = createServer(rootDir, crossOriginIsolated)
     server.listen(0, '127.0.0.1', () => {
       const addr = server.address()
       const port = typeof addr === 'object' && addr ? addr.port : 0

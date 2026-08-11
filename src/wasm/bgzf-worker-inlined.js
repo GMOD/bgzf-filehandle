@@ -433,9 +433,15 @@ async function handleMessage(data) {
   }
 
   if (data.type === 'decompressRange') {
-    const { batchId, sharedInput, inputOffset, inputLength } = data
+    const { batchId, sharedInput, inputBuffer, inputOffset, inputLength } = data
     const t0 = performance.now()
-    const input = new Uint8Array(sharedInput, inputOffset, inputLength)
+    // Two ways the compressed bytes get here. `sharedInput` is a
+    // SharedArrayBuffer read in place, which needs the page to be cross-origin
+    // isolated; `inputBuffer` is an ArrayBuffer transferred to this worker,
+    // which needs nothing and is the default. See workerPool.ts.
+    const input = sharedInput
+      ? new Uint8Array(sharedInput, inputOffset, inputLength)
+      : new Uint8Array(inputBuffer)
     const t1 = performance.now()
     const decompressed = await decompressAll(input)
     const t2 = performance.now()

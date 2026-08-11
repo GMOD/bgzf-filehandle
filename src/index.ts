@@ -7,6 +7,6 @@ export {
   destroySharedWorkerPool,
   getSharedWorkerPool,
 } from './workerPool.ts'
-export type { BgzfWorkerPool } from './workerPool.ts'
+export type { BgzfWorkerPool, PoolInput } from './workerPool.ts'
 export { BgzfWorkerPoolClient } from './workerPoolClient.ts'
 export { BgzfWorkerPoolHost, createPoolPort } from './workerPoolHost.ts'

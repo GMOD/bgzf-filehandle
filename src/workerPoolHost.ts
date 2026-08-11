@@ -4,7 +4,9 @@ import type { BgzfWorkerPool } from './workerPool.ts'
 interface HostRequest {
   type: string
   requestId: number
-  sharedInput: SharedArrayBuffer
+  // exactly one of these is set; see BgzfWorkerPoolClient.decompressBlocks
+  sharedInput?: SharedArrayBuffer
+  inputBuffer?: ArrayBuffer
   blocks: BgzfBlockInfo[]
 }
 
@@ -32,10 +34,8 @@ export class BgzfWorkerPoolHost {
   private async handleRequest(port: MessagePort, req: HostRequest) {
     if (req.type === 'decompressBlocks') {
       try {
-        const result = await this.pool.decompressBlocks(
-          req.sharedInput,
-          req.blocks,
-        )
+        const input = req.sharedInput ?? new Uint8Array(req.inputBuffer!)
+        const result = await this.pool.decompressBlocks(input, req.blocks)
         const seen = new Set<ArrayBuffer>()
         const transfer: Transferable[] = []
         for (const block of result.blocks) {

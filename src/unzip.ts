@@ -19,7 +19,7 @@ interface Chunk {
 }
 
 function hasGzipHeader(data: Uint8Array) {
-  return data.length >= 2 && data[0] === 0x1F && data[1] === 0x8B
+  return data.length >= 2 && data[0] === 0x1f && data[1] === 0x8b
 }
 
 async function decompressGzip(inputData: Uint8Array) {
@@ -136,20 +136,21 @@ export async function unzipChunkSlice(
     )
 
     if (blocks.length > 1) {
-      let sharedBuf: SharedArrayBuffer
-      if (
+      // Pass shared memory through only when the caller already handed us
+      // some; the pool slices and transfers otherwise. Copying into a fresh
+      // SharedArrayBuffer to take the shared path — which is what this did —
+      // measured *slower* than transferring, and dragged the whole feature
+      // behind cross-origin isolation for nothing. See workerPool.ts PoolInput.
+      const poolInput =
         typeof SharedArrayBuffer !== 'undefined' &&
         inputData.buffer instanceof SharedArrayBuffer &&
-        inputData.byteOffset === 0
-      ) {
-        sharedBuf = inputData.buffer
-      } else {
-        sharedBuf = new SharedArrayBuffer(inputData.byteLength)
-        new Uint8Array(sharedBuf).set(inputData)
-      }
+        inputData.byteOffset === 0 &&
+        inputData.byteLength === inputData.buffer.byteLength
+          ? inputData.buffer
+          : inputData
 
       const decompressResult = await workerPool.decompressBlocks(
-        sharedBuf,
+        poolInput,
         blocks,
       )
       return {
