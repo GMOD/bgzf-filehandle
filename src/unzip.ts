@@ -1,9 +1,14 @@
 import { ungzip } from 'pako-esm2'
 
+import { scanBgzfBlocks } from './bgzfBlockScan.ts'
+import { concatUint8Array } from './util.ts'
 import {
   decompressAll,
   decompressChunkSlice,
 } from './wasm/bgzf-wasm-inlined.js'
+
+import type { BgzfBlockInfo } from './bgzfBlockScan.ts'
+import type { BgzfWorkerPool } from './workerPool.ts'
 
 interface VirtualOffset {
   blockPosition: number
@@ -111,11 +116,77 @@ export interface ChunkSlice {
   dpositions: Float64Array
 }
 
+/**
+ * Reassemble a chunk slice from independently decompressed blocks.
+ *
+ * Mirrors what `decompress_chunk_slice` does in wasm: trim the first block to
+ * `minv.dataPosition` and the last to `maxv.dataPosition`, and record each
+ * block's compressed offset and its uncompressed offset within the result.
+ */
+function assembleChunkSliceResult(
+  blocks: Uint8Array[],
+  infos: BgzfBlockInfo[],
+  minv: VirtualOffset,
+  maxv: VirtualOffset,
+): ChunkSlice {
+  const cpositions: number[] = []
+  const dpositions: number[] = []
+  const slices: Uint8Array[] = []
+  let dpos = minv.dataPosition
+
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i]!
+    const info = infos[i]!
+    const isLast = info.filePosition >= maxv.blockPosition
+
+    cpositions.push(info.filePosition)
+    dpositions.push(dpos)
+
+    const start = i === 0 ? minv.dataPosition : 0
+    const end = isLast
+      ? Math.min(maxv.dataPosition + 1, block.length)
+      : block.length
+    if (start < end) {
+      slices.push(block.subarray(start, end))
+    }
+    dpos += block.length - start
+
+    if (isLast) {
+      cpositions.push(info.filePosition + info.compressedSize)
+      dpositions.push(dpos)
+      break
+    }
+  }
+
+  return {
+    buffer: concatUint8Array(slices),
+    // Float64Array to match the wasm path's shape exactly — a caller must not
+    // be able to tell which one produced its result
+    cpositions: Float64Array.from(cpositions),
+    dpositions: Float64Array.from(dpositions),
+  }
+}
+
 export async function unzipChunkSlice(
   inputData: Uint8Array,
   chunk: Chunk,
+  workerPool?: BgzfWorkerPool,
 ): Promise<ChunkSlice> {
   const { minv, maxv } = chunk
+
+  if (workerPool) {
+    const blocks = scanBgzfBlocks(
+      inputData,
+      minv.blockPosition,
+      maxv.blockPosition,
+    )
+    // one block is not worth a round trip to a worker
+    if (blocks.length > 1) {
+      const result = await workerPool.decompressBlocks(inputData, blocks)
+      return assembleChunkSliceResult(result.blocks, blocks, minv, maxv)
+    }
+  }
+
   try {
     const result = await decompressChunkSlice(
       inputData,

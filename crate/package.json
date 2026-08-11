@@ -5,7 +5,8 @@
   "scripts": {
     "build:wasm": "bash build-wasm.sh",
     "build:bundle": "webpack --config webpack.config.js",
-    "build": "pnpm build:wasm && pnpm build:bundle"
+    "build:worker-bundle": "webpack --config webpack.worker.config.js && bash ../scripts/inline-worker.sh",
+    "build": "pnpm build:wasm && pnpm build:bundle && pnpm build:worker-bundle"
   },
   "devDependencies": {
     "webpack": "^5.109.2",
