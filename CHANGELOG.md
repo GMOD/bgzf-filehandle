@@ -1,3 +1,9 @@
+## [6.6.0](https://github.com/GMOD/bgzf-filehandle/compare/v6.5.0...v6.6.0) (2026-08-12)
+
+### Features
+
+- Reap idle workers, keeping the pool object valid ([8dba074](https://github.com/GMOD/bgzf-filehandle/commit/8dba074b2cfe16fdec4cb838c9723343b0b1c62d))
+
 ## [6.5.0](https://github.com/GMOD/bgzf-filehandle/compare/v6.4.0...v6.5.0) (2026-08-12)
 
 ### Chores
