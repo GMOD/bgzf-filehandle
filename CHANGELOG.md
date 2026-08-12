@@ -1,3 +1,16 @@
+## [6.5.0](https://github.com/GMOD/bgzf-filehandle/compare/v6.4.0...v6.5.0) (2026-08-12)
+
+### Chores
+
+- Render only the commit subject, and link the commit ([d99ee1a](https://github.com/GMOD/bgzf-filehandle/commit/d99ee1a904cf7bb71a38fffd7e6b375e44d5594f))
+- Create a GitHub release for each published tag ([4ecebf3](https://github.com/GMOD/bgzf-filehandle/commit/4ecebf3fea272680b1cd449338286c4ec22ed07e))
+- Enforce type strippability in tsconfig ([f127a6d](https://github.com/GMOD/bgzf-filehandle/commit/f127a6d65febabe5246839805e49ea6dcea3a559))
+- Stop publishing the worker build's intermediates ([7902147](https://github.com/GMOD/bgzf-filehandle/commit/790214728b32993193d9b51607f0c1488ffe66f9))
+
+### Documentation
+
+- Move the worker pool detail into docs/worker-pool.md ([2a9ac2d](https://github.com/GMOD/bgzf-filehandle/commit/2a9ac2d6b7a1939d103b5dac84ca32637e42b0e6))
+
 ## [6.4.0](https://github.com/GMOD/bgzf-filehandle/compare/v6.3.3...v6.4.0) (2026-08-11)
 
 ### Other Changes
