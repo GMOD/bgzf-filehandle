@@ -2,8 +2,8 @@ import fs from 'node:fs'
 
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
+import { installFakeWorker } from './fakeWorker.ts'
 import { unzipChunkSlice } from '../src/unzip.ts'
-import { decompressAll } from '../src/wasm/bgzf-wasm-inlined.js'
 import {
   createBgzfWorkerPool,
   destroySharedWorkerPool,
@@ -67,68 +67,8 @@ test('recommended JBrowse-style pattern: await getSharedWorkerPool() then pass t
   expect(viaPool.dpositions).toEqual(sequential.dpositions)
 })
 
-/**
- * A stand-in for a real Worker that runs the same wasm on this thread.
- *
- * Lets the transferable protocol — the `inputBuffer` field, the transfer list,
- * and the caller's buffer surviving the call — be asserted in CI, where no
- * Worker exists. It deliberately does NOT emulate structured clone; the browser
- * suite covers what actually crosses a thread boundary.
- */
-function installFakeWorker() {
-  const posted: { hadInputBuffer: boolean }[] = []
-  interface WorkerRequest {
-    type: string
-    batchId: number
-    inputBuffer?: ArrayBuffer
-  }
-  class FakeWorker {
-    onmessage: ((e: { data: unknown }) => void) | undefined = undefined
-    postMessage(msg: WorkerRequest, transfer?: Transferable[]) {
-      if (msg.type === 'init') {
-        queueMicrotask(() => this.onmessage?.({ data: { type: 'ready' } }))
-        return
-      }
-      posted.push({ hadInputBuffer: msg.inputBuffer !== undefined })
-      // a transferred buffer must actually be listed for transfer
-      if (msg.inputBuffer !== undefined) {
-        expect(transfer).toContain(msg.inputBuffer)
-      }
-      const input = new Uint8Array(msg.inputBuffer!)
-      void Promise.resolve(decompressAll(input)).then(
-        (data: Uint8Array) => {
-          this.onmessage?.({
-            data: {
-              type: 'rangeResult',
-              batchId: msg.batchId,
-              data,
-              viewMs: 0,
-              wasmMs: 0,
-            },
-          })
-        },
-        (error: unknown) => {
-          this.onmessage?.({
-            data: {
-              type: 'error',
-              batchId: msg.batchId,
-              message: String(error),
-            },
-          })
-        },
-      )
-    }
-    terminate() {
-      this.onmessage = undefined
-    }
-  }
-  // node supplies real Blob and URL.createObjectURL, so only Worker is missing
-  vi.stubGlobal('Worker', FakeWorker)
-  return posted
-}
-
 test('pool takes the transferable path and leaves the caller its bytes', async () => {
-  const posted = installFakeWorker()
+  const { posted } = installFakeWorker()
 
   const testData = new Uint8Array(
     fs.readFileSync(require.resolve('./data/paired.bam')),

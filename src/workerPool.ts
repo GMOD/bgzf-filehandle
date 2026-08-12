@@ -172,6 +172,23 @@ function getWorkerBlobUrl() {
   return cachedBlobUrl
 }
 
+/**
+ * Terminate a pool's workers once nothing has asked it to inflate anything for
+ * this long, and spawn a fresh set on the next call. Transparent to whoever
+ * holds the pool — see {@link createBgzfWorkerPool}.
+ *
+ * Three minutes, matching the parsed-chunk caches in `@gmod/bam`, `@gmod/tabix`
+ * and `@gmod/cram`, and for the same reason their ADRs give: the point is to
+ * catch a reader who has walked away, not one who is looking at the screen in
+ * front of them. A pan back a minute later should find the pool still up.
+ *
+ * It could afford to be shorter than those, since respawning costs a worker
+ * boot and a wasm instantiate rather than a re-download — but there is no
+ * measurement here to justify a different number, and matching the rest of the
+ * stack is worth more than a tuned one that is not.
+ */
+export const DEFAULT_POOL_IDLE_TIMEOUT_MS = 3 * 60 * 1000
+
 let sharedPool: BgzfWorkerPool | undefined
 let sharedPoolPromise: Promise<BgzfWorkerPool | undefined> | undefined
 let poolGeneration = 0
@@ -181,8 +198,15 @@ let poolGeneration = 0
 // unzipChunkSlice and get the sequential fallback path. A browser without
 // cross-origin isolation is NOT such a host — it gets a working pool over the
 // transferable path.
+//
+// The pool this hands back reaps its own workers while idle and spawns them
+// again on demand, so holding it for the life of a file — which is what
+// `@gmod/bam` does — no longer pins four workers and their wasm heaps for the
+// life of the page. See {@link createBgzfWorkerPool}; `idleTimeoutMs`, like
+// `numWorkers`, only applies to the call that actually creates the pool.
 export function getSharedWorkerPool(
   numWorkers?: number,
+  idleTimeoutMs?: number,
 ): Promise<BgzfWorkerPool | undefined> {
   if (sharedPool) {
     return Promise.resolve(sharedPool)
@@ -194,6 +218,8 @@ export function getSharedWorkerPool(
     const gen = poolGeneration
     const promise: Promise<BgzfWorkerPool | undefined> = createBgzfWorkerPool(
       numWorkers,
+      undefined,
+      idleTimeoutMs,
     ).then(
       pool => {
         if (gen !== poolGeneration) {
@@ -223,9 +249,31 @@ export function destroySharedWorkerPool() {
   sharedPoolPromise = undefined
 }
 
+/**
+ * A pool of `numWorkers` workers, which **reaps them while idle** and spawns a
+ * fresh set on the next call.
+ *
+ * The reap is invisible to whoever holds the pool, and that is the whole design
+ * constraint rather than a nicety. Consumers keep a pool — `@gmod/bam` stores
+ * the promise on the `BamFile` and awaits it once per chunk read, for the life
+ * of the file — so the reclaiming cannot be `destroy()`: a destroyed pool
+ * throws out of `decompressBlocks`, which would turn every open reader's next
+ * read into an error rather than degrading it to inflating in process. Reaping
+ * inside the pool keeps the object valid and only the workers come and go.
+ *
+ * What this reclaims is worth stating, because it is not mainly threads. Each
+ * worker holds its own copy of the inlined wasm bundle, and that
+ * `WebAssembly.Memory` only ever grows — so a pool that has inflated one deep
+ * long-read chunk keeps that heap until the page goes away. Nothing else in
+ * this library ever gave it back.
+ *
+ * Pass `idleTimeoutMs: 0` to keep the workers up for the pool's lifetime, which
+ * is what every version before this did.
+ */
 export async function createBgzfWorkerPool(
   numWorkers?: number,
   workerUrl?: string | URL,
+  idleTimeoutMs: number = DEFAULT_POOL_IDLE_TIMEOUT_MS,
 ): Promise<BgzfWorkerPool> {
   if (!workersAvailable()) {
     throw new Error(
@@ -235,25 +283,119 @@ export async function createBgzfWorkerPool(
 
   const url = workerUrl ?? getWorkerBlobUrl()
   const count = numWorkers ?? Math.min(navigator.hardwareConcurrency, 4)
-  const workers: ManagedWorker[] = []
-
-  for (let i = 0; i < count; i++) {
-    workers.push(new ManagedWorker(url))
-  }
-
-  for (const w of workers) {
-    w.init()
-  }
-  await Promise.all(workers.map(w => w.readyPromise))
-
+  let workers: ManagedWorker[] = []
   let destroyed = false
+  let idleTimer: ReturnType<typeof setTimeout> | undefined
+  let inFlight = 0
+  let spawning: Promise<void> | undefined
+
+  async function spawn() {
+    const started = Array.from({ length: count }, () => new ManagedWorker(url))
+    for (const w of started) {
+      w.init()
+    }
+    await Promise.all(started.map(w => w.readyPromise))
+    // destroy() may have landed while these were booting; do not adopt them
+    if (destroyed) {
+      for (const w of started) {
+        w.terminate()
+      }
+      return
+    }
+    workers = started
+  }
+
+  /** Workers, spawning them if an idle reap has taken them away. */
+  async function ensureWorkers() {
+    if (workers.length === 0) {
+      // one spawn shared by every concurrent caller, or two queries arriving
+      // together after a reap would each start a full set
+      spawning ??= spawn().finally(() => {
+        spawning = undefined
+      })
+      await spawning
+    }
+    return workers
+  }
+
+  function clearIdle() {
+    if (idleTimer !== undefined) {
+      clearTimeout(idleTimer)
+      idleTimer = undefined
+    }
+  }
+
+  // `terminate()` rejects a worker's pending callbacks, so reaping mid-request
+  // fails a live query rather than reclaiming an idle pool. The case is two
+  // OVERLAPPING requests — `decompressBlocks` clears the timer on entry, so a
+  // single request in flight has no armed timer to go wrong; it is the arming
+  // when the first settles, while the second is still out, that would kill it.
+  //
+  // The check inside the callback is the load-bearing one (verified by removing
+  // each in turn: only dropping both fails the test). The one here just avoids
+  // arming a timer that would no-op, which a multi-chunk query would otherwise
+  // do once per chunk as each settles.
+  function armIdle() {
+    clearIdle()
+    if (destroyed || idleTimeoutMs <= 0 || inFlight > 0) {
+      return
+    }
+    idleTimer = setTimeout(() => {
+      idleTimer = undefined
+      if (inFlight > 0) {
+        return
+      }
+      for (const w of workers) {
+        w.terminate()
+      }
+      workers = []
+    }, idleTimeoutMs)
+    // never hold a node process open on this; the browser's number has no unref
+    const timer: unknown = idleTimer
+    if (
+      typeof timer === 'object' &&
+      timer !== null &&
+      'unref' in timer &&
+      typeof timer.unref === 'function'
+    ) {
+      timer.unref()
+    }
+  }
+
+  await spawn()
+  armIdle()
 
   return {
     async decompressBlocks(input, blocks) {
       if (destroyed) {
         throw new Error('Worker pool has been destroyed')
       }
+      clearIdle()
+      inFlight++
+      try {
+        return await run(input, blocks)
+      } finally {
+        inFlight--
+        armIdle()
+      }
+    },
 
+    destroy() {
+      destroyed = true
+      clearIdle()
+      for (const w of workers) {
+        w.terminate()
+      }
+      workers = []
+    },
+  }
+
+  async function run(
+    input: PoolInput,
+    blocks: BgzfBlockInfo[],
+  ): Promise<DecompressResult> {
+    {
+      const workers = await ensureWorkers()
       const numW = workers.length
       const blocksPerWorker = Math.ceil(blocks.length / numW)
 
@@ -303,14 +445,6 @@ export async function createBgzfWorkerPool(
         blocks: resultBlocks,
         timing: { workerTimings, dispatchMs, reassembleMs },
       }
-    },
-
-    destroy() {
-      destroyed = true
-      for (const w of workers) {
-        w.terminate()
-      }
-      workers.length = 0
-    },
+    }
   }
 }

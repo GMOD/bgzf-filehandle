@@ -23,14 +23,43 @@ without `Worker` plus `Blob` URLs — so the same call site works everywhere and
 callers can pass the result straight through to a sequential fallback. A browser
 that is _not_ cross-origin isolated is not such a host; see below.
 
-- `getSharedWorkerPool(numWorkers?)` — the shared pool. `numWorkers` defaults to
-  `Math.min(navigator.hardwareConcurrency, 4)`, and only applies to the call
-  that actually creates it.
-- `createBgzfWorkerPool(numWorkers?, workerUrl?)` — an unshared pool you own,
-  for picking the worker count per pool or controlling the lifecycle yourself.
-  It **throws** where `getSharedWorkerPool` returns `undefined`.
+- `getSharedWorkerPool(numWorkers?, idleTimeoutMs?)` — the shared pool.
+  `numWorkers` defaults to `Math.min(navigator.hardwareConcurrency, 4)`, and
+  both arguments only apply to the call that actually creates it.
+- `createBgzfWorkerPool(numWorkers?, workerUrl?, idleTimeoutMs?)` — an unshared
+  pool you own, for picking the worker count per pool or controlling the
+  lifecycle yourself. It **throws** where `getSharedWorkerPool` returns
+  `undefined`.
 - `destroySharedWorkerPool()` — terminate the shared pool's workers. A later
   `getSharedWorkerPool()` builds a fresh one.
+
+## Idle workers are reaped, and the pool stays valid
+
+A pool terminates its workers after `idleTimeoutMs` (default 3 minutes) with
+nothing to inflate, and spawns a fresh set on the next call. Pass `0` to keep
+them up for the pool's lifetime, which is what every version before 6.5 did.
+
+**The reap is invisible to whoever holds the pool, and that is a requirement
+rather than a nicety.** Consumers keep a pool — `@gmod/bam` stores the promise
+on the `BamFile` and awaits it once per chunk read, for the life of the file —
+so reclaiming by calling `destroy()` on their behalf is not an option: a
+destroyed pool throws out of `decompressBlocks`, which turns every open reader's
+next read into an error rather than degrading it to inflating in process. Only
+the workers come and go; the object stays usable.
+
+What this gives back is mostly not threads. Each worker holds its own copy of
+the inlined wasm bundle, and that `WebAssembly.Memory` only ever grows — so a
+pool that has inflated one deep long-read chunk kept that heap until the page
+went away, times however many pools the consumer had. Multiply that by a
+consumer that creates one pool per data worker (below) and it is the largest
+thing the pool was holding.
+
+An in-flight request is never reaped out from under itself. The case that needs
+care is two overlapping requests: `decompressBlocks` clears the timer on entry,
+so one request alone has no armed timer to go wrong, but the arming that happens
+when the first settles would otherwise terminate the second's workers — and
+`terminate()` rejects their pending callbacks, so it would fail rather than
+merely slow down.
 
 ## Using it
 
