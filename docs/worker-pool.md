@@ -4,8 +4,10 @@ BGZF blocks inflate independently, so the blocks in one chunk can be spread
 across Web Workers. Inflating is where an indexed read spends its time — 70-90%
 of the wall clock of a `@gmod/bam` query that finds nothing in its cache — which
 makes this the largest speedup available to a consumer. What it actually
-measures is [below](#what-it-is-worth): the inflate moves about 2.5x at four
-workers, and a caller of `unzipChunkSlice` sees 1.1-2.0x of that.
+measures is [below](#what-it-is-worth): at the default four workers a BAM chunk
+goes about 1.8-2.1x once it is past a couple of MB, which on a deep long-read
+view is
+[most of a second off a 1.8s inflate](#at-the-size-where-it-saves-seconds).
 
 Nothing creates a pool implicitly. Workers are a thread budget the application
 owns, and a library that quietly started four of them per file would be a bad
@@ -57,11 +59,11 @@ Four things the tables say:
   the input copy with nothing to overlap it, and it is the floor a fixture
   climbs off only when it has enough blocks to divide.
 
-- **A small chunk never climbs off it.** paired.bam is 7 blocks and 0.3MB out,
-  and loses at every worker count. `unzipChunkSlice` already declines the pool
-  for a single-block chunk; between two blocks and roughly ten there is nothing
-  to win either, so a consumer whose chunks are that small should not expect
-  this to show up.
+- **A whole small file never climbs off it.** paired.bam is 7 blocks and 0.3MB
+  out, and loses at every worker count. That is about the total work, not the
+  block count — see
+  [how big a chunk has to be](#how-big-does-the-chunk-have-to-be), where eight
+  blocks out of a deep BAM is already a win.
 
 - **The end-to-end column is the smaller one, and the gap is serial.** A pooled
   call gets one `Uint8Array` per block back and concatenates them on the
@@ -73,6 +75,66 @@ Four things the tables say:
   out, reassembly is 58% of its four-worker call, and end to end it never
   reaches 1.3x however many workers are added. The same term is 23-36% of the
   other three.
+
+### How big does the chunk have to be?
+
+The tables above use a whole-file chunk, which is not the shape a reader asks
+for — an indexed query resolves to a run of blocks. Holding the pool at its
+default four workers and sweeping the chunk instead (`pnpm bench:chunksize`, min
+of 15 rounds, input sliced to the chunk the way `@gmod/bam` passes it):
+
+| blocks | compressed | uncompressed | shortreads_300x | ultra-long-ont | chr22_nanopore | out.sorted.gff |
+| ------ | ---------- | ------------ | --------------- | -------------- | -------------- | -------------- |
+| 1      | 5-63KB     | 0.1MB        | 0.82x           | 0.98x          | 1.11x          | 0.94x          |
+| 2      | 8-127KB    | 0.1MB        | 0.80x           | 1.12x          | 0.84x          | 0.43x          |
+| 4      | 16-253KB   | 0.2MB        | 0.90x           | 1.32x          | 1.44x          | 0.83x          |
+| 8      | 28-507KB   | 0.4-0.5MB    | 1.36x           | 1.68x          | 1.60x          | 1.03x          |
+| 16     | 57-527KB   | 0.8-1.0MB    | 1.40x           | 1.82x          | 1.79x          | 0.98x          |
+| 32     | 112KB-1MB  | 1.6-2.0MB    | 1.62x           | 2.12x          | 1.77x          | 1.01x          |
+| 64     | 231KB-2MB  | 3.3-4.0MB    | 1.53x           | 2.04x          | 1.87x          | 0.71x          |
+| 128    | 441KB-4MB  | 6.6-8.0MB    | 1.83x           | 2.05x          | 2.16x          | 0.83x          |
+| 256    | 911KB-8MB  | 13-16MB      | 1.58x           | —              | 1.68x          | 1.18x          |
+
+The single-block row is a control: `unzipChunkSlice` declines the pool outright
+there, so both arms run the same code and the spread off 1.00x is the noise
+floor — call it ±0.15x, and read no row as finer than that.
+
+- **It turns positive at four to eight blocks** — roughly 150-500KB compressed,
+  0.2-0.5MB uncompressed. Below that the round trip and the input copy cost more
+  than the parallelism returns.
+- **It has most of its value by sixteen to thirty-two blocks**, around 1-2MB of
+  uncompressed chunk, and the ratio is flat after that. So a query does not have
+  to be large to collect this — but past a couple of MB, growing the region buys
+  absolute time rather than a better multiple.
+- **out.sorted.gff.gz is flat at ~1.0x throughout**, for the reassembly reason
+  above. It is the fixture whose chunks decompress ~18x, so the serial concat
+  tracks the inflate no matter how the chunk is sized.
+
+### At the size where it saves seconds
+
+The fixtures top out at a 60ms query, so the rows above cannot show what this is
+worth on a deep long-read view. Repeating a fixture's block range builds a chunk
+that can — a repeat is valid BGZF, the format being concatenated gzip members —
+and holds the block-size distribution fixed (`pnpm bench:largechunk`, four
+workers, min of 7):
+
+| fixture                   | blocks | compressed | uncompressed | seq   | 4w    | speedup | saved |
+| ------------------------- | ------ | ---------- | ------------ | ----- | ----- | ------- | ----- |
+| chr22_nanopore_subset.bam | 894    | 27MB       | 47MB         | 0.20s | 0.12s | 1.59x   | 0.07s |
+| chr22_nanopore_subset.bam | 2682   | 81MB       | 140MB        | 0.63s | 0.31s | 1.99x   | 0.31s |
+| chr22_nanopore_subset.bam | 7152   | 216MB      | 373MB        | 1.77s | 0.91s | 1.95x   | 0.86s |
+| ultra-long-ont.bam        | 772    | 26MB       | 43MB         | 0.21s | 0.11s | 1.85x   | 0.09s |
+| ultra-long-ont.bam        | 2509   | 84MB       | 139MB        | 0.66s | 0.32s | 2.09x   | 0.35s |
+| ultra-long-ont.bam        | 6948   | 231MB      | 384MB        | 1.62s | 0.85s | 1.90x   | 0.77s |
+| shortreads_300x.bam       | 861    | 15MB       | 53MB         | 0.13s | 0.09s | 1.44x   | 0.04s |
+| shortreads_300x.bam       | 2296   | 39MB       | 141MB        | 0.40s | 0.24s | 1.63x   | 0.16s |
+| shortreads_300x.bam       | 6314   | 107MB      | 389MB        | 0.97s | 0.55s | 1.77x   | 0.42s |
+
+The multiple holds — 1.8-2.1x on long-read BAM across two orders of magnitude of
+chunk — so the saving scales with the query: **roughly 0.9s off a 1.8s inflate
+at 373MB uncompressed**, or 1.1-2.3ms per MB of output. That is the regime the
+jbrowse figure below comes from, and it is why the pool is worth its threads on
+deep data even though it is a rounding error on a 0.3MB fixture.
 
 ### The number this doc used to quote
 
@@ -106,14 +168,22 @@ falling back, are in jbrowse-components'
 
 `pnpm bench:pool` runs `scripts/bench-worker-pool.ts`, which serves the repo
 over HTTP with no COOP/COEP and drives `test/browser/scaling.html` under
-puppeteer. Five ways to get a fake number out of this, four of them found the
-hard way:
+puppeteer, alongside `bench:chunksize` and `bench:largechunk` on the same page.
+Six ways to get a fake number out of this, five of them found the hard way:
 
 - **Node cannot measure the pool at all.** `workersAvailable()` wants a global
   `Worker` plus Blob URLs, and `worker_threads` is a different API — so the pool
   resolves to `undefined` and the in-process path runs. Every vitest bench in
   `benchmarks/` is blind to it and will report parity forever.
 - **Don't time `decompressBlocks` against `unzipChunkSlice`.** See above.
+- **Slice the input to the chunk.** `scanBgzfBlocks` treats the buffer as
+  _starting_ at `minv.blockPosition`, and the sequential path hands the whole
+  buffer to wasm, which copies all of it into its heap and preallocates
+  `total_uncompressed_size(input)`. Benchmark a small chunk against a whole-file
+  buffer and the sequential arm inflates the file while the pooled arm inflates
+  the chunk: it reads as a clean 2.2-3.1x on **two** blocks, rising as the chunk
+  shrinks, which is the tell. `@gmod/bam` passes the read that covers the chunk,
+  so a benchmark should too.
 - **Interleave the arms.** Run all of one and then all of the other and any
   machine drift lands entirely on the second; interleaved, throttling hits both
   alike and the ratio survives even where the milliseconds do not.

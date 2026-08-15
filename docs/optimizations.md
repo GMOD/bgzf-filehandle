@@ -187,11 +187,13 @@ either. The rest of the layer builds on that:
 BGZF blocks inflate independently, so a chunk can spread its blocks across Web
 Workers. Of everything in this document this is the only lever aimed at the
 inflate cost itself — the 70-90% of a query — rather than at the work around it.
-Four workers take 2.3-2.7x off the inflate on this package's multi-megabyte
-fixtures, of which a caller of `unzipChunkSlice` keeps 1.1-2.0x, and
+At its default four workers a BAM chunk runs 1.8-2.1x once it is past a couple
+of MB uncompressed, which is 0.9s off a 1.8s inflate at 373MB, and
 jbrowse-components measures 1.95x end to end in a browser over 1000x long-read
 data. Scaling is sublinear from the first worker rather than near-linear out to
-four; the tables, and what eats the difference, are in
+four, a chunk has to reach four to eight blocks before it pays at all, and a
+chunk that decompresses ~18x never gets past ~1.0x. The tables, and the serial
+reassembly that eats the difference, are in
 [worker-pool.md](worker-pool.md#what-it-is-worth).
 
 Splitting work across threads usually hands most of a gain like that straight

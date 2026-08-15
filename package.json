@@ -40,6 +40,8 @@
     "build": "pnpm build:wasm && pnpm build:esm && pnpm build:es5",
     "benchonly": "vitest bench",
     "bench:pool": "pnpm build:esm && node --experimental-strip-types scripts/bench-worker-pool.ts",
+    "bench:chunksize": "pnpm build:esm && node --experimental-strip-types scripts/bench-chunk-size.ts",
+    "bench:largechunk": "pnpm build:esm && node --experimental-strip-types scripts/bench-large-chunk.ts",
     "bench": "./scripts/build-both-branches.sh \"$BRANCH1\" \"$BRANCH2\" && vitest bench",
     "build:wasm": "pnpm --filter bgzf-wasm-build build"
   },

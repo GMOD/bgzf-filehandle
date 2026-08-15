@@ -123,6 +123,181 @@
         }
       }
 
+      // A chunk of `count` consecutive blocks taken from the middle of the file.
+      //
+      // The input is sliced down to exactly that byte range, which is not a
+      // convenience: `scanBgzfBlocks` treats the buffer as *starting* at
+      // `minv.blockPosition`, and the sequential path hands the whole buffer to
+      // wasm, which copies all of it into its heap and preallocates its full
+      // uncompressed size. Pass the whole file with a small chunk and the
+      // sequential arm inflates the file while the pooled arm inflates the
+      // chunk — which reads as a 2-3x speedup on two blocks. bam-js passes the
+      // read that covers the chunk, so this matches it.
+      function middleChunk(data, allBlocks, count) {
+        const start = Math.max(0, Math.floor((allBlocks.length - count) / 2))
+        const first = allBlocks[start]
+        const last = allBlocks[Math.min(start + count, allBlocks.length) - 1]
+        const end = last.inputOffset + last.compressedSize
+        return {
+          input: data.slice(first.inputOffset, end),
+          compressed: end - first.inputOffset,
+          chunk: {
+            minv: { dataPosition: 0, blockPosition: first.filePosition },
+            maxv: { dataPosition: 65535, blockPosition: last.filePosition },
+          },
+        }
+      }
+
+      // A chunk far larger than any fixture, built by repeating the file's block
+      // range. BGZF is concatenated gzip members, so a repeat is a valid chunk
+      // with the same block-size distribution — and `scanBgzfBlocks` assigns
+      // file positions by walking it, so the copies are indistinguishable from
+      // more data. The ratios plateau by a couple of MB; this exists to put an
+      // absolute number on a query big enough for the saving to be measured in
+      // seconds rather than milliseconds.
+      function repeatedChunk(data, targetUncompressedBytes) {
+        const blocks = scanBgzfBlocks(data, 0, data.length)
+        const last = blocks[blocks.length - 1]
+        const usable = last.inputOffset + last.compressedSize
+        const perCopy = blocks.reduce((a, b) => a + b.decompressedSize, 0)
+        const copies = Math.max(
+          1,
+          Math.round(targetUncompressedBytes / perCopy),
+        )
+
+        const input = new Uint8Array(usable * copies)
+        for (let i = 0; i < copies; i++) {
+          input.set(data.subarray(0, usable), i * usable)
+        }
+        const all = scanBgzfBlocks(input, 0, input.length)
+        return {
+          input,
+          copies,
+          blocks: all.length,
+          compressed: input.length,
+          chunk: {
+            minv: { dataPosition: 0, blockPosition: 0 },
+            maxv: {
+              dataPosition: 65535,
+              blockPosition: all[all.length - 1].filePosition,
+            },
+          },
+        }
+      }
+
+      window.runLargeChunks = async config => {
+        const pool = await createBgzfWorkerPool(config.workers, undefined, 0)
+        const results = []
+
+        for (const f of config.files) {
+          const data = await fetchFile(f.path)
+          for (const target of config.targets) {
+            const { input, chunk, copies, blocks, compressed } = repeatedChunk(
+              data,
+              target,
+            )
+            const reference = await unzipChunkSlice(input, chunk)
+            const pooled = await unzipChunkSlice(input, chunk, pool)
+            const identical = same(reference.buffer, pooled.buffer)
+            const uncompressed = reference.buffer.length
+
+            const arms = [
+              { key: 'seq', run: () => timeArm(input, chunk, undefined, 1) },
+              { key: 'pool', run: () => timeArm(input, chunk, pool, 1) },
+            ]
+            const samples = { seq: [], pool: [] }
+            for (const arm of arms) {
+              await arm.run()
+            }
+            for (let r = 0; r < config.rounds; r++) {
+              for (const arm of arms) {
+                samples[arm.key].push(await arm.run())
+              }
+            }
+            results.push({
+              name: f.name,
+              copies,
+              blocks,
+              compressed,
+              uncompressed,
+              identical,
+              samples,
+            })
+          }
+        }
+
+        pool.destroy()
+        return { workers: config.workers, results }
+      }
+
+      async function benchChunkSizes(name, data, pool, blockCounts, rounds) {
+        const allBlocks = scanBgzfBlocks(data, 0, data.length)
+        const rows = []
+
+        for (const count of blockCounts) {
+          if (count > allBlocks.length) {
+            continue
+          }
+          const { input, chunk, compressed } = middleChunk(
+            data,
+            allBlocks,
+            count,
+          )
+          const reference = await unzipChunkSlice(input, chunk)
+          const pooled = await unzipChunkSlice(input, chunk, pool)
+          // keep each measurement about the same total work, so a 2-block row
+          // is not one timer read
+          const reps = Math.max(2, Math.round(2e7 / reference.buffer.length))
+
+          const arms = [
+            { key: 'seq', run: () => timeArm(input, chunk, undefined, reps) },
+            { key: 'pool', run: () => timeArm(input, chunk, pool, reps) },
+          ]
+          const samples = { seq: [], pool: [] }
+          for (const arm of arms) {
+            await arm.run()
+          }
+          for (let r = 0; r < rounds; r++) {
+            for (const arm of arms) {
+              samples[arm.key].push(await arm.run())
+            }
+          }
+
+          rows.push({
+            blocks: count,
+            compressed,
+            uncompressed: reference.buffer.length,
+            reps,
+            identical: same(reference.buffer, pooled.buffer),
+            samples,
+          })
+        }
+        return { name, rows }
+      }
+
+      window.runChunkSizes = async config => {
+        const pool = await createBgzfWorkerPool(config.workers, undefined, 0)
+        const results = []
+        for (const f of config.files) {
+          const data = await fetchFile(f.path)
+          results.push(
+            await benchChunkSizes(
+              f.name,
+              data,
+              pool,
+              config.blockCounts,
+              config.rounds,
+            ),
+          )
+        }
+        pool.destroy()
+        return {
+          workers: config.workers,
+          hardwareConcurrency: navigator.hardwareConcurrency,
+          results,
+        }
+      }
+
       window.runScaling = async config => {
         const workerCounts = config.workerCounts
         const pools = []
