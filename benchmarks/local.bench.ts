@@ -1,5 +1,8 @@
-// Benchmarks src/ directly (no branch-comparison build needed).
-// Run: npx vitest bench benchmarks/local.bench.ts
+// The layers above inflate, benchmarked against src/ directly (no
+// branch-comparison build needed). Timing `unzip` on a BGZF file belongs in
+// inflate.bench.ts, where there are pako and zlib arms to read it against.
+//
+// Run with `pnpm benchonly local`.
 import { readFileSync } from 'node:fs'
 
 import { LocalFile } from 'generic-filehandle2'
@@ -8,20 +11,10 @@ import { bench, describe } from 'vitest'
 import BgzFilehandle from '../src/bgzFilehandle.ts'
 import { unzip, unzipChunkSlice } from '../src/unzip.ts'
 
-const gff = new Uint8Array(readFileSync('test/data/out.sorted.gff.gz'))
-const twobit = new Uint8Array(readFileSync('test/data/T_ko.2bit.gz'))
 const bam = new Uint8Array(readFileSync('test/data/paired.bam'))
 const plainGz = new Uint8Array(readFileSync('test/data/plain-gzip-test.txt.gz'))
 
-describe('unzip whole file', () => {
-  bench('out.sorted.gff.gz 5.2MB', async () => {
-    await unzip(gff)
-  })
-  bench('T_ko.2bit.gz 518KB', async () => {
-    await unzip(twobit)
-  })
-})
-
+// The one unzip arm that is not libdeflate: plain gzip falls back to pako.
 describe('unzip plain gzip (non-bgzf fallback)', () => {
   bench('plain-gzip-test.txt.gz', async () => {
     await unzip(plainGz)

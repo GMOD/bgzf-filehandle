@@ -59,6 +59,10 @@ import { unzip } from '@gmod/bgzf-filehandle'
 const decompressed: Uint8Array = await unzip(compressedData)
 ```
 
+Only BGZF takes the libdeflate path. A plain gzip stream has no block structure
+to exploit and no uncompressed size to size a buffer from, so it goes to pako
+instead — which is why pako remains a dependency.
+
 ## unzipChunkSlice
 
 Decompress a range of blocks and slice out a virtual offset range — what BAM and
