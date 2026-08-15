@@ -25,7 +25,7 @@ npm install @gmod/bgzf-filehandle
 
 ## BgzfFilehandle
 
-Read a bgzip-compressed file with a `.gzi` index as if it were uncompressed:
+Read a bgzip-compressed file with a `.gzi` index as though it never was:
 
 ```typescript
 import { BgzfFilehandle } from '@gmod/bgzf-filehandle'
@@ -42,8 +42,8 @@ const data: Uint8Array = await f.read(300, 0)
 ```
 
 Create the index with `bgzip -i my_file`, or `bgzip -r my_file.gz` for an
-already-compressed one. Everything a read touches is fetched as one contiguous
-range and inflated in one call.
+already-compressed one. Everything a read touches arrives as one contiguous
+range and inflates in one call.
 
 ## unzip
 
@@ -108,7 +108,7 @@ pool directly: [docs/worker-pool.md](docs/worker-pool.md).
 ## Docs
 
 - [docs/optimizations.md](docs/optimizations.md) — benchmark numbers, and what
-  was measured, kept and rejected
+  we measured, kept and rejected
 - [docs/worker-pool.md](docs/worker-pool.md) — pool lifecycle, sizing, sharing,
   and `scanBgzfBlocks`
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development and release steps

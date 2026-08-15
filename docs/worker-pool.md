@@ -73,7 +73,7 @@ Four things the tables say:
   touches it. It grows with the uncompressed size rather than the file's, so it
   is worst where compression is best: out.sorted.gff.gz is 5.0MB in and 92.8MB
   out, reassembly is 58% of its four-worker call, and end to end it never
-  reaches 1.3x however many workers are added. The same term is 23-36% of the
+  reaches 1.3x however many workers you add. The same term is 23-36% of the
   other three.
 
 ### How big does the chunk have to be?
@@ -114,8 +114,8 @@ floor — call it ±0.15x, and read no row as finer than that.
 
 The fixtures top out at a 60ms query, so the rows above cannot show what this is
 worth on a deep long-read view. Repeating a fixture's block range builds a chunk
-that can — a repeat is valid BGZF, the format being concatenated gzip members —
-and holds the block-size distribution fixed (`pnpm bench:largechunk`, four
+that can — a repeat is valid BGZF, since the format is concatenated gzip members
+— and holds the block-size distribution fixed (`pnpm bench:largechunk`, four
 workers, min of 7):
 
 | fixture                   | blocks | compressed | uncompressed | seq   | 4w    | speedup | saved |
@@ -160,9 +160,10 @@ in headless Chrome over real HTTP with four workers:
   are enormous because every 1000-Genomes record carries a genotype field per
   sample.
 
-Both, plus how to verify the pool is engaged in production rather than silently
-falling back, are in jbrowse-components'
-[BGZF_WORKER_POOL.md](https://github.com/GMOD/jbrowse-components/blob/main/agent-docs/reference/BGZF_WORKER_POOL.md).
+jbrowse-components'
+[BGZF_WORKER_POOL.md](https://github.com/GMOD/jbrowse-components/blob/main/agent-docs/reference/BGZF_WORKER_POOL.md)
+covers both, plus how to confirm the pool is really running in production rather
+than quietly falling back.
 
 ### Measuring it again
 
@@ -211,10 +212,10 @@ There are three entry points:
 - **`destroySharedWorkerPool()`** — terminates the shared pool's workers. The
   next `getSharedWorkerPool()` builds a fresh one.
 
-`getSharedWorkerPool` resolves to `undefined` only where Workers cannot be
-launched at all — Node, or any host lacking `Worker` plus Blob URLs. So the same
-call site works everywhere, and the result can be passed straight through to a
-sequential fallback. `createBgzfWorkerPool` throws in those same cases.
+`getSharedWorkerPool` resolves to `undefined` only where nothing can launch a
+Worker at all — Node, or any host lacking `Worker` plus Blob URLs. So the same
+call site works everywhere, and you can hand the result straight to a sequential
+fallback. `createBgzfWorkerPool` throws in those same cases.
 
 A browser that is _not_ cross-origin isolated is a perfectly good host; see
 [No cross-origin isolation required](#no-cross-origin-isolation-required).
@@ -259,7 +260,7 @@ const { blocks: decompressed } = await pool.decompressBlocks(input, blocks)
 `decompressBlocks` and `destroy` are the whole of the `BgzfWorkerPool`
 interface, so they are all an alternative implementation has to provide.
 
-## Idle workers are reaped
+## The pool reaps idle workers
 
 After `idleTimeoutMs` (default 3 minutes) with nothing to inflate, a pool
 terminates its workers, and spawns a fresh set on the next call. Pass `0` to
@@ -321,21 +322,21 @@ bytes is the price of the hop, and it is small against the inflate.
 ## No cross-origin isolation required
 
 Each worker's range crosses as a **transferable**: the `ArrayBuffer` rides in
-`postMessage`'s transfer list, so ownership moves rather than the bytes being
-structured-cloned. Transfers need no isolation, so the pool works on an ordinary
-non-isolated origin, and results come back the same way. The range is copied out
-of the input first, because transferring detaches the buffer it came from and
-that buffer belongs to the caller (bam-js hands over the filehandle read it is
-still holding). Across all the workers that is one pass over the compressed
-bytes, the smaller side of the operation.
+`postMessage`'s transfer list, so ownership moves rather than the bytes
+structured-cloning. Transfers need no isolation, so the pool works on an
+ordinary non-isolated origin, and results come back the same way. Each range
+copies out of the input first, because transferring detaches the buffer it came
+from and that buffer belongs to the caller (bam-js hands over the filehandle
+read it is still holding). Across all the workers that is one pass over the
+compressed bytes, the smaller side of the operation.
 
-`SharedArrayBuffer` is deliberately not used. It was the original design, and it
-was measured out. It needs COOP/COEP, which most JBrowse installs cannot set,
-and it buys nothing where they can: `decompressAll` copies its input into the
-wasm heap either way, so shared memory removes the host-side slice rather than
-the boundary copy. Head to head in Chrome at 4 workers, a pooled `SAB` was at
-parity with transferring, and a freshly allocated one was slower.
+The pool deliberately avoids `SharedArrayBuffer`. It was the original design,
+and measurement ruled it out. It needs COOP/COEP, which most JBrowse installs
+cannot set, and it buys nothing where they can: `decompressAll` copies its input
+into the wasm heap either way, so shared memory removes the host-side slice
+rather than the boundary copy. Head to head in Chrome at 4 workers, a pooled
+`SAB` was at parity with transferring, and a freshly allocated one was slower.
 
 Dropping it is also what made the feature generally available. Availability used
-to be gated on `SharedArrayBuffer` existing — that is, on cross-origin isolation
-— when the real requirement is only a Worker and a Blob URL to launch it from.
+to hang on `SharedArrayBuffer` existing — that is, on cross-origin isolation —
+when the real requirement is only a Worker and a Blob URL to launch it from.
