@@ -9,3 +9,5 @@ esm
 esm_*/
 crate/target
 build/
+.claude/settings.local.json
+.claude/worktrees/
