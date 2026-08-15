@@ -1,11 +1,12 @@
 # @gmod/bgzf-filehandle
 
 [![NPM version](https://img.shields.io/npm/v/@gmod/bgzf-filehandle.svg?style=flat-square)](https://npmjs.org/package/@gmod/bgzf-filehandle)
-![Build Status](https://img.shields.io/github/actions/workflow/status/GMOD/bgzf-filehandle/publish.yml?branch=main)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/GMOD/bgzf-filehandle/publish.yml?branch=main)](https://github.com/GMOD/bgzf-filehandle/actions/workflows/publish.yml)
 
 Reads [block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such
 as those created by bgzip, using coordinates from the uncompressed file.
-Decompression is libdeflate compiled to WASM. Used by
+Decompression is libdeflate compiled to WASM and inlined in the bundle, so there
+is no `.wasm` file to serve. Used by
 [@gmod/indexedfasta](https://github.com/GMOD/indexedfasta),
 [@gmod/bam](https://github.com/GMOD/bam-js) and
 [@gmod/tabix](https://github.com/GMOD/tabix-js).
@@ -35,10 +36,10 @@ const data: Uint8Array = await f.read(300, 0)
 ```
 
 Create the index with `bgzip -i my_file`, or `bgzip -r my_file.gz` for an
-already-compressed one. Blocks are adjacent on disk, so every block a read
-touches is fetched as one contiguous range and inflated in one call — a read
-spanning 300 blocks is one request. Reads over 32MB uncompressed split into
-batches, and `blockConcurrency` caps how many are in flight.
+already-compressed one. Blocks are adjacent on disk, so the blocks a read
+touches are fetched as one contiguous range and inflated in one call — a read
+spanning 300 blocks is one request. Past 32MB uncompressed the read splits into
+batches of that size, and `blockConcurrency` caps how many are in flight.
 
 ## unzip
 
@@ -95,12 +96,9 @@ const result = await unzipChunkSlice(compressedData, chunk, pool)
 
 Safe to pass unconditionally — `undefined` keeps the sequential wasm path, and
 readers that take a pool of their own (`@gmod/bam`'s `bgzfWorkerPool`) accept
-the same value. Worker counts, cross-thread sharing, lifecycle, and why
-`SharedArrayBuffer` is deliberately not used:
-[docs/worker-pool.md](docs/worker-pool.md).
-
-`benchmarks/inflate.bench.ts` (`pnpm benchonly inflate`) measures the wasm path
-against pako and native zlib.
+the same value. Worker counts, cross-thread sharing, lifecycle, driving a pool
+directly with `scanBgzfBlocks`, and why `SharedArrayBuffer` is deliberately not
+used: [docs/worker-pool.md](docs/worker-pool.md).
 
 ## Academic Use
 

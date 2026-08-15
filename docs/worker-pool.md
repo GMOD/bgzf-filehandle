@@ -72,7 +72,27 @@ const pool = await getSharedWorkerPool()
 const result = await unzipChunkSlice(compressedData, chunk, pool)
 ```
 
-Or hand it to a reader that takes one.
+Or drive it directly. A pool inflates whole blocks, so it takes the block list
+`scanBgzfBlocks` finds — the same call `unzipChunkSlice` makes internally, split
+out for readers that want the blocks rather than a chunk slice:
+
+```typescript
+import { scanBgzfBlocks } from '@gmod/bgzf-filehandle'
+
+// input starts at file offset `minv.blockPosition`; scanning stops after the
+// block at `maxv.blockPosition`, or at the first byte that isn't a valid block
+const blocks = scanBgzfBlocks(input, minv.blockPosition, maxv.blockPosition)
+const { blocks: decompressed } = await pool.decompressBlocks(input, blocks)
+```
+
+`decompressed` is one `Uint8Array` per entry of `blocks`, in order. Each
+`BgzfBlockInfo` carries `filePosition` (compressed offset in the file),
+`inputOffset` (its offset within `input`), `compressedSize` and
+`decompressedSize`. `decompressBlocks` and `destroy` are the whole of the
+`BgzfWorkerPool` interface, so they are what an alternative implementation has
+to provide.
+
+Or hand the pool to a reader that takes one.
 [`@gmod/bam`](https://github.com/GMOD/bam-js) accepts the pending promise
 directly, so a synchronous constructor doesn't have to await first:
 
@@ -113,9 +133,12 @@ the inflate.
 
 ## No cross-origin isolation required
 
-Each worker's range is **transferred** to it as an `ArrayBuffer` — a zero-copy
-move every browser allows on any page — so the pool works on an ordinary
-non-isolated origin.
+Each worker's range is **transferred** to it as an `ArrayBuffer` — a move every
+browser allows on any page — so the pool works on an ordinary non-isolated
+origin. The range is copied out of the input first, because transferring
+detaches the buffer it came from and that buffer belongs to the caller (bam-js
+hands over the filehandle read it is still holding). Across all the workers that
+is one pass over the compressed bytes, the smaller side of the operation.
 
 `SharedArrayBuffer` is deliberately not used. It was the original design and was
 measured out. It needs COOP/COEP, which most JBrowse installs cannot set, and it
