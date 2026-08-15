@@ -180,9 +180,12 @@ either. Around that:
 
 BGZF blocks inflate independently, so a chunk's blocks can spread across Web
 Workers. This is the only lever that attacks the 70-90% itself rather than the
-remainder, and it scales close to linearly out to about four workers: 2.7-4.1x
-on this package's fixtures, and 1.95x end to end in a browser over 1000x
-long-read data.
+remainder. At four workers it takes 2.3-2.7x off the inflate on this package's
+multi-megabyte fixtures, of which a caller of `unzipChunkSlice` keeps 1.1-2.0x,
+and jbrowse-components measures 1.95x end to end in a browser over 1000x
+long-read data. Scaling is sublinear from the first worker, not near-linear to
+four: the tables and what eats the difference are in
+[worker-pool.md](worker-pool.md#what-it-is-worth).
 
 Splitting work across threads usually gives most of that back in overhead. Two
 choices are why this one does not:

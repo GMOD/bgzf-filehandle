@@ -90,7 +90,10 @@
           name: `benchmark ${name} (${sizeMB}MB)`,
           pass: true,
           detail: [
-            `${blocks.length} blocks, ${iterations}x: seq=${seqTime.toFixed(0)}ms par=${parTime.toFixed(0)}ms speedup=${(seqTime / parTime).toFixed(2)}x`,
+            // NOT an end-to-end speedup: the par arm stops after
+            // decompressBlocks, so it leaves out the reassembly the seq arm's
+            // unzipChunkSlice does. scripts/bench-worker-pool.ts measures both.
+            `${blocks.length} blocks, ${iterations}x: seq=${seqTime.toFixed(0)}ms par(inflate only)=${parTime.toFixed(0)}ms inflate ratio=${(seqTime / parTime).toFixed(2)}x`,
             `  avg/iter: scan=${avgScan}ms dispatch+wasm=${avgDispatch}ms reassemble=${avgReassemble}ms`,
             `  worker totals/iter: view=${(totalWorkerViewMs / iterations).toFixed(1)}ms wasm=${avgWorkerWasm}ms`,
           ].join('\n'),

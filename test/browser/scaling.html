@@ -1,0 +1,158 @@
+<!doctype html>
+<html>
+  <head>
+    <title>BGZF Worker Pool Scaling</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "pako-esm2": "/node_modules/pako-esm2/esm/main.js",
+          "generic-filehandle2": "/node_modules/generic-filehandle2/esm/browser.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <script type="module">
+      import {
+        unzipChunkSlice,
+        createBgzfWorkerPool,
+        scanBgzfBlocks,
+      } from '/esm/index.js'
+
+      async function fetchFile(path) {
+        const response = await fetch(path)
+        return new Uint8Array(await response.arrayBuffer())
+      }
+
+      function wholeFileChunk(data) {
+        const blocks = scanBgzfBlocks(data, 0, data.length)
+        const last = blocks[blocks.length - 1]
+        return {
+          blocks: blocks.length,
+          chunk: {
+            minv: { dataPosition: 0, blockPosition: 0 },
+            maxv: { dataPosition: 65535, blockPosition: last.filePosition },
+          },
+        }
+      }
+
+      function same(a, b) {
+        if (a.length !== b.length) {
+          return false
+        }
+        for (let i = 0; i < a.length; i++) {
+          if (a[i] !== b[i]) {
+            return false
+          }
+        }
+        return true
+      }
+
+      // Arms are interleaved inside each round and reduced with min, so machine
+      // drift lands on both arms rather than on whichever ran last. See the
+      // benchmark traps in jbrowse-components' BGZF_WORKER_POOL.md.
+      async function timeArm(data, chunk, pool, reps) {
+        const start = performance.now()
+        for (let i = 0; i < reps; i++) {
+          await unzipChunkSlice(data, chunk, pool)
+        }
+        return (performance.now() - start) / reps
+      }
+
+      // The inflate alone, with the serial reassembly `unzipChunkSlice` does
+      // after it left out. This is the part the pool can actually reach, and
+      // measuring it against the sequential *whole* is the trap that produced
+      // the speedup this doc used to quote.
+      async function timeInflateOnly(data, chunk, pool, reps) {
+        const start = performance.now()
+        for (let i = 0; i < reps; i++) {
+          const blocks = scanBgzfBlocks(
+            data,
+            chunk.minv.blockPosition,
+            chunk.maxv.blockPosition,
+          )
+          await pool.decompressBlocks(data, blocks)
+        }
+        return (performance.now() - start) / reps
+      }
+
+      async function benchFile(name, data, pools, reps, rounds) {
+        const { blocks, chunk } = wholeFileChunk(data)
+        const arms = [
+          { key: 'seq', run: () => timeArm(data, chunk, undefined, reps) },
+          ...pools.flatMap(p => [
+            {
+              key: String(p.count),
+              run: () => timeArm(data, chunk, p.pool, reps),
+            },
+            {
+              key: `${p.count}i`,
+              run: () => timeInflateOnly(data, chunk, p.pool, reps),
+            },
+          ]),
+        ]
+
+        const reference = (await unzipChunkSlice(data, chunk)).buffer
+        const identical = {}
+        for (const p of [{ count: 'seq', pool: undefined }, ...pools]) {
+          const out = await unzipChunkSlice(data, chunk, p.pool)
+          identical[String(p.count)] = same(reference, out.buffer)
+        }
+
+        for (const arm of arms) {
+          await arm.run()
+        }
+
+        const samples = {}
+        for (const arm of arms) {
+          samples[arm.key] = []
+        }
+        for (let r = 0; r < rounds; r++) {
+          for (const arm of arms) {
+            samples[arm.key].push(await arm.run())
+          }
+        }
+
+        return {
+          name,
+          bytes: data.byteLength,
+          decompressedBytes: reference.length,
+          blocks,
+          identical,
+          samples,
+        }
+      }
+
+      window.runScaling = async config => {
+        const workerCounts = config.workerCounts
+        const pools = []
+        for (const count of workerCounts) {
+          // idleTimeoutMs 0: a reap mid-sweep would put a worker respawn inside
+          // a timed arm
+          pools.push({
+            count,
+            pool: await createBgzfWorkerPool(count, undefined, 0),
+          })
+        }
+
+        const results = []
+        for (const f of config.files) {
+          const data = await fetchFile(f.path)
+          results.push(
+            await benchFile(f.name, data, pools, f.reps, config.rounds),
+          )
+        }
+
+        for (const p of pools) {
+          p.pool.destroy()
+        }
+        return {
+          crossOriginIsolated,
+          hardwareConcurrency: navigator.hardwareConcurrency,
+          workerCounts,
+          results,
+        }
+      }
+    </script>
+  </body>
+</html>
