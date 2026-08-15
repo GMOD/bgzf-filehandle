@@ -35,7 +35,7 @@ import { LocalFile } from 'generic-filehandle2'
 const f = new BgzfFilehandle({
   filehandle: new LocalFile('path/to/my_file.gz'),
   gziFilehandle: new LocalFile('path/to/my_file.gz.gzi'),
-  blockConcurrency: 10, // in-flight batch reads (not threads), default 10
+  blockConcurrency: 10, // concurrent range requests per read, default 10
 })
 
 // read(length, position) — matches generic-filehandle2
@@ -46,7 +46,8 @@ Create the index with `bgzip -i my_file`, or `bgzip -r my_file.gz` for an
 already-compressed one. Blocks sit adjacent on disk, so everything a read
 touches is fetched as one contiguous range and inflated in one call — a read
 spanning 300 blocks is a single request. Past 32MB uncompressed the read splits
-into batches of that size, and `blockConcurrency` caps how many are in flight.
+into batches of that size, one request each, and `blockConcurrency` caps how
+many of those are in flight at once — requests, not threads.
 
 ## unzip
 
