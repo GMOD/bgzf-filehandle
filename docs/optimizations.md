@@ -107,12 +107,14 @@ What keeps that from being eaten by overhead:
   known without decompressing. Blocks are dealt out in contiguous runs, one
   input slice and one wasm call per worker — overheads scale with worker count,
   not block count.
-- **Ranges go over as transferables.** Each worker's slice is an `ArrayBuffer`
-  in the `postMessage` transfer list, so ownership moves instead of the bytes
-  being structured-cloned — and a transfer needs no cross-origin isolation, so
-  this works on an ordinary page. Transferring detaches the source buffer, which
-  belongs to the caller, so the slice is copied out first: one pass over the
-  **compressed** bytes, the smaller side.
+- **Ranges go over as
+  [transferables](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Transferable_objects).**
+  Each worker's slice is an `ArrayBuffer` in the `postMessage` transfer list, so
+  ownership moves instead of the bytes being structured-cloned — the handoff
+  costs the same whatever the range's size, and needs no cross-origin isolation,
+  so this works on an ordinary page. Transferring detaches the source buffer,
+  which belongs to the caller, so the slice is copied out first: one pass over
+  the **compressed** bytes, the smaller side.
 - **Results come back as transferables too**, one buffer per worker holding its
   whole range decompressed. Per-block results are `subarray` views into it,
   sized from the `ISIZE`s already scanned — no second copy.

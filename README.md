@@ -10,13 +10,10 @@ as those created by bgzip, using coordinates from the uncompressed file.
 [@gmod/tabix](https://github.com/GMOD/tabix-js) all read their BGZF through it.
 
 Decompression runs on [libdeflate](https://github.com/ebiggers/libdeflate),
-which gives up streaming for speed: it wants a whole input buffer and an output
-size known in advance. That is exactly the shape of BGZF, where every block is
-an independent gzip member recording its own uncompressed length, and it is why
-htslib can be built against the same library for BAM and CRAM. On this repo's
-test fixtures it inflates two to three times faster than pako — see
-[Performance](#performance). It is compiled to WebAssembly and inlined in the
-bundle as base64, so there is no `.wasm` file to serve.
+compiled to WebAssembly and inlined in the bundle as base64, so there is no
+`.wasm` file to serve. On this repo's fixtures it inflates two to three times
+faster than pako — table and reasoning in
+[docs/optimizations.md](docs/optimizations.md).
 
 ## Install
 
@@ -43,11 +40,8 @@ const data: Uint8Array = await f.read(300, 0)
 ```
 
 Create the index with `bgzip -i my_file`, or `bgzip -r my_file.gz` for an
-already-compressed one. Blocks sit adjacent on disk, so everything a read
-touches is fetched as one contiguous range and inflated in one call — a read
-spanning 300 blocks is a single request. Past 32MB uncompressed the read splits
-into batches of that size, one request each, and `blockConcurrency` caps how
-many of those are in flight at once — requests, not threads.
+already-compressed one. Everything a read touches is fetched as one contiguous
+range and inflated in one call.
 
 ## unzip
 
@@ -59,10 +53,6 @@ import { unzip } from '@gmod/bgzf-filehandle'
 
 const decompressed: Uint8Array = await unzip(compressedData)
 ```
-
-Only BGZF takes the libdeflate path. A plain gzip stream has no block structure
-to exploit and no uncompressed size to size a buffer from, so it goes to pako
-instead — which is why pako remains a dependency.
 
 ## unzipChunkSlice
 
@@ -96,8 +86,10 @@ coordinates, for generating stable feature IDs across chunk boundaries.
 ## Worker pool
 
 `unzipChunkSlice` takes an optional pool that spreads a chunk's blocks across
-Web Workers — close to linear to about four workers. Each worker's bytes cross
-as transferables rather than copies, so no cross-origin isolation is required:
+Web Workers — close to linear to about four workers. Bytes cross as
+[transferable objects](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Transferable_objects)
+rather than copies, so the handoff costs the same whatever the size and needs no
+cross-origin isolation:
 
 ```typescript
 import { getSharedWorkerPool, unzipChunkSlice } from '@gmod/bgzf-filehandle'
@@ -108,34 +100,16 @@ const result = await unzipChunkSlice(compressedData, chunk, pool)
 
 Safe to pass unconditionally — `undefined` keeps the sequential wasm path, and
 readers that take a pool of their own (`@gmod/bam`'s `bgzfWorkerPool`) accept
-the same value. Worker counts, cross-thread sharing, lifecycle, driving a pool
-directly with `scanBgzfBlocks`, and why `SharedArrayBuffer` is deliberately not
-used: [docs/worker-pool.md](docs/worker-pool.md).
+the same value. Worker counts, cross-thread sharing, lifecycle and driving a
+pool directly: [docs/worker-pool.md](docs/worker-pool.md).
 
-## Performance
+## Docs
 
-`pnpm benchonly inflate` decompresses the test fixtures three ways: the shipped
-wasm path, pako block by block (the pure-JS route this package took through
-v6.0.0), and node's native zlib block by block as a reference floor. All three
-are asserted byte-identical before anything is timed. Mean milliseconds per
-file, lower better:
-
-| fixture                          | wasm libdeflate | pako | node zlib |
-| -------------------------------- | --------------- | ---- | --------- |
-| paired.bam (84KB)                | 1.3             | 3.8  | 1.7       |
-| T_ko.2bit.gz (518KB)             | 4.8             | 9.4  | 2.6       |
-| shortreads_300x.bam (5.1MB)      | 69              | 176  | 88        |
-| chr22_nanopore_subset.bam (14MB) | 123             | 345  | 139       |
-
-The wasm path stays in the same range as native zlib, ahead of it on the three
-BAM fixtures and behind on the 2bit one, while running somewhere zlib is not an
-option at all. Measured on Node 24 on one laptop, so treat the ratios as
-indicative and rerun them on your own data.
-
-The codec is only part of it. Why the wasm boundary is crossed once per chunk,
-why a read is one range request, how a chunk's blocks are split across workers,
-and what was measured and rejected:
-[docs/optimizations.md](docs/optimizations.md).
+- [docs/optimizations.md](docs/optimizations.md) — benchmark numbers, and what
+  was measured, kept and rejected
+- [docs/worker-pool.md](docs/worker-pool.md) — pool lifecycle, sizing, sharing,
+  and `scanBgzfBlocks`
+- [CONTRIBUTING.md](CONTRIBUTING.md) — development and release steps
 
 ## Academic Use
 
@@ -143,10 +117,6 @@ This package was written with funding from the [NHGRI](http://genome.gov) as
 part of the [JBrowse](http://jbrowse.org) project. If you use it in an academic
 project that you publish, please cite the most recent JBrowse paper, which will
 be linked from [jbrowse.org](http://jbrowse.org).
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development and release steps.
 
 ## License
 
