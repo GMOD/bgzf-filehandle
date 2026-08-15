@@ -96,8 +96,8 @@ coordinates, for generating stable feature IDs across chunk boundaries.
 ## Worker pool
 
 `unzipChunkSlice` takes an optional pool that spreads a chunk's blocks across
-Web Workers — close to linear to about four workers, and no cross-origin
-isolation required:
+Web Workers — close to linear to about four workers. Each worker's bytes cross
+as transferables rather than copies, so no cross-origin isolation is required:
 
 ```typescript
 import { getSharedWorkerPool, unzipChunkSlice } from '@gmod/bgzf-filehandle'

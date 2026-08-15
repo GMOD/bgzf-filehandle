@@ -54,24 +54,23 @@ by the block count for no gain, since libdeflate is already decoding the blocks
 back to back inside that one call.
 
 What comes back owns its bytes. wasm-bindgen's `Vec<u8>` path already
-`.slice()`s out of the heap; the string path did not, which made every error
-message the module produced fail to decode in a browser — a `WebAssembly.Memory`
-buffer is resizable and `TextDecoder` refuses views over those. The fix is
-applied in `crate/build-wasm.sh` after `wasm-bindgen` runs
-([ADR 0002](../agent-docs/adr/0002-copy-out-of-wasm-memory-before-decoding-strings.md)),
-and the failure is worth knowing because of how it presents: a `TypeError` about
-a buffer type, naming no bgzf frame, that sorts by input file and invites
-bisecting the data rather than the stack.
+`.slice()`s out of the heap; the string path did not, so in a browser every
+error message the module produced failed to decode — a `WebAssembly.Memory`
+buffer is resizable and `TextDecoder` refuses views over those. Patched in
+`crate/build-wasm.sh` after `wasm-bindgen` runs
+([ADR 0002](../agent-docs/adr/0002-copy-out-of-wasm-memory-before-decoding-strings.md)).
+Worth knowing by its symptom: a `TypeError` naming a buffer type and no bgzf
+frame, which sorts by input file and invites bisecting the data rather than the
+stack.
 
-**Rejected: inflating straight into the output buffer.** Removing the per-block
-temporary `Vec` in `decompress_all` looks free and measures at 3-4% on a 5.2MB
-file, which is the noise floor — the cost is libdeflate's decode plus the single
-boundary copy, and neither is touched. It also splits a helper
-`decompress_chunk_slice` still needs, and churns the tracked wasm bundle
+**Rejected: inflating straight into the output buffer.** Dropping the per-block
+temporary `Vec` in `decompress_all` measures 3-4% on a 5.2MB file — the noise
+floor, since the cost is libdeflate's decode plus the one boundary copy and
+neither is touched. It also splits a helper `decompress_chunk_slice` still
+needs, and churns the tracked wasm bundle
 ([ADR 0001](../agent-docs/adr/0001-decompress-into-output-buffer.md)). That ADR
-also carries the benchmarking lesson that produced a spurious "26% faster":
-**always alternate run order**, or a cold CPU measures frequency scaling rather
-than code.
+carries the benchmarking lesson behind a spurious "26% faster": **alternate run
+order**, or a cold CPU measures frequency scaling rather than code.
 
 ## Reading through a `.gzi`
 
@@ -96,56 +95,52 @@ allocation of the entry list.
 
 ## The worker pool
 
-BGZF blocks inflate independently, so a chunk's blocks can be spread across Web
-Workers. This is the largest lever left in the read path, since it is the only
-one that attacks the 70-90% rather than the remainder: close to linear to about
-four workers, 2.7-4.1x on this package's fixtures, and 1.95x end to end in a
-real browser on a 22-view pan and zoom over 1000x long-read data.
+BGZF blocks inflate independently, so a chunk's blocks spread across Web
+Workers. It is the only lever that attacks the 70-90% rather than the remainder:
+close to linear to about four workers, 2.7-4.1x on this package's fixtures,
+1.95x end to end in a browser over 1000x long-read data.
 
-The shape of the split is what keeps that from being eaten by overhead:
+What keeps that from being eaten by overhead:
 
-- **One range per worker, not one block per worker.** `scanBgzfBlocks` reads
-  each block's `BSIZE` and `ISIZE` straight out of its header and trailer in JS,
-  so the boundaries are known without decompressing anything. The blocks are
-  then dealt out in contiguous runs, and each worker gets a single slice of the
-  input and makes a single wasm call over it — the per-call overheads stay
-  proportional to the worker count rather than to the block count.
-- **Transferred, not copied.** Each worker's range is moved to it as an
-  `ArrayBuffer`, which every browser allows on any page — hence no cross-origin
-  isolation requirement. The range is copied out of the caller's buffer first,
-  because transferring detaches the buffer it came from and that buffer belongs
-  to the caller; across all workers that is one pass over the **compressed**
-  bytes, the smaller side of the operation.
+- **One range per worker, not one block.** `scanBgzfBlocks` reads each block's
+  `BSIZE` and `ISIZE` out of its header and trailer in JS, so boundaries are
+  known without decompressing. Blocks are dealt out in contiguous runs, one
+  input slice and one wasm call per worker — overheads scale with worker count,
+  not block count.
+- **Ranges go over as transferables.** Each worker's slice is an `ArrayBuffer`
+  in the `postMessage` transfer list, so ownership moves instead of the bytes
+  being structured-cloned — and a transfer needs no cross-origin isolation, so
+  this works on an ordinary page. Transferring detaches the source buffer, which
+  belongs to the caller, so the slice is copied out first: one pass over the
+  **compressed** bytes, the smaller side.
+- **Results come back as transferables too**, one buffer per worker holding its
+  whole range decompressed. Per-block results are `subarray` views into it,
+  sized from the `ISIZE`s already scanned — no second copy.
 - **`SharedArrayBuffer` is deliberately not used.** It was the original design
-  and it was measured out: it needs COOP/COEP, which most JBrowse installs
-  cannot set, and it buys nothing where they can, because the wasm call copies
-  its input into the wasm heap either way. Head to head in Chrome at 4 workers a
-  pooled SAB was at parity with transferring, and a fresh one was slower.
-- **Reassembly is views, not copies.** Each worker returns one buffer holding
-  its whole range decompressed; the per-block results are `subarray` views into
-  it, sized from the `ISIZE` values already scanned.
-- **A single-block chunk skips the pool**, since it cannot be split and is not
-  worth a round trip to a worker.
-- **Idle workers are reaped after three minutes**, which reclaims mostly memory
-  rather than threads: each worker holds its own copy of the inlined wasm bundle
-  in a heap that only grows, so a pool that once inflated a deep long-read chunk
-  keeps that heap until the page goes away. The reap is invisible to whoever
-  holds the pool — consumers keep one for the life of a file, and a `destroy()`
-  on their behalf would fail their next read instead of degrading it.
+  and was measured out: it needs COOP/COEP, which most JBrowse installs cannot
+  set, and buys nothing where they can, since the wasm call copies its input
+  into the wasm heap either way. In Chrome at 4 workers a pooled SAB was at
+  parity with transferring; a fresh one was slower.
+- **A single-block chunk skips the pool** — nothing to split, and not worth the
+  round trip.
+- **Idle workers are reaped after three minutes**, which reclaims memory more
+  than threads: each worker holds its own inlined wasm bundle in a heap that
+  only grows. The reap is invisible to the pool's holder, since consumers keep a
+  pool for the life of a file and a `destroy()` on their behalf would fail their
+  next read rather than degrade it.
 
 Nothing creates a pool implicitly: workers are a thread budget the application
-owns. Lifecycle, sharing one pool across threads and driving it directly are in
+owns. Lifecycle, sharing one pool across threads and driving it directly:
 [worker-pool.md](worker-pool.md).
 
 ## What the consumers add
 
-The readers on top of this package cache what comes out of it, and that is the
-optimization neither side can do alone — inflating twice is the thing worth
-avoiding, and only the reader knows which bytes it has already asked for.
-`@gmod/bam` and `@gmod/tabix` both keep parsed chunks keyed by virtual-offset
-span, share reads that are still in flight, and take a `SharedBudget` so several
-open files bound their retention together. Their query paths, and where this
-package sits in them, are in
+The readers cache what comes out of here, which is the optimization neither side
+can do alone: not inflating twice is the win, and only the reader knows which
+bytes it has already asked for. `@gmod/bam` and `@gmod/tabix` both key parsed
+chunks by virtual-offset span, share reads still in flight, and take a
+`SharedBudget` so several open files bound their retention together. Their query
+paths, and where this package sits in them:
 [bam-js's optimizations doc](https://github.com/GMOD/bam-js/blob/main/docs/optimizations.md)
 and
 [tabix-js's](https://github.com/GMOD/tabix-js/blob/main/docs/optimizations.md).

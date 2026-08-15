@@ -139,13 +139,14 @@ bytes is the price of the hop, and it is small against the inflate.
 
 ## No cross-origin isolation required
 
-Each worker's range is **transferred** to it as an `ArrayBuffer` — a move every
-browser allows on any page — so the pool works on an ordinary non-isolated
-origin. The range is copied out of the input first, because transferring
-detaches the buffer it came from, and that buffer belongs to the caller (bam-js
-hands over the filehandle read it is still holding). Across all the workers that
-adds up to one pass over the compressed bytes, the smaller side of the
-operation.
+Each worker's range crosses as a **transferable**: the `ArrayBuffer` rides in
+`postMessage`'s transfer list, so ownership moves rather than the bytes being
+structured-cloned. Transfers need no isolation, so the pool works on an ordinary
+non-isolated origin, and results come back the same way. The range is copied out
+of the input first, because transferring detaches the buffer it came from and
+that buffer belongs to the caller (bam-js hands over the filehandle read it is
+still holding). Across all the workers that is one pass over the compressed
+bytes, the smaller side of the operation.
 
 `SharedArrayBuffer` is deliberately not used. It was the original design, and it
 was measured out. It needs COOP/COEP, which most JBrowse installs cannot set,
