@@ -1,6 +1,6 @@
 // Isolated decompression benchmark: the wasm/libdeflate path this library uses
-// against the two alternatives it could have been, over the real blocks of the
-// test fixtures.
+// against the three alternatives it could have been, over the real blocks of
+// the test fixtures.
 //
 // - `unzip` — the shipped path. BGZF input goes straight to the wasm
 //   `decompressAll`.
@@ -11,8 +11,14 @@
 //   candidate implementation (it does not exist in a browser); it is here as
 //   the reference floor, so the wasm number can be read as "how close to native
 //   are we" rather than only "how much better than JS".
+// - `DecompressionStream` over the whole buffer — the platform's own inflate,
+//   and the one alternative here that runs in a browser. BGZF is concatenated
+//   gzip members, and a gzip decoder decodes all of them, so this needs no
+//   per-block loop: the whole fixture goes through one call. That matters,
+//   because the API's cost is dominated by per-call overhead and this shape
+//   pays it once.
 //
-// All three are asserted byte-identical before timing, so this measures inflate
+// All four are asserted byte-identical before timing, so this measures inflate
 // throughput and nothing else.
 //
 // Run with `pnpm benchonly inflate`. Unlike unzip.bench.ts this needs no
@@ -95,6 +101,14 @@ const fixtures: Fixture[] = [
   return { label, data, blocks: blockPayloads(data), iterations }
 })
 
+/** The whole multi-member stream through one `DecompressionStream` call. */
+async function decompressionStream(data: Uint8Array) {
+  const stream = new Blob([data as Uint8Array<ArrayBuffer>])
+    .stream()
+    .pipeThrough(new DecompressionStream('gzip'))
+  return new Uint8Array(await new Response(stream).arrayBuffer())
+}
+
 function assertSame(a: Uint8Array, b: Uint8Array, what: string) {
   if (a.length !== b.length) {
     throw new Error(`${what}: length ${b.length} != wasm's ${a.length}`)
@@ -119,6 +133,11 @@ for (const fixture of fixtures) {
     expected,
     perBlock(b => inflateRawSync(b), fixture),
     'node zlib',
+  )
+  assertSame(
+    expected,
+    await decompressionStream(fixture.data),
+    'DecompressionStream',
   )
 }
 
@@ -146,6 +165,14 @@ for (const fixture of fixtures) {
       'node zlib per block',
       () => {
         perBlock(b => inflateRawSync(b), fixture)
+      },
+      { iterations, warmupIterations: 5 },
+    )
+
+    bench(
+      'DecompressionStream (whole buffer)',
+      async () => {
+        await decompressionStream(data)
       },
       { iterations, warmupIterations: 5 },
     )

@@ -12,8 +12,10 @@ as those created by bgzip, using coordinates from the uncompressed file.
 Decompression runs on [libdeflate](https://github.com/ebiggers/libdeflate),
 compiled to WebAssembly and inlined in the bundle as base64, so there is no
 `.wasm` file to serve. On this repo's fixtures it inflates two to three times
-faster than pako — table and reasoning in
-[docs/optimizations.md](docs/optimizations.md).
+faster than pako, and about twice as fast as the browser's own
+`DecompressionStream` — tables and reasoning, including
+[why not just use `DecompressionStream`](docs/optimizations.md#why-not-decompressionstream-for-everything),
+in [docs/optimizations.md](docs/optimizations.md).
 
 ## Install
 

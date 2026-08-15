@@ -23,7 +23,7 @@ the output size. That happens to be exactly the shape of BGZF, where every block
 is an independent gzip member that records its own uncompressed length in its
 trailer — which is also why htslib can be built against the same library.
 
-Mean ms per file, lower is better, with all three arms asserted byte-identical
+Mean ms per file, lower is better, with all four arms asserted byte-identical
 first (`pnpm benchonly inflate`):
 
 | fixture                            | wasm libdeflate | pako | node zlib |
@@ -47,6 +47,54 @@ pako stays a dependency for **plain** gzip only. A plain gzip stream has no
 block structure to split and no uncompressed size to preallocate from, so
 neither of libdeflate's requirements is met. `DecompressionStream` handles that
 case where the host has one, and pako is the fallback where it does not.
+
+## Why not `DecompressionStream` for everything?
+
+Reasonable question, given the browser has had a built-in inflate since 2023 and
+this package ships 65 KB of wasm to do the same job. We do use it — for the
+plain gzip path just above. For BGZF it measures about half the speed.
+
+It gets its best case here, too. BGZF is concatenated gzip members and a gzip
+decoder decodes all of them, so a whole buffer goes through **one** call rather
+than one per block. That matters a great deal: the API's cost is dominated by
+per-call overhead, and this shape pays it once.
+
+Best of three runs, mean ms per file, lower is better, all arms asserted
+byte-identical first (`pnpm benchonly inflate`):
+
+| fixture                            | wasm libdeflate | `DecompressionStream` | pako | node zlib |
+| ---------------------------------- | --------------- | --------------------- | ---- | --------- |
+| paired.bam (84KB)                  | 1.3             | 3.8                   | 3.7  | 1.4       |
+| T_ko.2bit.gz (518KB)               | 3.6             | 9.8                   | 9.5  | 2.4       |
+| shortreads_300x.bam (5.1MB)        | 77              | 143                   | 207  | 73        |
+| chr22_nanopore_subset.bam (14.1MB) | 127             | 237                   | 394  | 127       |
+
+So it is 1.9-2.9x slower than what ships, roughly level with pako on the small
+fixtures and ahead of it on the large ones. Take these as noisier than the table
+above — the `DecompressionStream` arm ran at ±8-19% relative margin of error
+against ±4-7% for the others, and one run produced a wasm number on the 5.1MB
+fixture more than twice the other two. Best-of-three is reported for that
+reason; rerun before leaning on any single figure.
+
+Two things beyond the throughput:
+
+- **It has only been baseline since May 2023** (Safari 16.4, Firefox 113). A
+  library cannot drop the fallback, so pako ships either way and the bundle
+  saving — the main argument for switching — does not arrive.
+- **It cannot do `unzipChunkSlice`'s job.** Slicing a virtual offset range needs
+  each member's boundaries in the output, and a single stream call returns one
+  flat buffer with no record of where the members met.
+
+A caveat worth stating plainly: these are Node numbers, where
+`DecompressionStream` is zlib with little plumbing around it. A browser adds the
+`Blob` → stream → `Response` path on top, so treat the column as the API's best
+case rather than its typical one.
+
+Sibling libraries land further from it than this one does. `@gmod/bbi` and
+`@gmod/hic` decompress many small independent zlib blocks, where the
+whole-buffer shape is unavailable and the per-call overhead — around 215 µs
+against roughly 20 µs for a wasm call — dominates everything else. On 3 KB
+blocks it runs about 4x slower than pako there, and 11x slower than wasm.
 
 ## Crossing into wasm
 
