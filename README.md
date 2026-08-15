@@ -5,11 +5,10 @@
 
 Reads [block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such
 as those created by bgzip, using coordinates from the uncompressed file.
-
-Uses WASM (libdeflate) for decompression. Used by
-[@gmod/indexedfasta](https://github.com/GMOD/indexedfasta) for bgzip-indexed
-FASTA files with gzi index, and also [@gmod/bam](https://github.com/GMOD/bam-js)
-and [@gmod/tabix](https://github.com/GMOD/tabix-js) for block decoding.
+Decompression is libdeflate compiled to WASM. Used by
+[@gmod/indexedfasta](https://github.com/GMOD/indexedfasta),
+[@gmod/bam](https://github.com/GMOD/bam-js) and
+[@gmod/tabix](https://github.com/GMOD/tabix-js).
 
 ## Install
 
@@ -17,12 +16,9 @@ and [@gmod/tabix](https://github.com/GMOD/tabix-js) for block decoding.
 npm install @gmod/bgzf-filehandle
 ```
 
-## Usage
+## BgzfFilehandle
 
-### BgzfFilehandle
-
-Read from a bgzip-compressed file with a `.gzi` index as if it were
-uncompressed:
+Read a bgzip-compressed file with a `.gzi` index as if it were uncompressed:
 
 ```typescript
 import { BgzfFilehandle } from '@gmod/bgzf-filehandle'
@@ -31,26 +27,23 @@ import { LocalFile } from 'generic-filehandle2'
 const f = new BgzfFilehandle({
   filehandle: new LocalFile('path/to/my_file.gz'),
   gziFilehandle: new LocalFile('path/to/my_file.gz.gzi'),
-  blockConcurrency: 10, // max in-flight async batch reads (not threads), default 10
+  blockConcurrency: 10, // in-flight batch reads (not threads), default 10
 })
 
-// read(length, position) — matches generic-filehandle2 convention
+// read(length, position) — matches generic-filehandle2
 const data: Uint8Array = await f.read(300, 0)
 ```
 
-The `.gzi` index maps uncompressed offsets to block starts; create one with
-`bgzip -i my_file` (or `bgzip -r my_file.gz` for an already-compressed file).
+Create the index with `bgzip -i my_file`, or `bgzip -r my_file.gz` for an
+already-compressed one. Blocks are adjacent on disk, so every block a read
+touches is fetched as one contiguous range and inflated in one call — a read
+spanning 300 blocks is one request. Reads over 32MB uncompressed split into
+batches, and `blockConcurrency` caps how many are in flight.
 
-BGZF blocks are adjacent in the file, so every block a read touches is fetched
-as one contiguous range and decompressed in a single call — a read spanning 300
-blocks is one request, not 300. Reads large enough to be split (over 32 MB
-uncompressed) produce several batches, and `blockConcurrency` caps how many of
-those are in flight at once.
+## unzip
 
-### unzip
-
-Decompress a BGZF or plain gzip buffer. Falls back to plain gzip automatically
-if the input is not a valid BGZF stream:
+Decompress a BGZF or plain gzip buffer, falling back to plain gzip if the input
+is not BGZF:
 
 ```typescript
 import { unzip } from '@gmod/bgzf-filehandle'
@@ -58,10 +51,10 @@ import { unzip } from '@gmod/bgzf-filehandle'
 const decompressed: Uint8Array = await unzip(compressedData)
 ```
 
-### unzipChunkSlice
+## unzipChunkSlice
 
-Decompress a range of BGZF blocks and slice out a virtual file offset range
-(used by BAM/tabix readers with BAI/TBI indices):
+Decompress a range of blocks and slice out a virtual offset range — what BAM and
+tabix readers do with a chunk from a BAI/TBI:
 
 ```typescript
 import { MAX_BGZF_BLOCK_SIZE, unzipChunkSlice } from '@gmod/bgzf-filehandle'
@@ -69,9 +62,9 @@ import { MAX_BGZF_BLOCK_SIZE, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 const minv = { blockPosition: 1234, dataPosition: 56 }
 const maxv = { blockPosition: 9876, dataPosition: 78 }
 
-// input must be the bytes starting at minv.blockPosition, through the end of
-// the block at maxv.blockPosition. That block's compressed length isn't
-// recorded anywhere, so over-read by one maximum-size block to cover it
+// input starts at minv.blockPosition and must run through the END of the block
+// at maxv.blockPosition. That block's compressed length is recorded nowhere, so
+// over-read by one maximum-size block to cover it
 const compressedData = await filehandle.read(
   maxv.blockPosition + MAX_BGZF_BLOCK_SIZE - minv.blockPosition,
   minv.blockPosition,
@@ -83,33 +76,31 @@ const { buffer, cpositions, dpositions } = await unzipChunkSlice(
 )
 ```
 
-`buffer` is a `Uint8Array` of the decompressed bytes between the two virtual
-offsets. `cpositions` and `dpositions` are `Float64Array` block boundaries in
-compressed (absolute file offset) and decompressed coordinates, useful for
-generating stable feature IDs across chunk boundaries. They come back as the
-typed arrays wasm produced — indexed reads and `.length` are all a consumer
-needs, so they are not copied into plain arrays on the way out.
+`buffer` holds the decompressed bytes between the two offsets. `cpositions` and
+`dpositions` are `Float64Array` block boundaries in compressed and decompressed
+coordinates, for generating stable feature IDs across chunk boundaries.
 
-## Decompressing on a worker pool
+## Worker pool
 
-`unzipChunkSlice` takes an optional pool that spreads a chunk's BGZF blocks
-across Web Workers — close to linear speedup up to about four workers, and no
-cross-origin isolation required:
+`unzipChunkSlice` takes an optional pool that spreads a chunk's blocks across
+Web Workers — close to linear to about four workers, and no cross-origin
+isolation required:
 
 ```typescript
 import { getSharedWorkerPool, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 
-const pool = await getSharedWorkerPool() // undefined if workers are unavailable
+const pool = await getSharedWorkerPool() // undefined if Workers are unavailable
 const result = await unzipChunkSlice(compressedData, chunk, pool)
 ```
 
-`getSharedWorkerPool()` is `undefined` only where Workers cannot be created at
-all (node, say), so the same call site works everywhere and falls back to the
-sequential wasm path. Readers that take a pool of their own — `@gmod/bam`'s
-`bgzfWorkerPool` option — accept the same value.
+Safe to pass unconditionally — `undefined` keeps the sequential wasm path, and
+readers that take a pool of their own (`@gmod/bam`'s `bgzfWorkerPool`) accept
+the same value. Worker counts, cross-thread sharing, lifecycle, and why
+`SharedArrayBuffer` is deliberately not used:
+[docs/worker-pool.md](docs/worker-pool.md).
 
-Worker counts, cross-thread sharing, lifecycle, and why `SharedArrayBuffer` is
-deliberately not used: [docs/worker-pool.md](docs/worker-pool.md).
+`benchmarks/inflate.bench.ts` (`pnpm benchonly inflate`) measures the wasm path
+against pako and native zlib.
 
 ## Academic Use
 
