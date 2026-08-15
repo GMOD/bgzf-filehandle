@@ -26,17 +26,22 @@ trailer — which is also why htslib can be built against the same library.
 Mean ms per file, lower is better, with all three arms asserted byte-identical
 first (`pnpm benchonly inflate`):
 
-| fixture                          | wasm libdeflate | pako | node zlib |
-| -------------------------------- | --------------- | ---- | --------- |
-| paired.bam (84KB)                | 1.3             | 3.8  | 1.7       |
-| T_ko.2bit.gz (518KB)             | 4.8             | 9.4  | 2.6       |
-| shortreads_300x.bam (5.1MB)      | 69              | 176  | 88        |
-| chr22_nanopore_subset.bam (14MB) | 123             | 345  | 139       |
+| fixture                            | wasm libdeflate | pako | node zlib |
+| ---------------------------------- | --------------- | ---- | --------- |
+| paired.bam (84KB)                  | 0.92            | 2.8  | 1.2       |
+| T_ko.2bit.gz (518KB)               | 3.9             | 8.5  | 2.5       |
+| shortreads_300x.bam (5.1MB)        | 63              | 220  | 82        |
+| chr22_nanopore_subset.bam (14.1MB) | 141             | 374  | 133       |
 
-That is two to three times pako, and in the same range as the platform's own
-zlib while running in places where zlib is not available at all. There is no
-faster codec to reach for, which is why the remaining levers are all structural
-ones.
+_Measured 2026-08-15 on an Intel i9-9880H under Node 24.13.0. Absolute times
+track the machine and the Node version — node zlib in particular moves between
+Node majors — so rerun rather than trust these if the ratios matter to a
+decision._
+
+That is two to three and a half times pako, and in the same range as the
+platform's own zlib — sometimes ahead of it, sometimes behind — while running in
+places where zlib is not available at all. There is no faster codec to reach
+for, which is why the remaining levers are all structural ones.
 
 pako stays a dependency for **plain** gzip only. A plain gzip stream has no
 block structure to split and no uncompressed size to preallocate from, so
@@ -89,7 +94,16 @@ either. Around that:
   is there for the wasm heap rather than for the network — without it, one
   enormous read materializes in that heap in full and leaves it that size.
 - **`blockConcurrency` (default 10) caps how many batch requests are in
-  flight.** Requests, not threads.
+  flight.** Requests, not threads. Both this and the 32MB figure are reasoned
+  rather than measured: no benchmark here compares them against other values, so
+  treat them as sane defaults to tune from, not as an optimum anyone found.
+- **The last batch over-reads by one maximum-size block.** A `.gzi` records
+  where each block starts and not how long it is, so the end of the final block
+  in a read can only be bounded, not known. `MAX_BGZF_BLOCK_SIZE` past the last
+  block's offset is guaranteed to cover it, and costs at most 64KB on the one
+  request — cheaper than a `stat()` round trip to find the real file length.
+  Consumers doing their own chunk reads need the same trick, which is why the
+  constant is exported.
 - **The index is two parallel `Float64Array`s** of block offsets rather than an
   array of `[compressed, uncompressed]` pairs. A gzi for a large file runs to
   hundreds of thousands of entries, and one JS array object per entry costs
@@ -107,40 +121,26 @@ remainder, and it scales close to linearly out to about four workers: 2.7-4.1x
 on this package's fixtures, and 1.95x end to end in a browser over 1000x
 long-read data.
 
-What keeps that speedup from being eaten by overhead:
+Splitting work across threads usually gives most of that back in overhead. Two
+choices are why this one does not:
 
 - **One range per worker, not one block.** `scanBgzfBlocks` reads each block's
   `BSIZE` and `ISIZE` out of its header and trailer in JS, so boundaries are
   known without decompressing anything. Blocks are then dealt out in contiguous
-  runs, one input slice and one wasm call per worker, so overheads scale with
-  worker count rather than block count.
-- **Ranges go over as
-  [transferables](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Transferable_objects).**
-  Each worker's slice is an `ArrayBuffer` in the `postMessage` transfer list, so
-  ownership moves instead of the bytes being structured-cloned. The handoff then
-  costs the same whatever the range's size, and it needs no cross-origin
-  isolation, so this works on an ordinary page. Transferring detaches the source
-  buffer, which belongs to the caller, so the slice is copied out first — one
+  runs, one input slice and one wasm call per worker, so per-call overhead
+  scales with worker count rather than block count — a chunk of 300 blocks
+  across 4 workers costs 4 crossings, not 300.
+- **Bytes move by transfer, not by copy**, in both directions. The handoff
+  therefore costs the same whatever the range's size, which is what keeps a
+  bigger chunk from paying more to be split. The one copy that does happen is a
   pass over the **compressed** bytes, the smaller side.
-- **Results come back as transferables too**, one buffer per worker holding its
-  whole range decompressed. Per-block results are `subarray` views into it,
-  sized from the `ISIZE`s already scanned, so there is no second copy.
-- **`SharedArrayBuffer` is deliberately not used.** It was the original design
-  and was measured out: it needs COOP/COEP, which most JBrowse installs cannot
-  set, and it buys nothing where they can, since the wasm call copies its input
-  into the wasm heap either way. In Chrome at 4 workers a pooled SAB was at
-  parity with transferring, and a fresh one was slower.
-- **A single-block chunk skips the pool.** There is nothing to split, and the
-  round trip is not worth it.
-- **Idle workers are reaped after three minutes.** This reclaims memory more
-  than threads, since each worker holds its own inlined wasm bundle in a heap
-  that only grows. The reap is invisible to the pool's holder: consumers keep a
-  pool for the life of a file, and a `destroy()` on their behalf would fail
-  their next read rather than degrade it.
 
-Nothing creates a pool implicitly — workers are a thread budget the application
-owns. For lifecycle, sharing one pool across threads, and driving it directly,
-see [worker-pool.md](worker-pool.md).
+The mechanism behind that second one, the measurement that ruled out
+`SharedArrayBuffer`, and how idle workers are reaped without the pool's holder
+noticing, are all in [worker-pool.md](worker-pool.md) — along with pool
+lifecycle, sizing, and sharing one pool across threads. Two things worth knowing
+here: a single-block chunk skips the pool entirely, and nothing ever creates a
+pool implicitly, because workers are a thread budget the application owns.
 
 ## What the consumers add
 
