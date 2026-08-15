@@ -23,6 +23,16 @@ the output size. That happens to be exactly the shape of BGZF, where every block
 is an independent gzip member that records its own uncompressed length in its
 trailer — which is also why htslib can be built against the same library.
 
+The crate around it is thin ([`crate/src/lib.rs`](../crate/src/lib.rs)):
+[libdeflater](https://github.com/adamkewley/libdeflater)'s Rust bindings, one
+reused decompressor, and two exports — `decompress_all` for a buffer of blocks,
+and `decompress_chunk_slice` for the same buffer trimmed to a virtual-offset
+range and annotated with where each block landed. `@gmod/bbi` compiles the same
+C library through the same bindings and shapes its crate for a different file
+format, batching hundreds of separately-compressed blocks into one call and
+fusing BigWig record parsing into it; that side is written up in
+[bbi-js's wasm doc](https://github.com/GMOD/bbi-js/blob/main/docs/wasm.md).
+
 Mean ms per file, lower is better, with all four arms asserted byte-identical
 first (`pnpm benchonly inflate`):
 
@@ -70,11 +80,12 @@ byte-identical first (`pnpm benchonly inflate`):
 | chr22_nanopore_subset.bam (14.1MB) | 127             | 237                   | 394  | 127       |
 
 So it is 1.9-2.9x slower than what ships, roughly level with pako on the small
-fixtures and ahead of it on the large ones. Take these as noisier than the table
-above — the `DecompressionStream` arm ran at ±8-19% relative margin of error
-against ±4-7% for the others, and one run produced a wasm number on the 5.1MB
-fixture more than twice the other two. Best-of-three is reported for that
-reason; rerun before leaning on any single figure.
+fixtures and ahead of it on the large ones. This is a separate run from the
+table above, and a noisier one: the `DecompressionStream` arm came in at ±8-19%
+relative margin of error against ±4-7% for the others, and one run produced a
+wasm number on the 5.1MB fixture more than twice the other two. Compare along a
+row rather than between the two tables, and rerun before leaning on any single
+figure.
 
 Two things beyond the throughput:
 
@@ -90,11 +101,15 @@ A caveat worth stating plainly: these are Node numbers, where
 `Blob` → stream → `Response` path on top, so treat the column as the API's best
 case rather than its typical one.
 
-Sibling libraries land further from it than this one does. `@gmod/bbi` and
-`@gmod/hic` decompress many small independent zlib blocks, where the
-whole-buffer shape is unavailable and the per-call overhead — around 215 µs
-against roughly 20 µs for a wasm call — dominates everything else. On 3 KB
-blocks it runs about 4x slower than pako there, and 11x slower than wasm.
+Sibling libraries land further from it than this one does, and the reason is
+container shape rather than codec quality. `@gmod/bbi` and `@gmod/hic` store
+each block as its own zlib stream, so the API can only be called once per block,
+hundreds of times in a wide query. Dividing the timings through gives
+[220-410 µs of overhead per call in bbi](https://github.com/GMOD/bbi-js/blob/main/docs/wasm.md#why-not-the-platforms-decompressionstream)
+and
+[300-720 µs in hic](https://github.com/GMOD/hic/blob/main/docs/optimizations.md#not-decompressionstream-either),
+against roughly 20 µs for a wasm call. That leaves it 4-11x slower than wasm in
+bbi and 5-6x in hic — and, unlike here, slower than pako as well.
 
 ## Crossing into wasm
 
@@ -117,9 +132,9 @@ error message the module produced failed to decode — a `WebAssembly.Memory`
 buffer is resizable, and `TextDecoder` refuses views over those. It is patched
 in `crate/build-wasm.sh` after `wasm-bindgen` runs
 ([ADR 0002](../agent-docs/adr/0002-copy-out-of-wasm-memory-before-decoding-strings.md)).
-Worth knowing by its symptom, which is a `TypeError` naming a buffer type with
-no bgzf frame anywhere in it: that sorts by input file, and so invites bisecting
-the data rather than the stack.
+Worth knowing by its symptom: a `TypeError` naming a buffer type, with no bgzf
+frame anywhere in it. That sorts by input file, so it invites bisecting the data
+rather than the stack.
 
 **Rejected: inflating straight into the output buffer.** Dropping the per-block
 temporary `Vec` in `decompress_all` measures 3-4% on a 5.2MB file, which is the
@@ -150,8 +165,8 @@ either. Around that:
   in a read can only be bounded, not known. `MAX_BGZF_BLOCK_SIZE` past the last
   block's offset is guaranteed to cover it, and costs at most 64KB on the one
   request — cheaper than a `stat()` round trip to find the real file length.
-  Consumers doing their own chunk reads need the same trick, which is why the
-  constant is exported.
+  Consumers doing their own chunk reads need the same trick, so the constant is
+  exported.
 - **The index is two parallel `Float64Array`s** of block offsets rather than an
   array of `[compressed, uncompressed]` pairs. A gzi for a large file runs to
   hundreds of thousands of entries, and one JS array object per entry costs
