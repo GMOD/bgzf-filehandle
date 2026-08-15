@@ -23,8 +23,9 @@ committed, in a throwaway worktree, so uncommitted work is not measured.
 
 ## Releasing
 
-Use `pnpm version patch/minor/major` — it runs lint, tests, and build, then
-pushes the version tag, which triggers the publish workflow.
+Use `pnpm version patch/minor/major` — it runs lint, format, types, tests, build
+and `test:pack`, regenerates CHANGELOG.md with git-cliff, then pushes the
+version tag, which triggers the publish workflow.
 
 That workflow publishes via npm trusted publishing (OIDC, no stored token),
 which requires `--provenance` and `id-token: write` permissions.
