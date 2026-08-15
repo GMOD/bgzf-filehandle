@@ -10,10 +10,13 @@ pnpm build
 
 ## Benchmarks
 
-`pnpm benchonly <name>` runs one file from `benchmarks/` against `src/`.
-`benchmarks/inflate.bench.ts` measures the wasm path against pako and native
-zlib. `pnpm bench` instead builds two branches (`BRANCH1`/`BRANCH2`, via
-`scripts/build-both-branches.sh`) and runs every benchmark across both.
+`pnpm benchonly <name>` runs one file from `benchmarks/`. `inflate.bench.ts`
+imports `src/` directly and measures the wasm path against pako and native zlib.
+
+`unzip.bench.ts` instead compares two refs, so it needs `pnpm bench` — that
+builds each into `esm_branch1/`/`esm_branch2/` first (`origin/main` and the
+current HEAD by default, or `BRANCH1`/`BRANCH2` to pick). Each ref is built as
+committed, in a throwaway worktree, so uncommitted work is not measured.
 
 ## Releasing
 
