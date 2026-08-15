@@ -51,9 +51,10 @@ Four things the tables say:
 
 - **Scaling is sublinear from the start, not near-linear to four.** At four
   workers the inflate is 2.3-2.7x on the multi-megabyte fixtures, so about 60%
-  efficiency, and four to eight buys another 1.2-1.4x for twice the threads.
-  Four is a reasonable default because the return past it is small and the cost
-  is a whole extra wasm heap each, not because eight would not help at all.
+  efficiency, and four to eight buys another 1.2-1.4x for twice the threads. The
+  default stops at four to bound what a consumer with many pools spends, not
+  because the curve has flattened — it has not, even at 140MB
+  ([four workers is not the ceiling](#four-workers-is-not-the-ceiling)).
 
 - **One worker is a loss** — 0.73-0.97x. That is the cost of the round trip and
   the input copy with nothing to overlap it, and it is the floor a fixture
@@ -136,6 +137,35 @@ at 373MB uncompressed**, or 1.1-2.3ms per MB of output. That is the regime the
 jbrowse figure below comes from, and it is why the pool is worth its threads on
 deep data even though it is a rounding error on a 0.3MB fixture.
 
+### Four workers is not the ceiling
+
+The obvious guess about a 373MB inflate is that it goes memory-bandwidth bound
+and the fourth worker is already doing nothing. It is not so, at least on
+sixteen threads. All three pools alive at once and interleaved against one
+sequential baseline, min of 7:
+
+| fixture                   | blocks | uncompressed | seq   | 2w            | 4w            | 8w            |
+| ------------------------- | ------ | ------------ | ----- | ------------- | ------------- | ------------- |
+| chr22_nanopore_subset.bam | 894    | 47MB         | 0.17s | 0.12s (1.41x) | 0.08s (2.22x) | 0.06s (2.66x) |
+| chr22_nanopore_subset.bam | 2682   | 140MB        | 0.50s | 0.37s (1.35x) | 0.24s (2.07x) | 0.19s (2.60x) |
+| ultra-long-ont.bam        | 772    | 43MB         | 0.15s | 0.11s (1.35x) | 0.07s (2.19x) | 0.05s (2.82x) |
+| ultra-long-ont.bam        | 2509   | 139MB        | 0.49s | 0.38s (1.30x) | 0.23s (2.16x) | 0.17s (2.82x) |
+| shortreads_300x.bam       | 861    | 53MB         | 0.11s | 0.08s (1.37x) | 0.06s (2.00x) | 0.05s (2.29x) |
+| shortreads_300x.bam       | 2296   | 141MB        | 0.30s | 0.23s (1.31x) | 0.16s (1.83x) | 0.13s (2.36x) |
+
+Every row is monotone and a repeat run agreed to ±0.15x. **Two workers get about
+two thirds of what four get** (1.3-1.4x against 1.8-2.2x), and **eight still add
+a quarter on top of four** (2.3-2.8x). Efficiency falls the whole way — 0.67,
+0.51, 0.32 of linear — but nothing has flattened by eight.
+
+So the default `min(hardwareConcurrency, 4)` is not the point where the curve
+stops paying. It is a budget decision, and the budget is set by the consumer
+rather than by this table: `getSharedWorkerPool()` memoizes per JS context, so
+an application that runs adapters in several RPC workers gets four pool workers
+_each_ — five tracks is twenty workers, each with its own grow-only wasm heap.
+Raise `numWorkers` when you know your process holds one pool; leave it alone
+when you do not.
+
 ### The number this doc used to quote
 
 "2.7-4.1x, close to linear out to four workers." That is the **inflate-only**
@@ -191,6 +221,15 @@ Six ways to get a fake number out of this, five of them found the hard way:
 - **Min over enough rounds**, because a single sample is mostly GC.
 - **Pass `idleTimeoutMs: 0` to the pools under test**, or a reap between arms
   puts a worker respawn and a wasm instantiate inside a timed region.
+- **Watch the tab's memory once the chunks get large.** A worker's wasm heap
+  only ever grows, so a sweep holding several pools alive across a 400MB chunk
+  runs the renderer out of memory and puppeteer reports it as a detached frame
+  or a dropped websocket rather than as anything about memory. One worker is the
+  worst case, not the cheapest, since the whole range lands in a single heap.
+  Either keep the chunk in the low hundreds of MB or measure one worker count
+  per page load — but if you split the passes, note that each gets its own
+  sequential baseline, and drift between them produced an 8w column whose raw
+  times were _slower_ than 4w while its ratio came out higher.
 
 ## Getting a pool
 

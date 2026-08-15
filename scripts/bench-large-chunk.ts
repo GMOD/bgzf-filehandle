@@ -15,9 +15,9 @@ import { launch } from 'puppeteer'
 
 import { startServer } from '../test/browser/serve.ts'
 
-const WORKERS = 4
+const WORKER_COUNTS = [2, 4, 8]
 const ROUNDS = 7
-const TARGETS = [50e6, 150e6, 400e6]
+const TARGETS = [50e6, 150e6]
 
 const FILES = [
   {
@@ -34,7 +34,7 @@ interface Row {
   blocks: number
   compressed: number
   uncompressed: number
-  identical: boolean
+  identical: Record<string, boolean>
   samples: Record<string, number[]>
 }
 
@@ -61,31 +61,41 @@ try {
   await page.goto(`http://127.0.0.1:${port}/test/browser/scaling.html`, {
     waitUntil: 'networkidle0',
   })
-
   const out = (await page.evaluate(
     async config =>
       // @ts-expect-error defined in the page's global scope
       globalThis.runLargeChunks(config),
-    { workers: WORKERS, rounds: ROUNDS, targets: TARGETS, files: FILES },
-  )) as { workers: number; results: Row[] }
+    {
+      workerCounts: WORKER_COUNTS,
+      rounds: ROUNDS,
+      targets: TARGETS,
+      files: FILES,
+    },
+  )) as { workerCounts: number[]; results: Row[] }
 
-  const bad = out.results.filter(r => !r.identical)
+  const bad = out.results.flatMap(r =>
+    Object.entries(r.identical)
+      .filter(([, ok]) => !ok)
+      .map(([w]) => `${r.name}/${mb(r.uncompressed)} at ${w}w`),
+  )
   if (bad.length) {
-    throw new Error(
-      `output differs from sequential: ${bad.map(r => `${r.name}/${mb(r.uncompressed)}`).join(', ')}`,
-    )
+    throw new Error(`output differs from sequential: ${bad.join(', ')}`)
   }
 
-  console.log(`workers=${out.workers} rounds=${ROUNDS}\n`)
+  console.log(`rounds=${ROUNDS}\n`)
+  const cols = WORKER_COUNTS.map(n => `${n}w`).join(' | ')
   console.log(
-    '| fixture | copies | blocks | compressed | uncompressed | seq | 4w | speedup | saved |',
+    `| fixture | blocks | uncompressed | seq | ${cols} | best saved |`,
   )
-  console.log('| --- | --- | --- | --- | --- | --- | --- | --- | --- |')
+  console.log(
+    `| --- | --- | --- | --- | ${WORKER_COUNTS.map(() => '---').join(' | ')} | --- |`,
+  )
   for (const r of out.results) {
     const seq = min(r.samples.seq!)
-    const pooled = min(r.samples.pool!)
+    const times = WORKER_COUNTS.map(n => min(r.samples[String(n)]!))
+    const cells = times.map(t => `${secs(t)} (${(seq / t).toFixed(2)}x)`)
     console.log(
-      `| ${r.name} | ${r.copies} | ${r.blocks} | ${mb(r.compressed)} | ${mb(r.uncompressed)} | ${secs(seq)} | ${secs(pooled)} | ${(seq / pooled).toFixed(2)}x | ${secs(seq - pooled)} |`,
+      `| ${r.name} | ${r.blocks} | ${mb(r.uncompressed)} | ${secs(seq)} | ${cells.join(' | ')} | ${secs(seq - Math.min(...times))} |`,
     )
   }
 } finally {
