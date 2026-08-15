@@ -2,8 +2,9 @@
 
 BGZF blocks inflate independently, so the blocks in one chunk can be spread
 across Web Workers. Scaling is close to linear up to about four workers, and
-decompression dominates an indexed read — 70-90% of a cold BAM query — which
-makes this the single biggest speedup available to a consumer.
+inflating is where an indexed read spends its time — 70-90% of the wall clock of
+a `@gmod/bam` query that finds nothing in its cache — which makes this the
+single biggest speedup available to a consumer.
 
 Nothing creates a pool implicitly. Workers are a thread budget the application
 owns, and a library that quietly started four of them per file would be a bad

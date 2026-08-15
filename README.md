@@ -132,6 +132,11 @@ BAM fixtures and behind on the 2bit one, while running somewhere zlib is not an
 option at all. Measured on Node 24 on one laptop, so treat the ratios as
 indicative and rerun them on your own data.
 
+The codec is only part of it. Why the wasm boundary is crossed once per chunk,
+why a read is one range request, how a chunk's blocks are split across workers,
+and what was measured and rejected:
+[docs/optimizations.md](docs/optimizations.md).
+
 ## Academic Use
 
 This package was written with funding from the [NHGRI](http://genome.gov) as
