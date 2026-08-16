@@ -3,7 +3,7 @@ export { MAX_BGZF_BLOCK_SIZE } from './constants.ts'
 export { scanBgzfBlocks } from './bgzfBlockScan.ts'
 export type { BgzfBlockInfo } from './bgzfBlockScan.ts'
 export { unzip, unzipChunkSlice } from './unzip.ts'
-export type { ChunkSlice } from './unzip.ts'
+export type { Chunk, ChunkSlice, VirtualOffset } from './unzip.ts'
 export {
   createBgzfWorkerPool,
   destroySharedWorkerPool,

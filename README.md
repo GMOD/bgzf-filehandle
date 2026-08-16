@@ -22,7 +22,9 @@ in [docs/optimizations.md](docs/optimizations.md).
 The docs here lean on three words, and two of them mean something narrower than
 they sound:
 
-- **BGZF block** — one gzip member of the file: at most 64KB compressed, its
+- **BGZF block** — bgzip files are so called 'multi-member gzip files',
+  basically indepently compressed gzip blocks that are concatenated together.
+  https://www.htslib.org/doc/bgzip.html they are at most 64KB compressed, its
   trailer recording its own uncompressed length. Blocks decode independently of
   each other, which is what buys both random access and the worker pool. A bare
   "block" always means this one, never a deflate block.

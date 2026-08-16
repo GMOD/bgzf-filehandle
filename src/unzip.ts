@@ -10,11 +10,21 @@ import {
 import type { BgzfBlockInfo } from './bgzfBlockScan.ts'
 import type { BgzfWorkerPool } from './workerPool.ts'
 
-interface VirtualOffset {
+/**
+ * A position in the uncompressed data: which BGZF block (by its compressed
+ * offset in the file), and how far into that block's decompressed bytes.
+ */
+export interface VirtualOffset {
   blockPosition: number
   dataPosition: number
 }
-interface Chunk {
+
+/**
+ * A range between two virtual offsets — what a BAI or TBI resolves a query to.
+ * It covers a run of consecutive BGZF blocks and usually starts and ends
+ * partway through the first and last of them.
+ */
+export interface Chunk {
   minv: VirtualOffset
   maxv: VirtualOffset
 }

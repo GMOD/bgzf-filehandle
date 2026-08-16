@@ -56,9 +56,9 @@ same range as the platform's zlib, while running where zlib is not available at
 all. With no faster codec to reach for, every remaining lever is structural.
 
 pako stays a dependency for **plain** gzip, which meets neither of libdeflate's
-requirements: no block structure to split, no uncompressed size to preallocate
-from. That case goes to `DecompressionStream` where the host has one, and to
-pako where it does not.
+requirements: no BGZF framing to split the input on, no uncompressed size to
+preallocate from. That case goes to `DecompressionStream` where the host has
+one, and to pako where it does not.
 
 ## Why not `DecompressionStream` for everything?
 
@@ -95,8 +95,9 @@ Throughput is not the only thing keeping it off the BGZF path:
   with no record of where the members met.
 
 Sibling libraries land further behind, and container shape explains it rather
-than codec quality. `@gmod/bbi` and `@gmod/hic` store each block as its own zlib
-stream, so a wide query reaches the API hundreds of times — working out to
+than codec quality. `@gmod/bbi` and `@gmod/hic` read formats of their own, with
+their own kind of block, and each of those is a separate zlib stream — so a wide
+query reaches the API hundreds of times — working out to
 [220-410 µs of overhead per call in bbi](https://github.com/GMOD/bbi-js/blob/main/docs/wasm.md#why-not-the-platforms-decompressionstream)
 and
 [300-720 µs in hic](https://github.com/GMOD/hic/blob/main/docs/optimizations.md#not-decompressionstream-either)
