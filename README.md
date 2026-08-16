@@ -17,6 +17,22 @@ faster than pako, and about twice as fast as the browser's own
 [why not just use `DecompressionStream`](docs/optimizations.md#why-not-decompressionstream-for-everything),
 in [docs/optimizations.md](docs/optimizations.md).
 
+## Terms
+
+The docs here lean on three words, and two of them mean something narrower than
+they sound:
+
+- **BGZF block** — one gzip member of the file: at most 64KB compressed, its
+  trailer recording its own uncompressed length. Blocks decode independently of
+  each other, which is what buys both random access and the worker pool. A bare
+  "block" always means this one, never a deflate block.
+- **Virtual offset** — `{blockPosition, dataPosition}`: which BGZF block, and
+  how far into that block's decompressed bytes.
+- **Chunk** — a range between two virtual offsets, `{minv, maxv}`, which is what
+  a BAM or tabix index resolves a query to. A chunk covers a run of consecutive
+  BGZF blocks and usually starts and ends partway through the first and last of
+  them.
+
 ## Install
 
 ```sh
@@ -58,8 +74,8 @@ const decompressed: Uint8Array = await unzip(compressedData)
 
 ## unzipChunkSlice
 
-Decompress a range of blocks and slice out a virtual offset range — what BAM and
-tabix readers do with a chunk from a BAI/TBI:
+Decompress a range of BGZF blocks and slice out a virtual offset range — what
+BAM and tabix readers do with a chunk from a BAI/TBI:
 
 ```typescript
 import { MAX_BGZF_BLOCK_SIZE, unzipChunkSlice } from '@gmod/bgzf-filehandle'

@@ -12,6 +12,14 @@ libdeflate. What is left to win is structural:
 - How often does a call cross the wasm boundary?
 - How much of the file must a reader fetch to answer for a range of it?
 
+Two words below carry narrow meanings. A **BGZF block** is one gzip member of
+the file — at most 64KB compressed, independently decodable, and the unit
+everything here counts in; a bare "block" never means a deflate block. A
+**chunk** is the virtual-offset range a BAM or tabix index resolves a query to,
+covering a run of consecutive BGZF blocks and usually starting and ending
+partway through the outer two. The [README](../README.md#terms) states both at
+length.
+
 ## The codec
 
 [libdeflate](https://github.com/ebiggers/libdeflate) gives up streaming for
@@ -132,10 +140,10 @@ than code.
 
 ## Reading through a `.gzi`
 
-`BgzfFilehandle` answers a read in uncompressed coordinates. Blocks sit adjacent
-on disk, so every block a read touches falls in one contiguous byte range: a
-read spanning 300 blocks is a single request and a single inflate. The rest
-builds on that:
+`BgzfFilehandle` answers a read in uncompressed coordinates. BGZF blocks sit
+adjacent on disk, so every block a read touches falls in one contiguous byte
+range: a read spanning 300 blocks is a single request and a single inflate. The
+rest builds on that:
 
 - **Reads batch at 32MB of uncompressed output**, one request per batch. The cap
   serves the wasm heap rather than the network — without it, one enormous read

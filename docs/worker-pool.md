@@ -1,5 +1,12 @@
 # The worker pool
 
+A **BGZF block** is one gzip member of the file — at most 64KB compressed, with
+its own uncompressed length in its trailer — and a **chunk** is the
+virtual-offset range a BAM or tabix index resolves a query to, covering a run of
+consecutive blocks and usually starting and ending partway through the outer
+two. Every count and every table below is in those terms; the
+[README](../README.md#terms) states them at length.
+
 BGZF blocks inflate independently, so the blocks in one chunk can be spread
 across Web Workers. Inflating is where an indexed read spends its time — 70-90%
 of the wall clock of a `@gmod/bam` query that finds nothing in its cache — which
@@ -278,9 +285,9 @@ directly, so a synchronous constructor doesn't have to await first:
 const bam = new BamFile({ bamUrl, bgzfWorkerPool: getSharedWorkerPool() })
 ```
 
-Or drive it yourself. A pool inflates whole blocks, so it takes the block list
-`scanBgzfBlocks` finds — the same call `unzipChunkSlice` makes internally, split
-out for readers that want the blocks rather than a chunk slice:
+Or drive it yourself. A pool inflates whole BGZF blocks, so it takes the block
+list `scanBgzfBlocks` finds — the same call `unzipChunkSlice` makes internally,
+split out for readers that want the blocks rather than a chunk slice:
 
 ```typescript
 import { scanBgzfBlocks } from '@gmod/bgzf-filehandle'
