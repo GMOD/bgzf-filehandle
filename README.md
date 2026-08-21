@@ -63,10 +63,11 @@ Create the index with `bgzip -i my_file`, or `bgzip -r my_file.gz` for an
 already-compressed one. Everything a read touches arrives as one contiguous
 range and inflates in one call.
 
-Over HTTP, pass
+When the file is remote, pass
 [`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle)
-as the filehandle: those ranges are then cached in 256 KiB chunks and an
-overlapping read costs no request.
+as the filehandle. Each of those contiguous ranges is then cached in 256 KiB
+chunks, so a later read that overlaps one already fetched is served from memory
+instead of the network.
 
 ## unzip
 
