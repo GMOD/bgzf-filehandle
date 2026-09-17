@@ -5,8 +5,8 @@ query
 ([bam-js ADR 0003](https://github.com/GMOD/bam-js/blob/main/agent-docs/adr/0003-where-bam-query-time-goes.md)),
 so this package's decompression is where most of a reader's time goes.
 
-The codec is already close to native, so nothing below tries to be cleverer than
-libdeflate. What is left to win is structural:
+The codec is already close to native, so the optimizations below focus on
+structure, not cleverer decoding. What is left to win is structural:
 
 - How many times does a byte get copied?
 - How often does a call cross the wasm boundary?
@@ -23,10 +23,9 @@ length.
 ## The codec
 
 [libdeflate](https://github.com/ebiggers/libdeflate) gives up streaming for
-speed: it wants the whole input up front and the output size told to it. That is
-exactly the shape of BGZF, where every block is an independent gzip member
-recording its own uncompressed length — which is also why htslib builds against
-it.
+speed: it needs the whole input up front and the output size given to it. That
+matches BGZF exactly, where every block is an independent gzip member recording
+its own uncompressed length — which is also why htslib builds against it.
 
 The crate around it is thin ([`crate/src/lib.rs`](../crate/src/lib.rs)):
 [libdeflater](https://github.com/adamkewley/libdeflater)'s bindings, one reused
@@ -66,7 +65,7 @@ We do use it, but only on that plain gzip path; on BGZF it measures about half
 the speed of wasm — even though BGZF is the friendliest container it could ask
 for. A fixed per-call overhead dominates its cost, and a BGZF file is
 concatenated gzip members, so an entire buffer goes through **one** call instead
-of one per block. It pays its overhead once and still finishes second.
+of one per block. It incurs that overhead once and still finishes second.
 
 Best of three runs, mean ms per file, again after asserting all arms
 byte-identical (`pnpm benchonly inflate`):
@@ -89,12 +88,12 @@ Throughput is not the only thing keeping it off the BGZF path:
 
 - **Baseline only since May 2023** (Safari 16.4, Firefox 113). A library cannot
   drop the fallback, so pako ships either way and the bundle saving — the main
-  argument for switching — never arrives.
+  argument for switching — never happens.
 - **It cannot do `unzipChunkSlice`'s job.** Slicing a virtual offset range needs
   each member's boundaries, and a single stream call returns one flat buffer
   with no record of where the members met.
 
-Sibling libraries land further behind, and container shape explains it rather
+Sibling libraries fall further behind, and container format explains it rather
 than codec quality. `@gmod/bbi` and `@gmod/hic` read formats of their own, with
 their own kind of block, and each of those is a separate zlib stream — so a wide
 query reaches the API hundreds of times — working out to
@@ -126,7 +125,7 @@ those. `crate/build-wasm.sh` patches it after `wasm-bindgen` runs
 ([ADR 0002](../agent-docs/adr/0002-copy-out-of-wasm-memory-before-decoding-strings.md)).
 The symptom misleads badly, so learn it: a `TypeError` naming a buffer type,
 with no bgzf frame in the stack, appearing and disappearing with the input file
-rather than the code — which sends you bisecting the data instead of the
+rather than the code — which leads you to bisect the data instead of the
 decoder.
 
 **Rejected: inflating straight into the output buffer.** Dropping the per-block
@@ -147,8 +146,8 @@ range: a read spanning 300 blocks is a single request and a single inflate. The
 rest builds on that:
 
 - **Reads batch at 32MB of uncompressed output**, one request per batch. The cap
-  serves the wasm heap rather than the network — without it, one enormous read
-  materializes in that heap and leaves it that size.
+  limits the wasm heap's growth rather than the network's — without it, one
+  enormous read materializes in that heap and leaves it that size.
 - **`blockConcurrency` (default 10) caps how many batch requests are in
   flight.** Requests, not threads. Neither it nor the 32MB figure rests on a
   benchmark, so treat them as defaults to tune from rather than an optimum.
@@ -168,17 +167,17 @@ rest builds on that:
 ## The worker pool
 
 BGZF blocks inflate independently, so a chunk can spread its blocks across Web
-Workers — the only lever here aimed at the inflate cost itself rather than the
-work around it. At its default four workers a BAM chunk runs 1.8-2.1x once past
-a couple of MB uncompressed, which is 0.9s off a 1.8s inflate at 373MB, and
-jbrowse-components measures 1.95x end to end in a browser over 1000x long-read
-data. Scaling is sublinear from the first worker, a chunk has to reach four to
-eight blocks before it pays at all, and a chunk that decompresses ~18x never
-gets past ~1.0x. The tables, and the serial reassembly that eats the difference,
-are in [worker-pool.md](worker-pool.md#what-it-is-worth).
+Workers — the only optimization here aimed at the inflate cost itself rather
+than the work around it. At its default four workers a BAM chunk runs 1.8-2.1x
+once past a couple of MB uncompressed, which is 0.9s off a 1.8s inflate at
+373MB, and jbrowse-components measures 1.95x end to end in a browser over 1000x
+long-read data. Scaling is sublinear from the first worker, a chunk has to reach
+four to eight blocks before it helps at all, and a chunk that decompresses ~18x
+never gets past ~1.0x. The tables, and the serial reassembly that eats the
+difference, are in [worker-pool.md](worker-pool.md#what-it-is-worth).
 
-Threading usually hands most of a gain like that back in overhead. Two choices
-keep this pool from doing so:
+Threading usually loses most of a gain like that to overhead. Two choices keep
+this pool from doing so:
 
 - **One range per worker, not one block.** `scanBgzfBlocks` reads each block's
   `BSIZE` and `ISIZE` out of its header and trailer in JS, learning every

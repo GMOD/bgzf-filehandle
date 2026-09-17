@@ -58,7 +58,7 @@ Four things the tables say:
 
 - **Scaling is sublinear from the start, not near-linear to four.** At four
   workers the inflate is 2.3-2.7x on the multi-megabyte fixtures, so about 60%
-  efficiency, and four to eight buys another 1.2-1.4x for twice the threads. The
+  efficiency, and four to eight adds another 1.2-1.4x for twice the threads. The
   default stops at four to bound what a consumer with many pools spends, not
   because the curve has flattened — it has not, even at 140MB
   ([four workers is not the ceiling](#four-workers-is-not-the-ceiling)).
@@ -112,8 +112,8 @@ floor — call it ±0.15x, and read no row as finer than that.
   than the parallelism returns.
 - **It has most of its value by sixteen to thirty-two blocks**, around 1-2MB of
   uncompressed chunk, and the ratio is flat after that. So a query does not have
-  to be large to collect this — but past a couple of MB, growing the region buys
-  absolute time rather than a better multiple.
+  to be large to collect this — but past a couple of MB, growing the region
+  gains more absolute time, not a better multiple.
 - **out.sorted.gff.gz is flat at ~1.0x throughout**, for the reassembly reason
   above. It is the fixture whose chunks decompress ~18x, so the serial concat
   tracks the inflate no matter how the chunk is sized.
@@ -166,22 +166,22 @@ a quarter on top of four** (2.3-2.8x). Efficiency falls the whole way — 0.67,
 0.51, 0.32 of linear — but nothing has flattened by eight.
 
 The default `min(hardwareConcurrency, 4)` is not the point where the curve stops
-paying. It is a budget decision, and the budget is set by the consumer rather
+improving. It is a budget decision, and the budget is set by the consumer rather
 than by this table: `getSharedWorkerPool()` memoizes per JS context, so an
 application that runs adapters in several RPC workers gets four pool workers
 _each_ — five tracks is twenty workers, each with its own grow-only wasm heap.
 Raise `numWorkers` when you know your process holds one pool; leave it alone
 when you do not.
 
-### Inflate-only vs. end-to-end
+### Inflate-only and end-to-end speedups
 
-The **inflate-only** column at **eight** workers reads "2.7-4.1x, close to
-linear" — but that comes from a harness that timed `pool.decompressBlocks`
-against a sequential `unzipChunkSlice`, which skips the reassembly the real call
-still has to do. Compare like with like and four workers is 1.1-2.0x end to end.
-Keep both columns when quoting: the inflate-only one is the right number for "is
-the parallelism working", and the end-to-end one is the only one a caller
-experiences.
+The inflate-only column at eight workers shows 2.7-4.1x, a figure this page once
+quoted as "close to linear out to four workers"; that column came from a harness
+that timed `pool.decompressBlocks` against a sequential `unzipChunkSlice`, whose
+pooled arm skipped the reassembly the real call still does; compared like with
+like, four workers give 1.1-2.0x end to end. Keep both columns when quoting: the
+inflate-only one is the right number for "is the parallelism working", and the
+end-to-end one is the only one a caller experiences.
 
 ### End to end in a consumer
 
@@ -320,12 +320,12 @@ destroyed pool throws out of `decompressBlocks`, which would turn every open
 reader's next read into an error instead of degrading it to inflating in
 process. Only the workers come and go; the object stays usable.
 
-**What this reclaims is mostly memory, not threads.** Each worker holds its own
-copy of the inlined wasm bundle, and that `WebAssembly.Memory` only ever grows.
-So a pool that had inflated one deep long-read chunk held onto that heap until
-the page went away — times however many pools the consumer had, which for a
-consumer creating one pool per data worker (below) is several. That heap was the
-largest thing an idle pool was keeping.
+**This reclaims mostly memory, not threads.** Each worker holds its own copy of
+the inlined wasm bundle, and that `WebAssembly.Memory` only ever grows. So a
+pool that had inflated one deep long-read chunk held onto that heap until the
+page went away — times however many pools the consumer had, which for a consumer
+creating one pool per data worker (below) is several. That heap was the largest
+thing an idle pool was keeping.
 
 **An in-flight request is never reaped out from under itself.**
 `decompressBlocks` clears the timer on entry, so a lone request has no armed
@@ -377,11 +377,12 @@ compressed bytes, the smaller side of the operation.
 
 The pool deliberately avoids `SharedArrayBuffer`. It was the original design,
 and measurement ruled it out. It needs COOP/COEP, which most JBrowse installs
-cannot set, and it buys nothing where they can: `decompressAll` copies its input
-into the wasm heap either way, so shared memory removes the host-side slice
-rather than the boundary copy. Head to head in Chrome at 4 workers, a pooled
-`SAB` was at parity with transferring, and a freshly allocated one was slower.
+cannot set, and it gains nothing where they can: `decompressAll` copies its
+input into the wasm heap either way, so shared memory removes the host-side
+slice rather than the boundary copy. Head to head in Chrome at 4 workers, a
+pooled `SAB` was at parity with transferring, and a freshly allocated one was
+slower.
 
 Dropping it also makes the feature generally available: availability no longer
-hangs on `SharedArrayBuffer` existing — that is, on cross-origin isolation —
+depends on `SharedArrayBuffer` existing — that is, on cross-origin isolation —
 when the real requirement is only a Worker and a Blob URL to launch it from.

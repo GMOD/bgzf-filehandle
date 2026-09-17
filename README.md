@@ -26,14 +26,14 @@ they sound:
   basically indepently compressed gzip blocks that are concatenated together.
   https://www.htslib.org/doc/bgzip.html they are at most 64KB compressed, its
   trailer recording its own uncompressed length. Blocks decode independently of
-  each other, which is what buys both random access and the worker pool. A bare
-  "block" always means this one, never a deflate block.
+  each other, enabling both random access and the worker pool. A bare "block"
+  always means this one, never a deflate block.
 - **Virtual offset** — `{blockPosition, dataPosition}`: which BGZF block, and
   how far into that block's decompressed bytes.
 - **Chunk** — a range between two virtual offsets, `{minv, maxv}`; a BAM or
-  tabix index resolves a query to one chunk. A chunk covers a run of consecutive
-  BGZF blocks and usually starts and ends partway through the first and last of
-  them.
+  tabix index resolves a query to one or more chunks. A chunk covers a run of
+  consecutive BGZF blocks and usually starts and ends partway through the first
+  and last of them.
 
 ## Install
 
