@@ -16,9 +16,9 @@ goes about 1.8-2.1x once it is past a couple of MB, which on a deep long-read
 view is
 [most of a second off a 1.8s inflate](#at-the-size-where-it-saves-seconds).
 
-Nothing creates a pool implicitly. Workers are a thread budget the application
-owns, and a library that quietly started four of them per file would be a bad
-guest.
+Only an explicit call creates a pool. Workers are a thread budget the
+application owns, and a library that quietly started four of them per file would
+be a bad guest.
 
 ## What it is worth
 
@@ -165,23 +165,23 @@ two thirds of what four get** (1.3-1.4x against 1.8-2.2x), and **eight still add
 a quarter on top of four** (2.3-2.8x). Efficiency falls the whole way — 0.67,
 0.51, 0.32 of linear — but nothing has flattened by eight.
 
-So the default `min(hardwareConcurrency, 4)` is not the point where the curve
-stops paying. It is a budget decision, and the budget is set by the consumer
-rather than by this table: `getSharedWorkerPool()` memoizes per JS context, so
-an application that runs adapters in several RPC workers gets four pool workers
+The default `min(hardwareConcurrency, 4)` is not the point where the curve stops
+paying. It is a budget decision, and the budget is set by the consumer rather
+than by this table: `getSharedWorkerPool()` memoizes per JS context, so an
+application that runs adapters in several RPC workers gets four pool workers
 _each_ — five tracks is twenty workers, each with its own grow-only wasm heap.
 Raise `numWorkers` when you know your process holds one pool; leave it alone
 when you do not.
 
-### The number this doc used to quote
+### Inflate-only vs. end-to-end
 
-"2.7-4.1x, close to linear out to four workers." That is the **inflate-only**
-column at **eight** workers, and it came from a harness that timed
-`pool.decompressBlocks` against a sequential `unzipChunkSlice` — the pooled arm
-skipping the reassembly the real call still has to do. Compare like with like
-and four workers is 1.1-2.0x end to end. Keep both columns when quoting: the
-inflate-only one is the right number for "is the parallelism working", and the
-end-to-end one is the only one a caller experiences.
+The **inflate-only** column at **eight** workers reads "2.7-4.1x, close to
+linear" — but that comes from a harness that timed `pool.decompressBlocks`
+against a sequential `unzipChunkSlice`, which skips the reassembly the real call
+still has to do. Compare like with like and four workers is 1.1-2.0x end to end.
+Keep both columns when quoting: the inflate-only one is the right number for "is
+the parallelism working", and the end-to-end one is the only one a caller
+experiences.
 
 ### End to end in a consumer
 
@@ -310,8 +310,7 @@ interface, so they are all an alternative implementation has to provide.
 
 After `idleTimeoutMs` (default 3 minutes) with nothing to inflate, a pool
 terminates its workers, and spawns a fresh set on the next call. Pass `0` to
-keep them up for the pool's lifetime, which is what every version before 6.5
-did.
+keep them up for the pool's lifetime instead.
 
 **The reap is invisible to whoever holds the pool, and that is a requirement
 rather than a nicety.** Consumers keep a pool around — `@gmod/bam` stores the
@@ -383,6 +382,6 @@ into the wasm heap either way, so shared memory removes the host-side slice
 rather than the boundary copy. Head to head in Chrome at 4 workers, a pooled
 `SAB` was at parity with transferring, and a freshly allocated one was slower.
 
-Dropping it is also what made the feature generally available. Availability used
-to hang on `SharedArrayBuffer` existing — that is, on cross-origin isolation —
+Dropping it also makes the feature generally available: availability no longer
+hangs on `SharedArrayBuffer` existing — that is, on cross-origin isolation —
 when the real requirement is only a Worker and a Blob URL to launch it from.

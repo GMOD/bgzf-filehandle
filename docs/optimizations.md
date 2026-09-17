@@ -193,8 +193,8 @@ keep this pool from doing so:
 [worker-pool.md](worker-pool.md) explains how that transfer works, gives the
 measurement that ruled out `SharedArrayBuffer`, and covers pool lifecycle,
 sizing, sharing across threads, and reaping idle workers. Two things to carry
-in: a single-block chunk skips the pool entirely, and nothing creates a pool
-implicitly, since workers are a thread budget the application owns.
+in: a single-block chunk skips the pool entirely, and only an explicit call
+creates one, since workers are a thread budget the application owns.
 
 ## What the consumers add
 

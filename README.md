@@ -30,8 +30,8 @@ they sound:
   "block" always means this one, never a deflate block.
 - **Virtual offset** — `{blockPosition, dataPosition}`: which BGZF block, and
   how far into that block's decompressed bytes.
-- **Chunk** — a range between two virtual offsets, `{minv, maxv}`, which is what
-  a BAM or tabix index resolves a query to. A chunk covers a run of consecutive
+- **Chunk** — a range between two virtual offsets, `{minv, maxv}`; a BAM or
+  tabix index resolves a query to one chunk. A chunk covers a run of consecutive
   BGZF blocks and usually starts and ends partway through the first and last of
   them.
 
@@ -137,7 +137,7 @@ pool directly: [docs/worker-pool.md](docs/worker-pool.md).
   and `scanBgzfBlocks`
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development and release steps
 
-## Academic Use
+## Academic use
 
 This package was written with funding from the [NHGRI](http://genome.gov) as
 part of the [JBrowse](http://jbrowse.org) project. If you use it in an academic
