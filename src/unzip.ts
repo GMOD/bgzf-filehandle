@@ -177,6 +177,24 @@ function assembleChunkSliceResult(
   }
 }
 
+/**
+ * The smallest chunk, in inflated bytes, that `unzipChunkSlice` hands to a
+ * pool. Below it the round trip and the input copy cost more than the
+ * parallelism returns: in the chunk-size table in docs/worker-pool.md every BAM
+ * fixture turned positive by eight blocks, 0.4-0.5MB out, and at two to four
+ * blocks most lost. A reader that only ever asks for smaller chunks never boots
+ * a shared pool's workers at all.
+ */
+export const POOL_MIN_DECOMPRESSED_BYTES = 400_000
+
+function decompressedBytes(blocks: BgzfBlockInfo[]) {
+  let total = 0
+  for (const block of blocks) {
+    total += block.decompressedSize
+  }
+  return total
+}
+
 export async function unzipChunkSlice(
   inputData: Uint8Array,
   chunk: Chunk,
@@ -190,8 +208,7 @@ export async function unzipChunkSlice(
       minv.blockPosition,
       maxv.blockPosition,
     )
-    // one block is not worth a round trip to a worker
-    if (blocks.length > 1) {
+    if (decompressedBytes(blocks) >= POOL_MIN_DECOMPRESSED_BYTES) {
       const result = await workerPool.decompressBlocks(inputData, blocks)
       return assembleChunkSliceResult(result.blocks, blocks, minv, maxv)
     }

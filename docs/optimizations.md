@@ -192,8 +192,9 @@ this pool from doing so:
 [worker-pool.md](worker-pool.md) explains how that transfer works, gives the
 measurement that ruled out `SharedArrayBuffer`, and covers pool lifecycle,
 sizing, sharing across threads, and reaping idle workers. Two things to carry
-in: a single-block chunk skips the pool entirely, and only an explicit call
-creates one, since workers are a thread budget the application owns.
+in: a chunk under `POOL_MIN_DECOMPRESSED_BYTES` (0.4MB inflated) skips the pool
+entirely, and only an explicit call creates one, since workers are a thread
+budget the application owns.
 
 ## What the consumers add
 

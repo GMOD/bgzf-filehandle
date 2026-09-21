@@ -124,6 +124,11 @@ const pool = await getSharedWorkerPool() // undefined if Workers are unavailable
 const result = await unzipChunkSlice(compressedData, chunk, pool)
 ```
 
+A chunk under 0.4MB inflated stays on the calling thread, where a worker costs
+more than it returns, so a shared pool starts its workers only once a larger one
+arrives. No read waits on them: a pool inflates on the calling thread while its
+workers boot, and for good if one of them fails.
+
 Safe to pass unconditionally — `undefined` keeps the sequential wasm path, and
 readers that take a pool of their own (`@gmod/bam`'s `bgzfWorkerPool`) accept
 the same value. Worker counts, cross-thread sharing, lifecycle and driving a

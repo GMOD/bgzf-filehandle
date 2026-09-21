@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 import { installFakeWorker } from './fakeWorker.ts'
+import { scanBgzfBlocks } from '../src/bgzfBlockScan.ts'
 import { unzipChunkSlice } from '../src/unzip.ts'
 import {
   createBgzfWorkerPool,
@@ -70,12 +71,14 @@ test('recommended JBrowse-style pattern: await getSharedWorkerPool() then pass t
 test('pool takes the transferable path and leaves the caller its bytes', async () => {
   const { posted } = installFakeWorker()
 
+  // large enough that unzipChunkSlice hands it to the pool at all
   const testData = new Uint8Array(
-    fs.readFileSync(require.resolve('./data/paired.bam')),
+    fs.readFileSync(require.resolve('./data/shortreads_300x.bam')),
   )
+  const blocks = scanBgzfBlocks(testData, 0, testData.length)
   const chunk = {
     minv: { dataPosition: 0, blockPosition: 0 },
-    maxv: { dataPosition: 65535, blockPosition: testData.length },
+    maxv: { dataPosition: 100, blockPosition: blocks[15]!.filePosition },
   }
 
   const pool = await createBgzfWorkerPool(2)
@@ -87,7 +90,10 @@ test('pool takes the transferable path and leaves the caller its bytes', async (
   expect(posted.every(p => p.hadInputBuffer)).toBe(true)
   // the pool copies each worker's range out, so the caller's buffer is intact
   expect(testData.byteLength).toBe(before)
-  expect(viaPool.buffer).toEqual(sequential.buffer)
+  // Buffer.equals, since toEqual walks a typed array this size for seconds
+  expect(
+    Buffer.from(viaPool.buffer).equals(Buffer.from(sequential.buffer)),
+  ).toBe(true)
   expect([...viaPool.cpositions]).toEqual([...sequential.cpositions])
   expect([...viaPool.dpositions]).toEqual([...sequential.dpositions])
   pool.destroy()

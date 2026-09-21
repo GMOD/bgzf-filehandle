@@ -27,7 +27,21 @@ export interface FakeWorkerHandle {
   releaseReplies: (n?: number) => void
   /** how many replies are currently held */
   heldCount: () => number
+  /**
+   * Raise an `error` event on every live worker, as a worker that died would.
+   * Returns how many of those events had `preventDefault` called on them.
+   */
+  crash: (message?: string) => number
+  /** under `boot: 'never'`, start every worker still waiting, as a freed slot would */
+  startQueued: () => void
 }
+
+/**
+ * How a fake worker answers `init`: `ready` as a real one does, `error` as one
+ * whose thread could not start, or `never` as one Firefox has queued behind
+ * `dom.workers.maxPerDomain`, which raises no event at all.
+ */
+export type FakeBoot = 'ready' | 'error' | 'never'
 
 /**
  * A stand-in for a real Worker that runs the same wasm on this thread.
@@ -41,22 +55,49 @@ export interface FakeWorkerHandle {
  * idle suite needs the same protocol plus construct/terminate counts, and two
  * fakes that drift apart would be two different protocols under test.
  */
-export function installFakeWorker(): FakeWorkerHandle {
+interface FakeErrorEvent {
+  message: string
+  preventDefault: () => void
+}
+
+export function installFakeWorker(boot: FakeBoot = 'ready'): FakeWorkerHandle {
   const posted: { hadInputBuffer: boolean }[] = []
   const live = { constructed: 0, terminated: 0 }
   let defer = false
   const held: (() => void)[] = []
+  const running = new Set<FakeWorker>()
+  const queued: FakeWorker[] = []
+
+  function raiseError(worker: FakeWorker, message: string) {
+    let prevented = false
+    worker.onerror?.({
+      message,
+      preventDefault: () => {
+        prevented = true
+      },
+    })
+    return prevented
+  }
 
   class FakeWorker {
     onmessage: ((e: { data: unknown }) => void) | undefined = undefined
+    onerror: ((e: FakeErrorEvent) => void) | undefined = undefined
+    onmessageerror: (() => void) | undefined = undefined
 
     constructor() {
       live.constructed++
+      running.add(this)
     }
 
     postMessage(msg: WorkerRequest, transfer?: Transferable[]) {
       if (msg.type === 'init') {
-        queueMicrotask(() => this.onmessage?.({ data: { type: 'ready' } }))
+        if (boot === 'ready') {
+          queueMicrotask(() => this.onmessage?.({ data: { type: 'ready' } }))
+        } else if (boot === 'error') {
+          queueMicrotask(() => raiseError(this, 'could not start thread'))
+        } else {
+          queued.push(this)
+        }
         return
       }
       posted.push({ hadInputBuffer: msg.inputBuffer !== undefined })
@@ -98,7 +139,9 @@ export function installFakeWorker(): FakeWorkerHandle {
 
     terminate() {
       live.terminated++
+      running.delete(this)
       this.onmessage = undefined
+      this.onerror = undefined
     }
   }
 
@@ -118,5 +161,19 @@ export function installFakeWorker(): FakeWorkerHandle {
       }
     },
     heldCount: () => held.length,
+    startQueued: () => {
+      for (const worker of queued.splice(0)) {
+        worker.onmessage?.({ data: { type: 'ready' } })
+      }
+    },
+    crash: (message = 'worker crashed') => {
+      let prevented = 0
+      for (const worker of [...running]) {
+        if (raiseError(worker, message)) {
+          prevented++
+        }
+      }
+      return prevented
+    },
   }
 }

@@ -1,3 +1,4 @@
+import { decompressAll } from './wasm/bgzf-wasm-inlined.js'
 import workerSource from './wasm/bgzf-worker-source.ts'
 
 import type { BgzfBlockInfo } from './bgzfBlockScan.ts'
@@ -63,6 +64,15 @@ interface RangeCallback {
 }
 
 /**
+ * The worker failed, not the data: it raised an `error` event, sent a reply
+ * this thread could not deserialize, or was terminated with a request still
+ * out. A call that meets one inflates on the calling thread
+ * instead. A decompression error a worker reports against one batch is about
+ * the data, so it stays a plain `Error` and rejects the call.
+ */
+class WorkerFailure extends Error {}
+
+/**
  * Whether this context can host the pool at all.
  *
  * This used to test for `SharedArrayBuffer`, which made the whole feature
@@ -80,29 +90,61 @@ function workersAvailable() {
   )
 }
 
+// never hold a node process open on a timer; the browser's number has no unref
+function unrefIfPossible(timer: unknown) {
+  if (
+    typeof timer === 'object' &&
+    timer !== null &&
+    'unref' in timer &&
+    typeof timer.unref === 'function'
+  ) {
+    timer.unref()
+  }
+}
+
 class ManagedWorker {
   private callbacks = new Map<number, RangeCallback>()
-  private readyResolve?: () => void
+  private readyResolve!: () => void
+  private readyReject!: (err: Error) => void
   private worker: Worker
   private nextBatchId = 0
+  private dead = false
+  private onFailure: (err: WorkerFailure) => void
   readyPromise: Promise<void>
 
-  constructor(workerUrl: string | URL) {
+  constructor(
+    workerUrl: string | URL,
+    onFailure: (err: WorkerFailure) => void,
+  ) {
+    this.onFailure = onFailure
     this.worker = new Worker(workerUrl)
-    this.readyPromise = new Promise<void>(resolve => {
+    this.readyPromise = new Promise<void>((resolve, reject) => {
       this.readyResolve = resolve
+      this.readyReject = reject
+    })
+    this.readyPromise.catch(() => {
+      // a worker that dies after booting rejects this with nobody awaiting it
     })
     this.worker.onmessage = e => {
       this.handleMessage(e.data)
+    }
+    // preventDefault, or the error reaches the enclosing scope: inside a data
+    // worker that is its global onerror, which a host treats as that worker
+    // dying and fails every call it has in flight
+    this.worker.onerror = e => {
+      e.preventDefault()
+      this.fail(new WorkerFailure(`bgzf worker failed: ${e.message}`))
+    }
+    this.worker.onmessageerror = () => {
+      this.fail(
+        new WorkerFailure('a bgzf worker reply could not be deserialized'),
+      )
     }
   }
 
   private handleMessage(msg: WorkerMessage) {
     if (msg.type === 'ready') {
-      if (this.readyResolve) {
-        this.readyResolve()
-        this.readyResolve = undefined
-      }
+      this.readyResolve()
     } else if (msg.type === 'rangeResult') {
       const cb = this.callbacks.get(msg.batchId)
       if (cb) {
@@ -112,26 +154,28 @@ class ManagedWorker {
           timing: { viewMs: msg.viewMs, wasmMs: msg.wasmMs },
         })
       }
+    } else if (msg.batchId === undefined) {
+      this.fail(new WorkerFailure(msg.message ?? 'bgzf worker failed'))
     } else {
-      const err = new Error(msg.message ?? 'worker decompression failed')
-      if (msg.batchId !== undefined) {
-        const cb = this.callbacks.get(msg.batchId)
-        if (cb) {
-          this.callbacks.delete(msg.batchId)
-          cb.reject(err)
-        }
-      } else {
-        // No batchId — error wasn't tied to a specific request (e.g. the
-        // worker died mid-init). Fail every in-flight callback.
-        for (const [key, cb] of this.callbacks) {
-          this.callbacks.delete(key)
-          cb.reject(err)
-        }
+      const cb = this.callbacks.get(msg.batchId)
+      if (cb) {
+        this.callbacks.delete(msg.batchId)
+        cb.reject(new Error(msg.message ?? 'worker decompression failed'))
       }
     }
   }
 
+  private fail(err: WorkerFailure) {
+    if (!this.dead) {
+      this.terminate(err)
+      this.onFailure(err)
+    }
+  }
+
   decompressRange(input: PoolInput, inputOffset: number, inputLength: number) {
+    if (this.dead) {
+      return Promise.reject(new WorkerFailure('bgzf worker was terminated'))
+    }
     const batchId = this.nextBatchId++
     const promise = new Promise<RangeResult>((resolve, reject) => {
       this.callbacks.set(batchId, { resolve, reject })
@@ -153,11 +197,16 @@ class ManagedWorker {
     this.worker.postMessage({ type: 'init' })
   }
 
-  terminate() {
+  terminate(reason = new WorkerFailure('bgzf worker was terminated')) {
+    if (this.dead) {
+      return
+    }
+    this.dead = true
     this.worker.terminate()
+    this.readyReject(reason)
     for (const [key, cb] of this.callbacks) {
       this.callbacks.delete(key)
-      cb.reject(new Error('Worker terminated'))
+      cb.reject(reason)
     }
   }
 }
@@ -181,94 +230,64 @@ function getWorkerBlobUrl() {
  * and `@gmod/cram`, and for the same reason their ADRs give: the point is to
  * catch a reader who has walked away, not one who is looking at the screen in
  * front of them. A pan back a minute later should find the pool still up.
- *
- * It could afford to be shorter than those, since respawning costs a worker
- * boot and a wasm instantiate rather than a re-download — but there is no
- * measurement here to justify a different number, and matching the rest of the
- * stack is worth more than a tuned one that is not.
  */
 export const DEFAULT_POOL_IDLE_TIMEOUT_MS = 3 * 60 * 1000
 
 let sharedPool: BgzfWorkerPool | undefined
-let sharedPoolPromise: Promise<BgzfWorkerPool | undefined> | undefined
-let poolGeneration = 0
 
-// Returns undefined where workers cannot be launched at all (node, or a host
-// with no Blob URLs), so callers can pass the result straight to
-// unzipChunkSlice and get the sequential fallback path. A browser without
-// cross-origin isolation is NOT such a host — it gets a working pool over the
-// transferable path.
-//
-// The pool this hands back reaps its own workers while idle and spawns them
-// again on demand, so holding it for the life of a file — which is what
-// `@gmod/bam` does — no longer pins four workers and their wasm heaps for the
-// life of the page. See {@link createBgzfWorkerPool}; `idleTimeoutMs`, like
-// `numWorkers`, only applies to the call that actually creates the pool.
+/**
+ * One pool for this JS context, created on the first call and reused after
+ * that. `numWorkers` and `idleTimeoutMs` apply only to the call that creates it.
+ *
+ * Resolves to undefined where workers cannot be launched at all (node, or a
+ * host with no Blob URLs), so callers can pass the result straight to
+ * `unzipChunkSlice` and get the sequential path. A browser without
+ * cross-origin isolation is NOT such a host — it gets a working pool over the
+ * transferable path.
+ *
+ * **Starts no workers.** They boot on the first call that reaches the pool,
+ * which through `unzipChunkSlice` means the first chunk of at least
+ * `POOL_MIN_DECOMPRESSED_BYTES`, so a reader that only ever asks for small
+ * chunks never pays for them. Nothing waits on the boot either — see
+ * {@link createBgzfWorkerPool}.
+ */
 export function getSharedWorkerPool(
   numWorkers?: number,
   idleTimeoutMs?: number,
 ): Promise<BgzfWorkerPool | undefined> {
-  if (sharedPool) {
-    return Promise.resolve(sharedPool)
+  if (!sharedPool && workersAvailable()) {
+    sharedPool = makePool(numWorkers, undefined, idleTimeoutMs).pool
   }
-  if (!workersAvailable()) {
-    return Promise.resolve(undefined)
-  }
-  if (!sharedPoolPromise) {
-    const gen = poolGeneration
-    const promise: Promise<BgzfWorkerPool | undefined> = createBgzfWorkerPool(
-      numWorkers,
-      undefined,
-      idleTimeoutMs,
-    ).then(
-      pool => {
-        if (gen !== poolGeneration) {
-          pool.destroy()
-          throw new Error('Worker pool was destroyed during initialization')
-        }
-        sharedPool = pool
-        return pool
-      },
-      (error: unknown) => {
-        // Clear the cached rejected promise so a later call can retry.
-        if (sharedPoolPromise === promise) {
-          sharedPoolPromise = undefined
-        }
-        throw error
-      },
-    )
-    sharedPoolPromise = promise
-  }
-  return sharedPoolPromise
+  return Promise.resolve(sharedPool)
 }
 
 export function destroySharedWorkerPool() {
-  poolGeneration++
   sharedPool?.destroy()
   sharedPool = undefined
-  sharedPoolPromise = undefined
 }
 
 /**
- * A pool of `numWorkers` workers, which **reaps them while idle** and spawns a
- * fresh set on the next call.
+ * A pool of `numWorkers` workers you own, resolved once they are up, and
+ * rejected if one of them fails to start. A worker the browser never starts
+ * leaves it pending — Firefox queues one past `dom.workers.maxPerDomain`
+ * without a word — so where that matters, use {@link getSharedWorkerPool},
+ * which never waits.
  *
- * The reap is invisible to whoever holds the pool, and that is the whole design
- * constraint rather than a nicety. Consumers keep a pool — `@gmod/bam` stores
- * the promise on the `BamFile` and awaits it once per chunk read, for the life
- * of the file — so the reclaiming cannot be `destroy()`: a destroyed pool
- * throws out of `decompressBlocks`, which would turn every open reader's next
- * read into an error rather than degrading it to inflating in process. Reaping
- * inside the pool keeps the object valid and only the workers come and go.
+ * Past creation, **no call waits on a worker**: while the workers are booting,
+ * or after the pool has given up on them, `decompressBlocks` inflates on the
+ * calling thread and returns the same blocks. A worker failing mid-request
+ * sends that request back to the calling thread too, and turns the pool off for
+ * good — a worker that errors once is a pool that will error again, and the
+ * calling thread is the path every consumer already runs without one.
  *
- * What this reclaims is worth stating, because it is not mainly threads. Each
- * worker holds its own copy of the inlined wasm bundle, and that
- * `WebAssembly.Memory` only ever grows — so a pool that has inflated one deep
- * long-read chunk keeps that heap until the page goes away. Nothing else in
- * this library ever gave it back.
- *
- * Pass `idleTimeoutMs: 0` to keep the workers up for the pool's lifetime, which
- * is what every version before this did.
+ * The pool **reaps its workers while idle** and spawns a fresh set on the next
+ * call, invisibly to whoever holds it. Consumers keep a pool — `@gmod/bam`
+ * stores the promise on the `BamFile` and awaits it once per chunk read, for
+ * the life of the file — so the reclaiming cannot be `destroy()`: a destroyed
+ * pool throws out of `decompressBlocks`. What the reap reclaims is mostly
+ * memory: each worker holds its own wasm heap, and that `WebAssembly.Memory`
+ * only ever grows. Pass `idleTimeoutMs: 0` to keep the workers up for the
+ * pool's lifetime.
  */
 export async function createBgzfWorkerPool(
   numWorkers?: number,
@@ -280,42 +299,84 @@ export async function createBgzfWorkerPool(
       'cannot create a bgzf worker pool: this context has no Worker and Blob URL support',
     )
   }
+  const { pool, boot } = makePool(numWorkers, workerUrl, idleTimeoutMs)
+  try {
+    await boot()
+  } catch (e) {
+    pool.destroy()
+    throw e
+  }
+  return pool
+}
 
-  const url = workerUrl ?? getWorkerBlobUrl()
+function makePool(
+  numWorkers: number | undefined,
+  workerUrl: string | URL | undefined,
+  idleTimeoutMs: number = DEFAULT_POOL_IDLE_TIMEOUT_MS,
+) {
   const count = numWorkers ?? Math.min(navigator.hardwareConcurrency, 4)
   let workers: ManagedWorker[] = []
   let destroyed = false
+  let gaveUp = false
   let idleTimer: ReturnType<typeof setTimeout> | undefined
   let inFlight = 0
-  let spawning: Promise<void> | undefined
+  let booting: Promise<void> | undefined
+
+  function giveUp() {
+    gaveUp = true
+    clearIdle()
+    for (const w of workers) {
+      w.terminate()
+    }
+    workers = []
+  }
 
   async function spawn() {
-    const started = Array.from({ length: count }, () => new ManagedWorker(url))
+    const url = workerUrl ?? getWorkerBlobUrl()
+    const started = Array.from(
+      { length: count },
+      () => new ManagedWorker(url, giveUp),
+    )
     for (const w of started) {
       w.init()
     }
-    await Promise.all(started.map(w => w.readyPromise))
+    // No deadline, deliberately. Nothing waits on this but createBgzfWorkerPool,
+    // and a deadline would have to terminate the workers it gave up on: Firefox
+    // freezes the page when terminating a running worker lets it start one it
+    // had queued past `dom.workers.maxPerDomain`, which is the very state a
+    // worker that never comes up is most often in. Left alone, a queued worker
+    // that starts later is adopted then.
+    try {
+      await Promise.all(started.map(w => w.readyPromise))
+    } catch (e) {
+      for (const w of started) {
+        w.terminate()
+      }
+      throw e
+    }
     // destroy() may have landed while these were booting; do not adopt them
-    if (destroyed) {
+    if (destroyed || gaveUp) {
       for (const w of started) {
         w.terminate()
       }
       return
     }
     workers = started
+    armIdle()
   }
 
-  /** Workers, spawning them if an idle reap has taken them away. */
-  async function ensureWorkers() {
-    if (workers.length === 0) {
-      // one spawn shared by every concurrent caller, or two queries arriving
-      // together after a reap would each start a full set
-      spawning ??= spawn().finally(() => {
-        spawning = undefined
+  // one boot shared by every concurrent caller, or two queries arriving
+  // together after a reap would each start a full set
+  function boot() {
+    booting ??= spawn()
+      .catch((e: unknown) => {
+        giveUp()
+        throw e
       })
-      await spawning
-    }
-    return workers
+      .finally(() => {
+        booting = undefined
+      })
+    return booting
   }
 
   function clearIdle() {
@@ -326,18 +387,20 @@ export async function createBgzfWorkerPool(
   }
 
   // `terminate()` rejects a worker's pending callbacks, so reaping mid-request
-  // fails a live query rather than reclaiming an idle pool. The case is two
-  // OVERLAPPING requests — `decompressBlocks` clears the timer on entry, so a
-  // single request in flight has no armed timer to go wrong; it is the arming
-  // when the first settles, while the second is still out, that would kill it.
-  //
-  // The check inside the callback is the load-bearing one (verified by removing
-  // each in turn: only dropping both fails the test). The one here just avoids
-  // arming a timer that would no-op, which a multi-chunk query would otherwise
-  // do once per chunk as each settles.
+  // would send a live query back to the calling thread rather than reclaim an
+  // idle pool. The case is two OVERLAPPING requests — `decompressBlocks` clears
+  // the timer on entry, so a single request in flight has no armed timer to go
+  // wrong; it is the arming when the first settles, while the second is still
+  // out, that would kill it. The check inside the callback is the load-bearing
+  // one; the one here avoids arming a timer that would no-op.
   function armIdle() {
     clearIdle()
-    if (destroyed || idleTimeoutMs <= 0 || inFlight > 0) {
+    if (
+      destroyed ||
+      idleTimeoutMs <= 0 ||
+      inFlight > 0 ||
+      workers.length === 0
+    ) {
       return
     }
     idleTimer = setTimeout(() => {
@@ -350,30 +413,32 @@ export async function createBgzfWorkerPool(
       }
       workers = []
     }, idleTimeoutMs)
-    // never hold a node process open on this; the browser's number has no unref
-    const timer: unknown = idleTimer
-    if (
-      typeof timer === 'object' &&
-      timer !== null &&
-      'unref' in timer &&
-      typeof timer.unref === 'function'
-    ) {
-      timer.unref()
-    }
+    unrefIfPossible(idleTimer)
   }
 
-  await spawn()
-  armIdle()
-
-  return {
+  const pool: BgzfWorkerPool = {
     async decompressBlocks(input, blocks) {
       if (destroyed) {
         throw new Error('Worker pool has been destroyed')
       }
+      if (workers.length === 0) {
+        if (!gaveUp) {
+          boot().catch(() => {
+            // giveUp has already turned the pool off; this call is inflating
+            // here either way
+          })
+        }
+        return inflateHere(input, blocks)
+      }
       clearIdle()
       inFlight++
       try {
-        return await run(input, blocks)
+        return await run(workers, input, blocks)
+      } catch (e) {
+        if (e instanceof WorkerFailure) {
+          return await inflateHere(input, blocks)
+        }
+        throw e
       } finally {
         inFlight--
         armIdle()
@@ -390,61 +455,86 @@ export async function createBgzfWorkerPool(
     },
   }
 
-  async function run(
-    input: PoolInput,
-    blocks: BgzfBlockInfo[],
-  ): Promise<DecompressResult> {
-    {
-      const workers = await ensureWorkers()
-      const numW = workers.length
-      const blocksPerWorker = Math.ceil(blocks.length / numW)
+  return { pool, boot }
+}
 
-      const rangeInfos: { startBlock: number; endBlock: number }[] = []
-      const promises: Promise<RangeResult>[] = []
+function splitBlocks(
+  decompressed: Uint8Array,
+  blocks: BgzfBlockInfo[],
+  startBlock: number,
+  endBlock: number,
+  out: Uint8Array[],
+) {
+  let offset = 0
+  for (let b = startBlock; b < endBlock; b++) {
+    const blockSize = blocks[b]!.decompressedSize
+    out[b] = decompressed.subarray(offset, offset + blockSize)
+    offset += blockSize
+  }
+}
 
-      const dispatchStart = performance.now()
-      for (let w = 0; w < numW; w++) {
-        const startBlock = w * blocksPerWorker
-        const endBlock = Math.min(startBlock + blocksPerWorker, blocks.length)
-        if (startBlock >= endBlock) {
-          continue
-        }
+/** The same blocks a worker would return, inflated on the calling thread. */
+async function inflateHere(
+  input: PoolInput,
+  blocks: BgzfBlockInfo[],
+): Promise<DecompressResult> {
+  const first = blocks[0]
+  const last = blocks.at(-1)
+  const resultBlocks = new Array<Uint8Array>(blocks.length)
+  if (first && last) {
+    const decompressed = await decompressAll(
+      input.subarray(first.inputOffset, last.inputOffset + last.compressedSize),
+    )
+    splitBlocks(decompressed, blocks, 0, blocks.length, resultBlocks)
+  }
+  return { blocks: resultBlocks }
+}
 
-        const firstBlock = blocks[startBlock]!
-        const lastBlock = blocks[endBlock - 1]!
-        const inputOffset = firstBlock.inputOffset
-        const inputLength =
-          lastBlock.inputOffset + lastBlock.compressedSize - inputOffset
+async function run(
+  workers: ManagedWorker[],
+  input: PoolInput,
+  blocks: BgzfBlockInfo[],
+): Promise<DecompressResult> {
+  const numW = workers.length
+  const blocksPerWorker = Math.ceil(blocks.length / numW)
 
-        rangeInfos.push({ startBlock, endBlock })
-        promises.push(
-          workers[w]!.decompressRange(input, inputOffset, inputLength),
-        )
-      }
+  const rangeInfos: { startBlock: number; endBlock: number }[] = []
+  const promises: Promise<RangeResult>[] = []
 
-      const rangeResults = await Promise.all(promises)
-      const dispatchMs = performance.now() - dispatchStart
-
-      const reassembleStart = performance.now()
-      const resultBlocks = new Array<Uint8Array>(blocks.length)
-      const workerTimings: WorkerTiming[] = []
-      for (let r = 0; r < rangeInfos.length; r++) {
-        const { startBlock, endBlock } = rangeInfos[r]!
-        const { data: decompressed, timing } = rangeResults[r]!
-        workerTimings.push(timing)
-        let offset = 0
-        for (let b = startBlock; b < endBlock; b++) {
-          const blockSize = blocks[b]!.decompressedSize
-          resultBlocks[b] = decompressed.subarray(offset, offset + blockSize)
-          offset += blockSize
-        }
-      }
-      const reassembleMs = performance.now() - reassembleStart
-
-      return {
-        blocks: resultBlocks,
-        timing: { workerTimings, dispatchMs, reassembleMs },
-      }
+  const dispatchStart = performance.now()
+  for (let w = 0; w < numW; w++) {
+    const startBlock = w * blocksPerWorker
+    const endBlock = Math.min(startBlock + blocksPerWorker, blocks.length)
+    if (startBlock >= endBlock) {
+      continue
     }
+
+    const firstBlock = blocks[startBlock]!
+    const lastBlock = blocks[endBlock - 1]!
+    const inputOffset = firstBlock.inputOffset
+    const inputLength =
+      lastBlock.inputOffset + lastBlock.compressedSize - inputOffset
+
+    rangeInfos.push({ startBlock, endBlock })
+    promises.push(workers[w]!.decompressRange(input, inputOffset, inputLength))
+  }
+
+  const rangeResults = await Promise.all(promises)
+  const dispatchMs = performance.now() - dispatchStart
+
+  const reassembleStart = performance.now()
+  const resultBlocks = new Array<Uint8Array>(blocks.length)
+  const workerTimings: WorkerTiming[] = []
+  for (let r = 0; r < rangeInfos.length; r++) {
+    const { startBlock, endBlock } = rangeInfos[r]!
+    const { data, timing } = rangeResults[r]!
+    workerTimings.push(timing)
+    splitBlocks(data, blocks, startBlock, endBlock, resultBlocks)
+  }
+  const reassembleMs = performance.now() - reassembleStart
+
+  return {
+    blocks: resultBlocks,
+    timing: { workerTimings, dispatchMs, reassembleMs },
   }
 }

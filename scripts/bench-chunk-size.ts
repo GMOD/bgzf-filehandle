@@ -16,8 +16,8 @@ import { startServer } from '../test/browser/serve.ts'
 
 const WORKERS = 4
 const ROUNDS = 15
-// 1 is a control: unzipChunkSlice declines the pool for a single-block chunk,
-// so that row must come out at 1.00x whatever else is going on.
+// Rows under POOL_MIN_DECOMPRESSED_BYTES are controls: unzipChunkSlice declines
+// the pool there, so they must come out at 1.00x whatever else is going on.
 const BLOCK_COUNTS = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
 
 const FILES = [

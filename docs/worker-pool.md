@@ -103,13 +103,19 @@ of 15 rounds, input sliced to the chunk the way `@gmod/bam` passes it):
 | 128    | 441KB-4MB  | 6.6-8.0MB    | 1.83x           | 2.05x          | 2.16x          | 0.83x          |
 | 256    | 911KB-8MB  | 13-16MB      | 1.58x           | —              | 1.68x          | 1.18x          |
 
-The single-block row is a control: `unzipChunkSlice` declines the pool outright
-there, so both arms run the same code and the spread off 1.00x is the noise
-floor — call it ±0.15x, and read no row as finer than that.
+The single-block row is a control: when this was measured `unzipChunkSlice`
+declined the pool only for a single block, so both arms of that row ran the same
+code and its spread off 1.00x is the noise floor — call it ±0.15x, and read no
+row as finer than that. These rows set the threshold below; a re-run now shows
+every row under it at 1.00x, since `unzipChunkSlice` declines the pool there
+too.
 
 - **It turns positive at four to eight blocks** — roughly 150-500KB compressed,
   0.2-0.5MB uncompressed. Below that the round trip and the input copy cost more
-  than the parallelism returns.
+  than the parallelism returns. So `unzipChunkSlice` hands a chunk to the pool
+  only from `POOL_MIN_DECOMPRESSED_BYTES`, 400,000 bytes inflated — the
+  eight-block row, where every BAM fixture had turned positive — and a shared
+  pool that never sees a chunk that large never starts its workers.
 - **It has most of its value by sixteen to thirty-two blocks**, around 1-2MB of
   uncompressed chunk, and the ratio is flat after that. So a query does not have
   to be large to collect this — but past a couple of MB, growing the region
@@ -249,12 +255,15 @@ const pool = await getSharedWorkerPool() // undefined if workers are unavailable
 There are three entry points:
 
 - **`getSharedWorkerPool(numWorkers?, idleTimeoutMs?)`** — one process-wide
-  pool, created on the first call and reused after that. `numWorkers` defaults
+  pool, created on the first call and reused after that. It starts no workers
+  until a call reaches it, so holding one costs nothing. `numWorkers` defaults
   to `Math.min(navigator.hardwareConcurrency, 4)`, and both arguments apply only
   to the call that actually creates the pool.
 - **`createBgzfWorkerPool(numWorkers?, workerUrl?, idleTimeoutMs?)`** — an
   unshared pool you own, for setting the worker count per pool or managing the
-  lifecycle yourself.
+  lifecycle yourself. It resolves once its workers are up, and rejects if one
+  fails to start. A worker the browser never starts leaves it pending, which
+  `getSharedWorkerPool` never does to a caller.
 - **`destroySharedWorkerPool()`** — terminates the shared pool's workers. The
   next `getSharedWorkerPool()` builds a fresh one.
 
@@ -309,8 +318,9 @@ interface, so they are all an alternative implementation has to provide.
 ## The pool reaps idle workers
 
 After `idleTimeoutMs` (default 3 minutes) with nothing to inflate, a pool
-terminates its workers, and spawns a fresh set on the next call. Pass `0` to
-keep them up for the pool's lifetime instead.
+terminates its workers, and starts a fresh set on the next call, which inflates
+on the calling thread while they boot. Pass `0` to keep them up for the pool's
+lifetime instead.
 
 **The reap is invisible to whoever holds the pool, and that is a requirement
 rather than a nicety.** Consumers keep a pool around — `@gmod/bam` stores the
@@ -331,8 +341,41 @@ thing an idle pool was keeping.
 `decompressBlocks` clears the timer on entry, so a lone request has no armed
 timer to go wrong. The case that needs care is two overlapping requests: when
 the first settles, it would rearm the timer and terminate the second request's
-workers mid-flight — and since `terminate()` rejects a worker's pending
-callbacks, that would fail the live query rather than merely slow it down.
+workers mid-flight, throwing away the second request's work and inflating it
+again on the calling thread.
+
+## A worker that fails never hangs a read
+
+No call waits on a worker to boot. While a pool's workers are starting — on the
+first call to reach a shared pool, or the first after an idle reap —
+`decompressBlocks` inflates on the calling thread and returns the same blocks.
+
+A worker that raises an `error` event or sends a reply this thread cannot
+deserialize turns the pool off for good, and a request it had in flight goes
+back to the calling thread. Every later call inflates there as well, which is
+the path every consumer already runs without a pool. A decompression error a
+worker reports against its batch is about the data rather than the worker, so it
+still rejects.
+
+Before this, the pool awaited every worker's `ready` and nothing listened for a
+worker's `error`, so one worker that never started left every reader awaiting
+the pool pending for the life of the page. Firefox queues a worker past
+`dom.workers.maxPerDomain` and raises nothing, and a machine short of memory can
+fail to start the thread and raise only `error`. In JBrowse either was a track
+stuck at "Downloading features 0%".
+
+**A worker that never starts is left alone rather than timed out.** Firefox
+freezes the page when terminating a running worker lets it start one it had
+queued past `dom.workers.maxPerDomain` — reproduced in Firefox Nightly build
+20260414 with plain workers and no pool code — and a queued worker is the usual
+reason one never comes up, so a deadline's cleanup would turn a slow track into
+a frozen tab. A queued worker that starts later is adopted then; until it does,
+calls inflate on the calling thread.
+
+The pool calls `preventDefault()` on the `error` it handles. Left to propagate,
+a pool worker's error reaches the scope that created it, and inside a data
+worker that is the worker's global `onerror` — which a host reads as the data
+worker dying, failing every call it has in flight.
 
 ## Sharing one pool across threads
 
