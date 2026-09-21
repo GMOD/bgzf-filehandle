@@ -1,3 +1,51 @@
+## [6.7.0](https://github.com/GMOD/bgzf-filehandle/compare/v6.6.0...v6.7.0) (2026-09-21)
+
+### Bug Fixes
+
+- A pool whose workers fail never hangs a read, and small chunks never boot one ([644520c](https://github.com/GMOD/bgzf-filehandle/commit/644520c78f5a641a90cd4ec2d3351c38341cff44))
+
+### Chores
+
+- Keep agent worktrees out of the toolchain's way ([c22643d](https://github.com/GMOD/bgzf-filehandle/commit/c22643dd4638921d63ed5413e0e83545dfeb2f34))
+- Build each ref in a worktree, with pnpm ([6f93d2c](https://github.com/GMOD/bgzf-filehandle/commit/6f93d2c3d6bd7443c99ee2e4b081f407e762bd4a))
+- Install each ref with --frozen-lockfile ([2542de7](https://github.com/GMOD/bgzf-filehandle/commit/2542de79c36b0074fab15d3df8911404ab40366f))
+
+### Documentation
+
+- Tighten the README ([4344324](https://github.com/GMOD/bgzf-filehandle/commit/4344324b3968502f1bd568598710e138c89bf914))
+- Link the build badge, document scanBgzfBlocks, move benches to CONTRIBUTING ([a8b323b](https://github.com/GMOD/bgzf-filehandle/commit/a8b323b7d9a90587f0a05f20ae7f249b4087f9ab))
+- Say which benchmark needs pnpm bench, and why ([b07fe04](https://github.com/GMOD/bgzf-filehandle/commit/b07fe0460e460a29c18f0de702cbc977050379e6))
+- Explain what libdeflate is and why, with a pako benchmark ([55c1e96](https://github.com/GMOD/bgzf-filehandle/commit/55c1e964c20a9984692650d6ee638745575a0b47))
+- Restructure worker-pool.md for readability ([79f4b1e](https://github.com/GMOD/bgzf-filehandle/commit/79f4b1eb87e3a325a0eaca4c821dfc3782358a7b))
+- Note the pako fallback, and document local.bench.ts ([8995426](https://github.com/GMOD/bgzf-filehandle/commit/8995426cc57489272d9e0ae5a2b42fa982d5b8c5))
+- Say blockConcurrency counts requests, not threads ([61e7149](https://github.com/GMOD/bgzf-filehandle/commit/61e7149d1bb98b937c4ffa6a8bfe3afd61bbfb6c))
+- Add optimizations.md, and say what the 70-90% is a share of ([e594cae](https://github.com/GMOD/bgzf-filehandle/commit/e594cae1532b4eff0d73ad1f85b3ae0c28b1ccd3))
+- Name transferables where the pool is described, and tighten ([4de9218](https://github.com/GMOD/bgzf-filehandle/commit/4de921833fb1fcedf0feae741525a29280e788f4))
+- Simplify README, link MDN transferables ([2a52985](https://github.com/GMOD/bgzf-filehandle/commit/2a529850e9a82a13a998248aeb76f8f79a27b3b4))
+- Restructure optimizations.md, link libdeflate ([213bbb8](https://github.com/GMOD/bgzf-filehandle/commit/213bbb8eb5769fd4d6d6b9fc10eecd3bcb52888c))
+- Cut worker-pool duplication, stamp the bench table, note the over-read ([53248e9](https://github.com/GMOD/bgzf-filehandle/commit/53248e9e6e11bb05b859b734317f98399447cc5a))
+- Answer "why not DecompressionStream" with a measured bench arm ([1a909d8](https://github.com/GMOD/bgzf-filehandle/commit/1a909d825e24e00508b68dcce956010867ecebb2))
+- Link bbi-js's crate, and correct the sibling DecompressionStream numbers ([0e8c501](https://github.com/GMOD/bgzf-filehandle/commit/0e8c501486319a74f9897bd28057c6a645bc02bc))
+- Measure the worker pool, and correct the speedup it claimed ([a538f1b](https://github.com/GMOD/bgzf-filehandle/commit/a538f1baa98865c76a4a42c0663e294248a774d9))
+- Smooth the prose in optimizations.md ([00fafd6](https://github.com/GMOD/bgzf-filehandle/commit/00fafd6b2cdddd81d1631241fddd23ada2335bbe))
+- Put optimizations.md in the active voice ([74e179a](https://github.com/GMOD/bgzf-filehandle/commit/74e179a9c4db5dbc13d1b932b8e878763d9110aa))
+- Measure the pool against chunk size, and out where it saves seconds ([9c2843f](https://github.com/GMOD/bgzf-filehandle/commit/9c2843f8f346d9f307be5d220d179f43bd5dc6ab))
+- Trim optimizations.md ([07b47d2](https://github.com/GMOD/bgzf-filehandle/commit/07b47d2ec72c33c22f0a724492d4e9e4ab146c73))
+- Put the README and worker-pool doc in the active voice ([9dcabce](https://github.com/GMOD/bgzf-filehandle/commit/9dcabce9d13b63b11bcccde2beebbdbf48740afb))
+- Sweep worker count at scale — four is not where the curve flattens ([0ad246c](https://github.com/GMOD/bgzf-filehandle/commit/0ad246c593a837156b59627144a40bc8d4fc648b))
+- Describe the release gate CONTRIBUTING actually runs ([72cec4e](https://github.com/GMOD/bgzf-filehandle/commit/72cec4e805a1cacfbb66560b886fec5c1ce7a07e))
+- Define chunk and BGZF block, and say which one 'block' means ([5dad6b6](https://github.com/GMOD/bgzf-filehandle/commit/5dad6b6cdebb35a154206e17c4df505e59341ce3))
+- Export Chunk and VirtualOffset, and document what a block scan returns ([fc59398](https://github.com/GMOD/bgzf-filehandle/commit/fc5939845af2390fb8980b7458fddbaa2af5a884))
+- Point remote readers at @gmod/range-cache-filehandle ([2d621aa](https://github.com/GMOD/bgzf-filehandle/commit/2d621aa8291851d53df0a42d2b290bf5b41a3605))
+- Say it in full sentences ([0bd6b38](https://github.com/GMOD/bgzf-filehandle/commit/0bd6b38c4756bb21ce7e87aae8bfb21ed3c1ccff))
+- Fix anti-AI prose tropes (changelog framing, cleft, Title Case heading, "So"/"Nothing" openers) ([c8aae25](https://github.com/GMOD/bgzf-filehandle/commit/c8aae255f4c6d30d0025e083b78082ac2b5191ca))
+- Fix inanimate-subject agency and figures of speech, correct two claims ([99c53ae](https://github.com/GMOD/bgzf-filehandle/commit/99c53ae40fb501d8de553794cc45bfc5dcc41a59))
+
+### Other Changes
+
+- Pin the wasm-vs-JS inflate ratio, which nothing measured ([0b39859](https://github.com/GMOD/bgzf-filehandle/commit/0b3985985473132ac7b53a9b6e8a5ca450279962))
+- Format ([3ca3438](https://github.com/GMOD/bgzf-filehandle/commit/3ca3438b6f4c3baabcc264940a1598dc6ea0b1c6))
+
 ## [6.6.0](https://github.com/GMOD/bgzf-filehandle/compare/v6.5.0...v6.6.0) (2026-08-12)
 
 ### Features
