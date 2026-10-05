@@ -122,7 +122,7 @@ already `.slice()`s out of the heap, but its string path did not, so in a
 browser every error message the module produced failed to decode: a
 `WebAssembly.Memory` buffer is resizable, and `TextDecoder` refuses views over
 those. `crate/build-wasm.sh` patches it after `wasm-bindgen` runs
-([ADR 0002](../agent-docs/adr/0002-copy-out-of-wasm-memory-before-decoding-strings.md)).
+([ADR 0002](../agent-docs/architecture-decision-records/0002-copy-out-of-wasm-memory-before-decoding-strings.md)).
 The symptom misleads badly, so learn it: a `TypeError` naming a buffer type,
 with no bgzf frame in the stack, appearing and disappearing with the input file
 rather than the code — which leads you to bisect the data instead of the
@@ -133,7 +133,7 @@ temporary `Vec` in `decompress_all` measures 3-4% on a 5.2MB file, the noise
 floor — libdeflate's decode plus the one boundary copy make up the cost, and the
 change touches neither. It also splits a helper `decompress_chunk_slice` needs
 and churns the tracked wasm bundle
-([ADR 0001](../agent-docs/adr/0001-decompress-into-output-buffer.md)). That ADR
+([ADR 0001](../agent-docs/architecture-decision-records/0001-decompress-into-output-buffer.md)). That ADR
 carries the benchmarking lesson behind a spurious "26% faster" result:
 **alternate the run order**, or a cold CPU measures frequency scaling rather
 than code.
