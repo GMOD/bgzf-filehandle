@@ -23,9 +23,9 @@ The docs here lean on three words, and two of them mean something narrower than
 they sound:
 
 - **BGZF block** — bgzip files are so called 'multi-member gzip files',
-  basically indepently compressed gzip blocks that are concatenated together.
-  https://www.htslib.org/doc/bgzip.html they are at most 64KB compressed, its
-  trailer recording its own uncompressed length. Blocks decode independently of
+  basically independently compressed gzip blocks that are concatenated together
+  (https://www.htslib.org/doc/bgzip.html). Each is at most 64KB compressed, and
+  its trailer records its uncompressed length. Blocks decode independently of
   each other, enabling both random access and the worker pool. A bare "block"
   always means this one, never a deflate block.
 - **Virtual offset** — `{blockPosition, dataPosition}`: which BGZF block, and
