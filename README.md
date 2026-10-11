@@ -11,11 +11,13 @@ as those created by bgzip, using coordinates from the uncompressed file.
 
 Decompression runs on [libdeflate](https://github.com/ebiggers/libdeflate),
 compiled to WebAssembly and inlined in the bundle as base64, so there is no
-`.wasm` file to serve. On this repo's fixtures it inflates two to three times
-faster than pako, and about twice as fast as the browser's own
-`DecompressionStream` — tables and reasoning, including
-[why not just use `DecompressionStream`](docs/optimizations.md#why-not-decompressionstream-for-everything),
-in [docs/optimizations.md](docs/optimizations.md).
+`.wasm` file to serve.
+
+- On this repo's fixtures it inflates two to three times faster than pako, and
+  about twice as fast as the browser's `DecompressionStream`.
+- Tables and reasoning, including
+  [why not just use `DecompressionStream`](docs/optimizations.md#why-not-decompressionstream-for-everything),
+  are in [docs/optimizations.md](docs/optimizations.md).
 
 ## Terms
 
@@ -65,9 +67,8 @@ range and inflates in one call.
 
 When the file is remote, pass
 [`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle)
-as the filehandle. Each of those contiguous ranges is then cached in 256 KiB
-chunks, so a later read that overlaps one already fetched is served from memory
-instead of the network.
+as the filehandle. It caches each contiguous range in 256 KiB chunks, so a later
+read that overlaps one already fetched comes from memory instead of the network.
 
 ## unzip
 
@@ -112,10 +113,13 @@ coordinates, for generating stable feature IDs across chunk boundaries.
 ## Worker pool
 
 `unzipChunkSlice` takes an optional pool that spreads a chunk's blocks across
-Web Workers — close to linear to about four workers. Bytes cross as
-[transferable objects](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Transferable_objects)
-rather than copies, so the handoff costs the same whatever the size and needs no
-cross-origin isolation:
+Web Workers.
+
+- Speedup is close to linear to about four workers.
+- Bytes cross as
+  [transferable objects](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Transferable_objects)
+  rather than copies, so the handoff costs the same whatever the size.
+- No cross-origin isolation is needed.
 
 ```typescript
 import { getSharedWorkerPool, unzipChunkSlice } from '@gmod/bgzf-filehandle'
@@ -124,15 +128,17 @@ const pool = await getSharedWorkerPool() // undefined if Workers are unavailable
 const result = await unzipChunkSlice(compressedData, chunk, pool)
 ```
 
-A chunk under 0.4MB inflated stays on the calling thread, where a worker costs
-more than it returns, so a shared pool starts its workers only once a larger one
-arrives. No read waits on them: a pool inflates on the calling thread while its
-workers boot, and for good if one of them fails.
+- A chunk under 0.4MB inflated stays on the calling thread, where a worker costs
+  more than it returns. A shared pool starts its workers only once a larger
+  chunk arrives.
+- No read waits on workers. A pool inflates on the calling thread while its
+  workers boot, and for good if one of them fails.
+- Passing `undefined` keeps the sequential wasm path, so the pool is safe to
+  pass unconditionally. Readers that take a pool of their own (`@gmod/bam`'s
+  `bgzfWorkerPool`) accept the same value.
 
-Safe to pass unconditionally — `undefined` keeps the sequential wasm path, and
-readers that take a pool of their own (`@gmod/bam`'s `bgzfWorkerPool`) accept
-the same value. Worker counts, cross-thread sharing, lifecycle and driving a
-pool directly: [docs/worker-pool.md](docs/worker-pool.md).
+Worker counts, cross-thread sharing, lifecycle and driving a pool directly are
+in [docs/worker-pool.md](docs/worker-pool.md).
 
 ## Docs
 
