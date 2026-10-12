@@ -14,7 +14,9 @@ if [ "$INSTALLED" != "$REQUIRED" ]; then
   fi
 fi
 
-cargo build --release --target wasm32-unknown-unknown
+# keeps this machine's ~/.cargo path out of the panic locations the wasm embeds
+RUSTFLAGS="--remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo" \
+  cargo build --release --target wasm32-unknown-unknown
 wasm-bindgen --target bundler --out-dir pkg target/wasm32-unknown-unknown/release/bgzf_wasm.wasm
 
 # wasm-bindgen emits `getStringFromWasm0` as a TextDecoder.decode over a
