@@ -133,8 +133,8 @@ temporary `Vec` in `decompress_all` measures 3-4% on a 5.2MB file, the noise
 floor — libdeflate's decode plus the one boundary copy make up the cost, and the
 change touches neither. It also splits a helper `decompress_chunk_slice` needs
 and churns the tracked wasm bundle
-([ADR 0001](../agent-docs/architecture-decision-records/0001-decompress-into-output-buffer.md)). That ADR
-carries the benchmarking lesson behind a spurious "26% faster" result:
+([ADR 0001](../agent-docs/architecture-decision-records/0001-decompress-into-output-buffer.md)).
+That ADR carries the benchmarking lesson behind a spurious "26% faster" result:
 **alternate the run order**, or a cold CPU measures frequency scaling rather
 than code.
 
