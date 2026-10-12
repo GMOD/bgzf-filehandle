@@ -22,19 +22,18 @@ check_tarball_contents() {
   local listing
   listing="$(tar tzf "$SCRATCH/$TARBALL")"
 
-  # (1) webpack's worker intermediate. It used to be written into src/wasm/,
-  # where tsc picked it up and copied it into esm/ and dist/ as well — three
-  # copies plus two sourcemaps of a file nothing imports. It now goes to a
-  # gitignored build/; one appearing here means that broke.
+  # (1) build intermediates. Only the wasm bundle and the worker source module
+  # belong in wasm/. webpack's worker bundle goes to the gitignored build/ and
+  # wasm-bindgen's glue and .wasm to crate/pkg/; under src/wasm, tsc would
+  # publish each three times, as every release from 6.0.1 through 6.7.0 did.
   #
-  # `-worker-inlined`, not `-inlined`, unlike cram-js's copy: this repo also
-  # ships `bgzf-wasm-inlined.js`, which IS a real artifact — the wasm bundle
-  # every consumer imports — and the broader pattern would reject the package
-  # for containing the thing it exists to contain.
+  # A whitelist, unlike cram-js's `-inlined` pattern: this repo ships
+  # `bgzf-wasm-inlined.js` on purpose, and that pattern would reject it.
   local intermediates
-  intermediates="$(grep -E '\-worker-inlined\.js(\.map)?$' <<<"$listing" || true)"
+  intermediates="$(grep '/wasm/' <<<"$listing" |
+    grep -vE '/wasm/bgzf-(wasm-inlined|worker-source)\.' || true)"
   if [ -n "$intermediates" ]; then
-    echo "error: build intermediates in the tarball; webpack should write these to build/, not src/wasm/:" >&2
+    echo "error: build intermediates in the tarball's wasm/ dirs; they belong in build/ or crate/pkg/:" >&2
     echo "$intermediates" >&2
     return 1
   fi

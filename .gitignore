@@ -8,6 +8,7 @@ test/data/extended/
 esm
 esm_*/
 crate/target
+crate/pkg/
 build/
 .claude/settings.local.json
 .claude/worktrees/

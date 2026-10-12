@@ -1,6 +1,6 @@
 // Import the WASM binary as base64 data URL
-import wasmData from '../../src/wasm/bgzf_wasm_bg.wasm'
-import * as bg from '../../src/wasm/bgzf_wasm_bg.js'
+import wasmData from '../pkg/bgzf_wasm_bg.wasm'
+import * as bg from '../pkg/bgzf_wasm_bg.js'
 
 let wasm = null
 let initPromise = null
