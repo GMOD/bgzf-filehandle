@@ -21,16 +21,6 @@ uncompressed coordinates. [@gmod/bam](https://github.com/GMOD/bam-js),
 npm install @gmod/bgzf-filehandle
 ```
 
-## Terms
-
-- **BGZF block**: one gzip member of a bgzip file, at most 64KB compressed. A
-  decoder can inflate it without the others. A bare "block" always means this,
-  never a deflate block
-- **Virtual offset**: `{blockPosition, dataPosition}`, a BGZF block's file
-  offset plus a position in its decompressed bytes
-- **Chunk**: `{minv, maxv}`, a range between two virtual offsets, as a BAM or
-  tabix index returns them
-
 ## BgzfFilehandle
 
 ```typescript
@@ -61,7 +51,8 @@ const decompressed = await unzip(compressedData)
 
 ## unzipChunkSlice
 
-Decompresses a chunk and slices out its bytes:
+Decompresses a chunk `{minv, maxv}` from a BAI or TBI index, where each end is a
+virtual offset `{blockPosition, dataPosition}`:
 
 ```typescript
 import { MAX_BGZF_BLOCK_SIZE, unzipChunkSlice } from '@gmod/bgzf-filehandle'
@@ -77,34 +68,25 @@ const { buffer, cpositions, dpositions } = await unzipChunkSlice(
 )
 ```
 
-`cpositions` and `dpositions` hold the block boundaries in compressed and
-decompressed coordinates, for building feature IDs that stay stable across
-chunks.
+`cpositions` and `dpositions` hold block boundaries, for building feature IDs
+that stay stable across chunks.
 
-## Worker pool
-
-Pass a pool to spread a chunk's blocks across Web Workers:
+A third argument spreads the blocks across Web Workers, which makes a
+multi-megabyte chunk 1.1-2.0x faster
+([docs/worker-pool.md](docs/worker-pool.md)):
 
 ```typescript
-import { getSharedWorkerPool, unzipChunkSlice } from '@gmod/bgzf-filehandle'
+import { getSharedWorkerPool } from '@gmod/bgzf-filehandle'
 
 const pool = await getSharedWorkerPool() // undefined without Worker support
-const result = await unzipChunkSlice(compressedData, chunk, pool)
+const result = await unzipChunkSlice(compressedData, { minv, maxv }, pool)
 ```
-
-- A multi-megabyte chunk decodes 1.1-2.0x faster with four workers
-- Chunks under 0.4MB inflated stay on the calling thread, as does everything
-  while the workers boot, so a read never waits on a worker
-- No cross-origin isolation is needed
-
-[docs/worker-pool.md](docs/worker-pool.md) covers sizing, lifecycle and
-measurements.
 
 ## Docs
 
-- [docs/optimizations.md](docs/optimizations.md): benchmarks, including
+- [docs/optimizations.md](docs/optimizations.md): terms, benchmarks, and
   [why not `DecompressionStream`](docs/optimizations.md#why-not-decompressionstream-for-everything)
-- [docs/worker-pool.md](docs/worker-pool.md): the worker pool
+- [docs/worker-pool.md](docs/worker-pool.md): sizing, lifecycle and measurements
 - [CONTRIBUTING.md](CONTRIBUTING.md): development and releases
 
 ## Academic use
