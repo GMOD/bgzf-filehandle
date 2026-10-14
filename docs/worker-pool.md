@@ -79,7 +79,7 @@ The tables show four things:
   inside wasm as part of the same call. That concatenation is a memcpy of the
   whole **decompressed** output, which measured 0.7-1.2 GB/s here, and adding
   workers does not shorten it. The memcpy grows with the uncompressed size
-  rather than the compressed size, so it is largest where compression is best.
+  rather than the compressed size, so it is worst where compression is best.
   out.sorted.gff.gz is 5.0MB in and 92.8MB out, reassembly is 58% of its
   four-worker call, and end to end it never reaches 1.3x however many workers
   you add. Reassembly is 23-36% of the four-worker call for the other three
@@ -147,7 +147,7 @@ The table uses four workers, min of 7:
 | shortreads_300x.bam       | 6314   | 107MB      | 389MB        | 0.97s | 0.55s | 1.77x   | 0.42s |
 
 The multiple stays at 1.8-2.1x on long-read BAM across two orders of magnitude
-of chunk size, so the saving grows with the query, to **roughly 0.9s off a 1.8s
+of chunk size, so the saving scales with the query, to **roughly 0.9s off a 1.8s
 inflate at 373MB uncompressed**, or 1.1-2.3ms per MB of output. The jbrowse
 figure below comes from chunks of this size. On deep data like this the pool
 saves enough to justify its threads, even though its effect on a 0.3MB fixture

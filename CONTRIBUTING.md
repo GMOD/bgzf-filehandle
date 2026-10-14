@@ -35,7 +35,7 @@ path against pako and native zlib, and `local.bench.ts` measures the layers
 above inflate — `unzipChunkSlice`, `BgzfFilehandle.read`, and the plain-gzip
 fallback.
 
-`unzip.bench.ts` compares two refs instead, so it needs `pnpm bench`, which
+`unzip.bench.ts` instead compares two refs, so it needs `pnpm bench`, which
 first builds each ref into `esm_branch1/` and `esm_branch2/` (`origin/main` and
 the current HEAD by default; set `BRANCH1`/`BRANCH2` to pick others). The script
 builds each ref as committed, in a throwaway worktree, so it does not measure
@@ -43,9 +43,9 @@ uncommitted work.
 
 ## Releasing
 
-`pnpm version patch/minor/major` runs `check:wasm`, lint, format, types, tests,
-build and `test:pack`, regenerates CHANGELOG.md with git-cliff, then pushes the
-version tag, which triggers the publish workflow.
+Use `pnpm version patch/minor/major` — it runs `check:wasm`, lint, format,
+types, tests, build and `test:pack`, regenerates CHANGELOG.md with git-cliff,
+then pushes the version tag, which triggers the publish workflow.
 
 The publish workflow uses npm trusted publishing (OIDC, no stored token), which
 requires `--provenance` and `id-token: write` permissions.

@@ -21,8 +21,8 @@ compiled to WebAssembly and inlined in the bundle as base64, so there is no
 
 ## Terms
 
-The docs here use three terms, and two of them have a narrower meaning than
-usual:
+The docs here use three terms, and two of them mean something narrower than they
+sound:
 
 - **BGZF block** — bgzip files are so called 'multi-member gzip files',
   basically independently compressed gzip blocks that are concatenated together
@@ -68,8 +68,8 @@ one contiguous range and inflates them in one call.
 
 When the file is remote, pass
 [`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle)
-as the filehandle. The cache stores each contiguous range in 256 KiB chunks and
-answers a later read that overlaps an already fetched chunk from memory.
+as the filehandle. It caches each contiguous range in 256 KiB chunks, so a later
+read that overlaps one already fetched comes from memory instead of the network.
 
 ## unzip
 

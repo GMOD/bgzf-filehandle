@@ -3,7 +3,7 @@
 Inflating BGZF blocks is 70-90% of the wall clock of an uncached `@gmod/bam`
 query
 ([bam-js ADR 0003](https://github.com/GMOD/bam-js/blob/main/agent-docs/architecture-decision-records/0003-where-bam-query-time-goes.md)),
-so a reader spends most of its time in this package's decompression.
+so this package's decompression is where most of a reader's time goes.
 
 The codec already runs close to native speed, so the optimizations below change
 the structure around it rather than the decoding. They address three questions:
@@ -153,8 +153,9 @@ The rest of the read path works as follows:
   limits the growth of the wasm heap rather than network use. Without it, one
   enormous read decompresses whole into the heap and leaves the heap that size.
 - **`blockConcurrency` (default 10) caps how many batch requests are in
-  flight**; it limits requests, not threads. No benchmark chose this default or
-  the 32MB batch size, so tune from them rather than treat them as optima.
+  flight**; it limits requests, not threads. Neither it nor the 32MB batch size
+  rests on a benchmark, so treat them as defaults to tune from rather than an
+  optimum.
 - **The last batch over-reads by one maximum-size block.** A `.gzi` records
   where each block starts, not how long it is, so a reader can bound the end of
   the final block but never know it. Reading `MAX_BGZF_BLOCK_SIZE` bytes past
@@ -211,4 +212,4 @@ chunks by virtual-offset span, share reads still in flight, and take a
 [bam-js's optimizations doc](https://github.com/GMOD/bam-js/blob/main/docs/optimizations.md)
 and
 [tabix-js's](https://github.com/GMOD/tabix-js/blob/main/docs/optimizations.md)
-describe those query paths.
+walk through those query paths.
