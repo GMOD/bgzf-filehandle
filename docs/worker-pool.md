@@ -349,12 +349,16 @@ While a pool's workers are starting, on the first call to reach a shared pool or
 the first after an idle reap, `decompressBlocks` inflates on the calling thread
 and returns the same blocks, so no call waits for a worker to boot.
 
-A worker that raises an `error` event, sends a reply this thread cannot
-deserialize, fails to load its wasm, or traps inside it turns the pool off for
-good, and a request it had in flight goes back to the calling thread. Every
-later call inflates there as well, which is the path every consumer already runs
-without a pool. A decompression error that a worker reports against its batch
-points to bad data rather than a broken worker, so the call still rejects.
+A broken worker turns the pool off for good, and its in-flight request and every
+later call inflate on the calling thread, the path every consumer runs without a
+pool. A worker counts as broken when it:
+
+- raises an `error` event
+- sends a reply this thread cannot deserialize
+- fails to load its wasm, or traps inside it
+
+A decompression error that a worker reports against its batch points to bad data
+rather than a broken worker, so the call still rejects.
 
 Before the fallback existed, the pool awaited every worker's `ready` and had no
 listener for a worker's `error`, so one worker that never started left every

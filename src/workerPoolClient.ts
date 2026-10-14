@@ -39,8 +39,7 @@ export class BgzfWorkerPoolClient implements BgzfWorkerPool {
     this.port.onmessageerror = () => {
       this.loseHost()
     }
-    // Chrome and node raise `close` when the host's end goes away, including
-    // with its thread; elsewhere the host's `closed` message is the only notice
+    // raised only in Chrome and node
     this.port.addEventListener('close', () => {
       this.loseHost()
     })
@@ -68,9 +67,16 @@ export class BgzfWorkerPoolClient implements BgzfWorkerPool {
       return
     }
     this.hostGone = true
+    this.port.close()
     for (const [key, req] of this.pending) {
       this.pending.delete(key)
-      inflateHere(req.input, req.blocks).then(req.resolve, req.reject)
+      inflateHere(req.input, req.blocks).then(result => {
+        if (this.destroyed) {
+          req.reject(new Error('Client destroyed'))
+        } else {
+          req.resolve(result)
+        }
+      }, req.reject)
     }
   }
 

@@ -8,8 +8,6 @@ interface HostRequest {
   blocks: BgzfBlockInfo[]
 }
 
-// a client with requests out would otherwise wait on them forever, since only
-// some browsers raise `close` on the far end of a port
 function closePort(port: MessagePort) {
   port.postMessage({ type: 'closed' })
   port.close()

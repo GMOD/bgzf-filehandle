@@ -313,8 +313,6 @@ async function init() {
       __wbg_set_wasm(wrapper_wasm)
       return wrapper_wasm
     })().catch(error => {
-      // a failed instantiate (memory pressure, say) is worth retrying on the
-      // next call rather than caching as a failure for the life of the module
       initPromise = null
       throw error
     })

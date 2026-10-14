@@ -1,8 +1,6 @@
 import { decompressAll, init } from './wrapper.js'
 
-// A trap (a failed allocation under panic=abort) or a JS allocation failure is
-// this worker failing, not the data. Replying without a batchId tells the pool
-// so, and the pool inflates on the calling thread rather than rejecting.
+// replied without a batchId, which the pool reads as the worker failing
 function isWorkerFault(error) {
   return (
     error instanceof WebAssembly.RuntimeError || error instanceof RangeError

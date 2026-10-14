@@ -20,8 +20,6 @@ export async function init() {
       bg.__wbg_set_wasm(wasm)
       return wasm
     })().catch(error => {
-      // a failed instantiate (memory pressure, say) is worth retrying on the
-      // next call rather than caching as a failure for the life of the module
       initPromise = null
       throw error
     })
