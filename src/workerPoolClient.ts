@@ -1,3 +1,5 @@
+import { inflateHere } from './inflateBlocks.ts'
+
 import type { BgzfBlockInfo } from './bgzfBlockScan.ts'
 import type {
   BgzfWorkerPool,
@@ -8,34 +10,67 @@ import type {
 type HostResponse =
   | { type: 'decompressResult'; requestId: number; blockData: Uint8Array[] }
   | { type: 'error'; requestId: number; message?: string }
+  | { type: 'closed' }
 
 interface PendingRequest {
-  resolve: (blocks: Uint8Array[]) => void
+  input: PoolInput
+  blocks: BgzfBlockInfo[]
+  resolve: (result: DecompressResult) => void
   reject: (err: Error) => void
 }
 
+/**
+ * A pool on another thread, reached over a `MessagePort` from
+ * {@link createPoolPort}. Once the host is gone, every call, including any
+ * still waiting on it, inflates on this thread instead.
+ */
 export class BgzfWorkerPoolClient implements BgzfWorkerPool {
   private port: MessagePort
   private nextRequestId = 0
   private pending = new Map<number, PendingRequest>()
+  private hostGone = false
+  private destroyed = false
 
   constructor(port: MessagePort) {
     this.port = port
     this.port.onmessage = e => {
       this.handleResponse(e.data)
     }
+    this.port.onmessageerror = () => {
+      this.loseHost()
+    }
+    // Chrome and node raise `close` when the host's end goes away, including
+    // with its thread; elsewhere the host's `closed` message is the only notice
+    this.port.addEventListener('close', () => {
+      this.loseHost()
+    })
     this.port.start()
   }
 
   private handleResponse(resp: HostResponse) {
-    const cb = this.pending.get(resp.requestId)
-    if (cb) {
+    if (resp.type === 'closed') {
+      this.loseHost()
+      return
+    }
+    const req = this.pending.get(resp.requestId)
+    if (req) {
       this.pending.delete(resp.requestId)
       if (resp.type === 'decompressResult') {
-        cb.resolve(resp.blockData)
+        req.resolve({ blocks: resp.blockData })
       } else {
-        cb.reject(new Error(resp.message ?? 'pool decompression failed'))
+        req.reject(new Error(resp.message ?? 'pool decompression failed'))
       }
+    }
+  }
+
+  private loseHost() {
+    if (this.hostGone) {
+      return
+    }
+    this.hostGone = true
+    for (const [key, req] of this.pending) {
+      this.pending.delete(key)
+      inflateHere(req.input, req.blocks).then(req.resolve, req.reject)
     }
   }
 
@@ -43,9 +78,15 @@ export class BgzfWorkerPoolClient implements BgzfWorkerPool {
     input: PoolInput,
     blocks: BgzfBlockInfo[],
   ): Promise<DecompressResult> {
+    if (this.destroyed) {
+      throw new Error('Client destroyed')
+    }
+    if (this.hostGone) {
+      return inflateHere(input, blocks)
+    }
     const requestId = this.nextRequestId++
-    const promise = new Promise<Uint8Array[]>((resolve, reject) => {
-      this.pending.set(requestId, { resolve, reject })
+    const promise = new Promise<DecompressResult>((resolve, reject) => {
+      this.pending.set(requestId, { input, blocks, resolve, reject })
     })
 
     // One copy so the transfer detaches a buffer we own rather than the
@@ -63,15 +104,15 @@ export class BgzfWorkerPoolClient implements BgzfWorkerPool {
       [owned.buffer],
     )
 
-    const resultBlocks = await promise
-    return { blocks: resultBlocks }
+    return promise
   }
 
   destroy() {
+    this.destroyed = true
     this.port.close()
-    for (const [key, cb] of this.pending) {
+    for (const [key, req] of this.pending) {
       this.pending.delete(key)
-      cb.reject(new Error('Client destroyed'))
+      req.reject(new Error('Client destroyed'))
     }
   }
 }

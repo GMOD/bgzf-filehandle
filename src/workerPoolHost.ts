@@ -8,6 +8,13 @@ interface HostRequest {
   blocks: BgzfBlockInfo[]
 }
 
+// a client with requests out would otherwise wait on them forever, since only
+// some browsers raise `close` on the far end of a port
+function closePort(port: MessagePort) {
+  port.postMessage({ type: 'closed' })
+  port.close()
+}
+
 export class BgzfWorkerPoolHost {
   private pool: BgzfWorkerPool
   private ports = new Set<MessagePort>()
@@ -26,7 +33,7 @@ export class BgzfWorkerPoolHost {
 
   disconnectPort(port: MessagePort) {
     this.ports.delete(port)
-    port.close()
+    closePort(port)
   }
 
   private async handleRequest(port: MessagePort, req: HostRequest) {
@@ -62,7 +69,7 @@ export class BgzfWorkerPoolHost {
 
   destroy() {
     for (const port of this.ports) {
-      port.close()
+      closePort(port)
     }
     this.ports.clear()
     this.pool.destroy()

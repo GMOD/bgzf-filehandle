@@ -349,12 +349,12 @@ While a pool's workers are starting, on the first call to reach a shared pool or
 the first after an idle reap, `decompressBlocks` inflates on the calling thread
 and returns the same blocks, so no call waits for a worker to boot.
 
-A worker that raises an `error` event or sends a reply this thread cannot
-deserialize turns the pool off for good, and a request it had in flight goes
-back to the calling thread. Every later call inflates there as well, which is
-the path every consumer already runs without a pool. A decompression error that
-a worker reports against its batch points to bad data rather than a broken
-worker, so the call still rejects.
+A worker that raises an `error` event, sends a reply this thread cannot
+deserialize, fails to load its wasm, or traps inside it turns the pool off for
+good, and a request it had in flight goes back to the calling thread. Every
+later call inflates there as well, which is the path every consumer already runs
+without a pool. A decompression error that a worker reports against its batch
+points to bad data rather than a broken worker, so the call still rejects.
 
 Before the fallback existed, the pool awaited every worker's `ready` and had no
 listener for a worker's `error`, so one worker that never started left every
@@ -401,6 +401,16 @@ import { BgzfWorkerPoolClient } from '@gmod/bgzf-filehandle'
 
 const pool = new BgzfWorkerPoolClient(port) // implements BgzfWorkerPool
 ```
+
+A client whose host goes away inflates on its own thread from then on, including
+the requests it was still waiting on:
+
+- `destroy()` and `disconnectPort()` tell the client before closing the port.
+- A host thread that ends without a word is noticed only where the port raises
+  `close`, which Chrome and node do. Elsewhere the client's waiting requests
+  stay pending.
+- No client request has a timeout, because a host busy with other clients' work
+  looks the same as a dead one.
 
 The client copies the compressed input once, so that the transfer detaches a
 buffer it owns rather than the caller's. That extra pass over the compressed
