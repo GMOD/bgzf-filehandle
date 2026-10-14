@@ -21,16 +21,10 @@ compiled to WebAssembly and inlined in the bundle as base64, so there is no
 
 ## Terms
 
-The docs here use three terms, and two of them mean something narrower than they
-sound:
-
-- **BGZF block** — bgzip files are so called 'multi-member gzip files',
-  basically independently compressed gzip blocks that are concatenated together
-  (https://www.htslib.org/doc/bgzip.html). Each is at most 64KB compressed, and
-  its trailer records its uncompressed length. Blocks decode independently of
-  each other, so a reader can start at any block, and the worker pool can decode
-  several in parallel. A bare "block" always means this one, never a deflate
-  block.
+- **BGZF block** — one gzip member of a bgzip file, which concatenates
+  independently compressed members. Each is at most 64KB compressed, its trailer
+  records its uncompressed length, and it decodes independently of the others. A
+  bare "block" always means this one, never a deflate block.
 - **Virtual offset** — `{blockPosition, dataPosition}`: which BGZF block, and
   how far into that block's decompressed bytes.
 - **Chunk** — a range between two virtual offsets, `{minv, maxv}`; a BAM or
@@ -68,8 +62,7 @@ one contiguous range and inflates them in one call.
 
 When the file is remote, pass
 [`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle)
-as the filehandle. It caches each contiguous range in 256 KiB chunks, so a later
-read that overlaps one already fetched comes from memory instead of the network.
+as the filehandle, so overlapping reads come from memory.
 
 ## unzip
 
@@ -138,11 +131,8 @@ const result = await unzipChunkSlice(compressedData, chunk, pool)
   if one of them fails, so a read never waits on a worker.
 - With `undefined` as the pool, `unzipChunkSlice` takes the sequential wasm
   path, so callers can pass the result of `getSharedWorkerPool()` without
-  checking it. Readers with a pool option, such as `@gmod/bam`'s
-  `bgzfWorkerPool`, accept the same value.
-
-Worker counts, cross-thread sharing, lifecycle and driving a pool directly are
-in [docs/worker-pool.md](docs/worker-pool.md).
+  checking it, as can readers with a pool option such as `@gmod/bam`'s
+  `bgzfWorkerPool`.
 
 ## Docs
 
@@ -154,10 +144,9 @@ in [docs/worker-pool.md](docs/worker-pool.md).
 
 ## Academic use
 
-This package was written with funding from the [NHGRI](http://genome.gov) as
-part of the [JBrowse](http://jbrowse.org) project. If you use it in an academic
-project that you publish, please cite the most recent JBrowse paper, which will
-be linked from [jbrowse.org](http://jbrowse.org).
+Written with [NHGRI](http://genome.gov) funding as part of
+[JBrowse](http://jbrowse.org). If you use this in a publication, please cite the
+most recent JBrowse paper at [jbrowse.org](http://jbrowse.org).
 
 ## License
 

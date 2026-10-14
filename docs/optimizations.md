@@ -12,12 +12,8 @@ the structure around it rather than the decoding. They address three questions:
 - How often does a call cross the wasm boundary?
 - How much of the file must a reader fetch to read one range of it?
 
-A **BGZF block** is one gzip member of the file: at most 64KB compressed,
-independently decodable, and the unit every count here uses. A bare "block"
-never means a deflate block. A **chunk** is the virtual-offset range a BAM or
-tabix index resolves a query to, covering a run of consecutive BGZF blocks and
-usually starting and ending partway through the outer two. The
-[README](../README.md#terms) defines both in more detail.
+A BGZF block is one gzip member, and a chunk is a virtual-offset range from a
+BAM or tabix index; the [README](../README.md#terms) defines both.
 
 ## The codec
 
@@ -95,10 +91,9 @@ We keep `DecompressionStream` off the BGZF path for two more reasons:
   each member's boundaries, and a single stream call returns one flat buffer
   with no record of where the members met.
 
-In sibling libraries `DecompressionStream` falls further behind, because of the
-container format rather than codec quality. `@gmod/bbi` and `@gmod/hic` read
-formats with their own kind of block, and each of those blocks is a separate
-zlib stream, so a wide query calls the API hundreds of times. Each call costs
+In `@gmod/bbi` and `@gmod/hic`, `DecompressionStream` falls further behind,
+because each of their blocks is a separate zlib stream, so a wide query calls
+the API hundreds of times. Each call costs
 [220-410 µs of overhead in bbi](https://github.com/GMOD/bbi-js/blob/main/docs/wasm.md#why-not-the-platforms-decompressionstream)
 and
 [300-720 µs in hic](https://github.com/GMOD/hic/blob/main/docs/optimizations.md#not-decompressionstream-either),
@@ -172,16 +167,11 @@ The rest of the read path works as follows:
 
 ## The worker pool
 
-BGZF blocks inflate independently, so the worker pool can spread a chunk's
-blocks across Web Workers. The pool is the only optimization here that reduces
-the inflate cost itself rather than the work around it. At its default four
+The worker pool spreads a chunk's blocks across Web Workers, and is the only
+optimization here that reduces the inflate cost itself. At its default four
 workers, a BAM chunk past a couple of MB uncompressed inflates 1.8-2.1x faster,
-which takes 0.9s off a 1.8s inflate at 373MB. jbrowse-components measures 1.95x
-end to end in a browser over 1000x long-read data. Scaling is sublinear from the
-first worker, a chunk has to reach four to eight blocks before the pool helps at
-all, and a chunk that decompresses ~18x never gets past ~1.0x. The tables, and
-the serial reassembly that accounts for the difference, are in
-[worker-pool.md](worker-pool.md#what-it-is-worth).
+which takes 0.9s off a 1.8s inflate at 373MB. The tables and their caveats are
+in [worker-pool.md](worker-pool.md#what-it-is-worth).
 
 Threading usually loses most of a gain like that to overhead. The pool limits
 its overhead with two design choices:
@@ -196,19 +186,15 @@ its overhead with two design choices:
   costs the same whatever the range's size. The one copy that happens is a pass
   over the **compressed** bytes, the smaller side.
 
-[worker-pool.md](worker-pool.md) explains how that transfer works, gives the
-measurement that ruled out `SharedArrayBuffer`, and covers pool lifecycle,
-sizing, sharing across threads, and reaping idle workers. A chunk under
-`POOL_MIN_DECOMPRESSED_BYTES` (0.4MB inflated) skips the pool entirely. Only an
-explicit call creates a pool, since workers are a thread budget the application
-owns.
+A chunk under `POOL_MIN_DECOMPRESSED_BYTES` (0.4MB inflated) skips the pool
+entirely.
 
 ## `@gmod/bam` and `@gmod/tabix` cache what this package returns
 
-The readers cache what this package returns, because only a reader knows which
-bytes it has already asked for. `@gmod/bam` caches each chunk's parsed records
-and `@gmod/tabix` each decompressed chunk. Both share reads still in flight and
-take a `SharedBudget`, so several open files share one limit on what they cache.
+Only a reader knows which bytes it has already asked for, so caching lives
+there. `@gmod/bam` caches each chunk's parsed records and `@gmod/tabix` each
+decompressed chunk. Both share reads still in flight and take a `SharedBudget`,
+so several open files share one limit on what they cache.
 [bam-js's optimizations doc](https://github.com/GMOD/bam-js/blob/main/docs/optimizations.md)
 and
 [tabix-js's](https://github.com/GMOD/tabix-js/blob/main/docs/optimizations.md)

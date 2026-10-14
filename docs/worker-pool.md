@@ -1,11 +1,7 @@
 # The worker pool
 
-A **BGZF block** is one gzip member of the file — at most 64KB compressed, with
-its own uncompressed length in its trailer — and a **chunk** is the
-virtual-offset range a BAM or tabix index resolves a query to, covering a run of
-consecutive blocks and usually starting and ending partway through the outer
-two. Every count and every table below is in those terms; the
-[README](../README.md#terms) states them at length.
+Counts below are in BGZF blocks and chunks, as the [README](../README.md#terms)
+defines them.
 
 BGZF blocks inflate independently, so the pool can spread the blocks in one
 chunk across Web Workers. An indexed read spends most of its time inflating,
@@ -16,8 +12,7 @@ workers, a BAM chunk past a couple of MB inflates about 1.8-2.1x faster
 [most of a second off a 1.8s inflate](#at-the-size-where-it-saves-seconds).
 
 Only an explicit call creates a pool, because workers are a thread budget the
-application owns, and a library that started four of them per file unasked would
-spend the application's threads for it.
+application owns.
 
 ## What it is worth
 
@@ -149,9 +144,7 @@ The table uses four workers, min of 7:
 The multiple stays at 1.8-2.1x on long-read BAM across two orders of magnitude
 of chunk size, so the saving scales with the query, to **roughly 0.9s off a 1.8s
 inflate at 373MB uncompressed**, or 1.1-2.3ms per MB of output. The jbrowse
-figure below comes from chunks of this size. On deep data like this the pool
-saves enough to justify its threads, even though its effect on a 0.3MB fixture
-is negligible.
+figure below comes from chunks of this size.
 
 ### Four workers is not the ceiling
 
@@ -185,13 +178,10 @@ when you do not.
 ### Inflate-only and end-to-end speedups
 
 The inflate-only column at eight workers shows 2.7-4.1x. This page once quoted
-that column as "close to linear out to four workers", but the column came from a
-harness that timed `pool.decompressBlocks` against a sequential
-`unzipChunkSlice`, so its pooled arm skipped the reassembly that the real call
-still does. Compared like with like, four workers give 1.1-2.0x end to end. Keep
-both columns when quoting: the inflate-only one is the right number for "is the
-parallelism working", and the end-to-end one is the only one a caller
-experiences.
+it as "close to linear out to four workers", from a harness whose pooled arm
+skipped the reassembly the real call still does. When quoting, give both
+columns. The inflate-only one shows whether the parallelism works, and the
+end-to-end one, 1.1-2.0x at four workers, is what a caller sees.
 
 ### End to end in a consumer
 
@@ -434,6 +424,3 @@ where they can, it gains nothing. `decompressAll` copies its input into the wasm
 heap either way, so shared memory removes the host-side slice rather than the
 boundary copy. Head to head in Chrome at 4 workers, a pooled `SAB` was at parity
 with transferring, and a freshly allocated one was slower.
-
-Without `SharedArrayBuffer`, the pool needs only a Worker and a Blob URL to
-launch it from, so it works whether or not the page is cross-origin isolated.
