@@ -107,6 +107,38 @@ test('a worker that errors while booting turns the pool off, and no read waits o
   expect(posted).toHaveLength(0)
 })
 
+test('a worker whose wasm fails to load turns the pool off, and no read rejects', async () => {
+  const { live, posted } = installFakeWorker('fault')
+  const input = fixture()
+  const large = chunkOf(input, POOL_MIN_DECOMPRESSED_BYTES)
+  const pool = await getSharedWorkerPool(2)
+
+  await expectSameAsSequential(input, large, pool)
+  await tick()
+  expect(live).toEqual({ constructed: 2, terminated: 2 })
+
+  await expectSameAsSequential(input, large, pool)
+  await tick()
+  expect(live.constructed).toBe(2)
+  expect(posted).toHaveLength(0)
+})
+
+test('a worker fault mid-request sends that request back to the calling thread', async () => {
+  const fake = installFakeWorker()
+  const input = fixture()
+  const large = chunkOf(input, POOL_MIN_DECOMPRESSED_BYTES)
+
+  const pool = await createBgzfWorkerPool(2)
+  fake.setFaultReplies(true)
+  await expectSameAsSequential(input, large, pool)
+  expect(fake.live.terminated).toBe(2)
+
+  const sent = fake.posted.length
+  await expectSameAsSequential(input, large, pool)
+  expect(fake.posted).toHaveLength(sent)
+  pool.destroy()
+})
+
 test('createBgzfWorkerPool rejects when a worker errors while booting', async () => {
   const { live } = installFakeWorker('error')
   await expect(createBgzfWorkerPool(2)).rejects.toThrow(/bgzf worker failed/)

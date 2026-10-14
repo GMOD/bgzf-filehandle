@@ -1,3 +1,3 @@
-0cc07658c8f1c791b68b8d4af806371e17897040bd20c2422266c72373691f45  crate/ scripts/inline-worker.sh
-2a013a21bcd924f8952b38bd17a786deebe4c8809879dde56c3d00c40a66e3fa  src/wasm/bgzf-wasm-inlined.js
-d8b7d50a5a462700d98c6b663a410a37f551d26e8b16d9d1e173609f3842a543  src/wasm/bgzf-worker-source.ts
+a5e0cc388540a0f560121f5c3077b9f1f5686e0aab4c2a4e304b0453f2a50f84  crate/ scripts/inline-worker.sh
+a8047e4c83a36ba7e0e7ca02fcc5de60f1571d59bc642c622838eddc2eab125a  src/wasm/bgzf-wasm-inlined.js
+69f14eab25f6114c0e299eda6076a2f39de5d4e811744fee95a0d8e496985e32  src/wasm/bgzf-worker-source.ts

@@ -5,7 +5,7 @@ import * as bg from '../pkg/bgzf_wasm_bg.js'
 let wasm = null
 let initPromise = null
 
-async function init() {
+export async function init() {
   if (wasm) return wasm
 
   if (!initPromise) {
@@ -19,7 +19,12 @@ async function init() {
       wasm = instance.exports
       bg.__wbg_set_wasm(wasm)
       return wasm
-    })()
+    })().catch(error => {
+      // a failed instantiate (memory pressure, say) is worth retrying on the
+      // next call rather than caching as a failure for the life of the module
+      initPromise = null
+      throw error
+    })
   }
 
   return initPromise

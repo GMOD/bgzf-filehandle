@@ -34,14 +34,17 @@ export interface FakeWorkerHandle {
   crash: (message?: string) => number
   /** under `boot: 'never'`, start every worker still waiting, as a freed slot would */
   startQueued: () => void
+  /** answer every request as a worker whose wasm trapped: an error with no batchId */
+  setFaultReplies: (fault: boolean) => void
 }
 
 /**
  * How a fake worker answers `init`: `ready` as a real one does, `error` as one
- * whose thread could not start, or `never` as one Firefox has queued behind
- * `dom.workers.maxPerDomain`, which raises no event at all.
+ * whose thread could not start, `fault` as one whose wasm failed to load, or
+ * `never` as one Firefox has queued behind `dom.workers.maxPerDomain`, which
+ * raises no event at all.
  */
-export type FakeBoot = 'ready' | 'error' | 'never'
+export type FakeBoot = 'ready' | 'error' | 'fault' | 'never'
 
 /**
  * A stand-in for a real Worker that runs the same wasm on this thread.
@@ -64,6 +67,7 @@ export function installFakeWorker(boot: FakeBoot = 'ready'): FakeWorkerHandle {
   const posted: { hadInputBuffer: boolean }[] = []
   const live = { constructed: 0, terminated: 0 }
   let defer = false
+  let fault = false
   const held: (() => void)[] = []
   const running = new Set<FakeWorker>()
   const queued: FakeWorker[] = []
@@ -95,6 +99,12 @@ export function installFakeWorker(boot: FakeBoot = 'ready'): FakeWorkerHandle {
           queueMicrotask(() => this.onmessage?.({ data: { type: 'ready' } }))
         } else if (boot === 'error') {
           queueMicrotask(() => raiseError(this, 'could not start thread'))
+        } else if (boot === 'fault') {
+          queueMicrotask(() =>
+            this.onmessage?.({
+              data: { type: 'error', message: 'wasm failed to load' },
+            }),
+          )
         } else {
           queued.push(this)
         }
@@ -104,6 +114,12 @@ export function installFakeWorker(boot: FakeBoot = 'ready'): FakeWorkerHandle {
       // a transferred buffer must actually be listed for transfer
       if (msg.inputBuffer !== undefined) {
         expect(transfer).toContain(msg.inputBuffer)
+      }
+      if (fault) {
+        queueMicrotask(() =>
+          this.onmessage?.({ data: { type: 'error', message: 'unreachable' } }),
+        )
+        return
       }
       const input = new Uint8Array(msg.inputBuffer!)
       void Promise.resolve(decompressAll(input)).then(
@@ -161,6 +177,9 @@ export function installFakeWorker(boot: FakeBoot = 'ready'): FakeWorkerHandle {
       }
     },
     heldCount: () => held.length,
+    setFaultReplies: (f: boolean) => {
+      fault = f
+    },
     startQueued: () => {
       for (const worker of queued.splice(0)) {
         worker.onmessage?.({ data: { type: 'ready' } })
