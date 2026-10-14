@@ -42,7 +42,7 @@ Two properties of the failure made it slow to diagnose.
 
 wasm-bindgen already emits `getArrayU8FromWasm0(r0, r1).slice()` on the
 `Vec<u8>` return path, so decompressed data always owned its bytes and never hit
-this error. The fix applies the same copy to strings.
+this error, and the fix applies the same copy to strings.
 
 ## Decision
 
@@ -58,7 +58,7 @@ fix.
 
 ## Consequences
 
-- Each string costs one extra copy. The strings are error messages, on error
+- Each string costs one extra copy, but the strings are error messages on error
   paths only, so the cost is not measurable and no data path pays it.
 - `test/resizable-buffer.test.ts` asserts two things: that `unzip()` on non-BGZF
   input rejects with its own message rather than with `/resizable/`, and,

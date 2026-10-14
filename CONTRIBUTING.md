@@ -15,8 +15,8 @@ pnpm build
   `pnpm build` starts with `build:wasm` and fails without the toolchain.
 - `pnpm build:wasm` rebuilds them from `crate/`. It needs rustup, which installs
   the Rust release and wasm target that `crate/rust-toolchain.toml` pins, and a
-  clang with a WebAssembly backend for libdeflate's C. Apple's clang has none.
-  `crate/build-wasm.sh` installs `wasm-bindgen-cli` at the version in
+  clang with a WebAssembly backend for libdeflate's C, which Apple's clang
+  lacks. `crate/build-wasm.sh` installs `wasm-bindgen-cli` at the version in
   `Cargo.lock`.
 - `build:wasm` also writes `crate/wasm-inputs.sha256`: a hash of `crate/` and
   `scripts/inline-worker.sh`, and a hash of each bundle. `pnpm check:wasm` runs

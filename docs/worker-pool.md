@@ -104,12 +104,12 @@ chunk the way `@gmod/bam` passes it):
 | 128    | 441KB-4MB  | 6.6-8.0MB    | 1.83x           | 2.05x          | 2.16x          | 0.83x          |
 | 256    | 911KB-8MB  | 13-16MB      | 1.58x           | —              | 1.68x          | 1.18x          |
 
-The single-block row is a control. At the time of the measurement,
-`unzipChunkSlice` declined the pool only for a single block, so both arms of
-that row ran the same code, and the row's spread off 1.00x is the noise floor,
-about ±0.15x. Read no row as finer than that. These rows set the threshold
-described below, and `unzipChunkSlice` now declines the pool for every row under
-it, so a re-run shows those rows at 1.00x.
+At the time of the measurement, `unzipChunkSlice` declined the pool only for a
+single block, so both arms of the single-block row ran the same code, which
+makes that row a control whose spread off 1.00x is the noise floor, about
+±0.15x. Read no row as finer than that. These rows set the threshold described
+below, and `unzipChunkSlice` now declines the pool for every row under it, so a
+re-run shows those rows at 1.00x.
 
 - **The speedup turns positive at four to eight blocks**, roughly 150-500KB
   compressed and 0.2-0.5MB uncompressed. Below that the round trip and the input
@@ -156,8 +156,8 @@ is negligible.
 ### Four workers is not the ceiling
 
 The obvious guess is that a 373MB inflate becomes memory-bandwidth bound,
-leaving the fourth worker with nothing to do. On sixteen threads, at least, it
-does not. The table below keeps all three pools alive at once and interleaves
+leaving the fourth worker with nothing to do, but on sixteen threads, at least,
+it does not. The table below keeps all three pools alive at once and interleaves
 them against one sequential baseline, min of 7:
 
 | fixture                   | blocks | uncompressed | seq   | 2w            | 4w            | 8w            |
@@ -270,8 +270,8 @@ There are three entry points:
   lifecycle yourself. It resolves once its workers are up, and rejects if one
   fails to start. If the browser never starts a worker, the promise stays
   pending; `getSharedWorkerPool` never leaves a caller pending.
-- **`destroySharedWorkerPool()`** — terminates the shared pool's workers. The
-  next `getSharedWorkerPool()` builds a fresh one.
+- **`destroySharedWorkerPool()`** — terminates the shared pool's workers, and
+  the next `getSharedWorkerPool()` builds a fresh one.
 
 `getSharedWorkerPool` resolves to `undefined` only on a host that cannot launch
 a Worker at all: Node, or any host lacking `Worker` plus Blob URLs. The same
@@ -293,18 +293,19 @@ const pool = await getSharedWorkerPool()
 const result = await unzipChunkSlice(compressedData, chunk, pool)
 ```
 
-Or hand it to a reader that takes one.
-[`@gmod/bam`](https://github.com/GMOD/bam-js) accepts the pending promise
-directly, so a synchronous constructor doesn't have to await first:
+A reader can take the pool instead:
+[`@gmod/bam`](https://github.com/GMOD/bam-js) takes it as a constructor option
+and accepts the pending promise directly, so a synchronous constructor doesn't
+have to await first:
 
 ```typescript
 const bam = new BamFile({ bamUrl, bgzfWorkerPool: getSharedWorkerPool() })
 ```
 
-Or drive it yourself. A pool inflates whole BGZF blocks, so it takes the block
-list from `scanBgzfBlocks`. `unzipChunkSlice` makes the same call internally,
-and the package exports it for readers that want the blocks rather than a chunk
-slice:
+To drive the pool yourself, give it the block list from `scanBgzfBlocks`, since
+a pool inflates whole BGZF blocks. `unzipChunkSlice` makes the same call
+internally, and the package exports it for readers that want the blocks rather
+than a chunk slice:
 
 ```typescript
 import { scanBgzfBlocks } from '@gmod/bgzf-filehandle'
@@ -418,22 +419,21 @@ inflate.
 
 ## No cross-origin isolation required
 
-The pool sends each worker's range as a **transferable**. It puts the
-`ArrayBuffer` in `postMessage`'s transfer list, so ownership moves and the bytes
-are not structured-cloned. Transfers need no isolation, so the pool works on an
-ordinary non-isolated origin, and results come back the same way. The pool
+The pool sends each worker's range as a **transferable**, putting the
+`ArrayBuffer` in `postMessage`'s transfer list so that ownership moves and the
+bytes are not structured-cloned. Transfers need no isolation, so the pool works
+on an ordinary non-isolated origin, and results come back the same way. The pool
 copies each range out of the input first, because transferring detaches the
 buffer it came from and that buffer belongs to the caller (bam-js hands over the
 filehandle read it is still holding). Across all the workers that is one pass
 over the compressed bytes, the smaller side of the operation.
 
-The pool avoids `SharedArrayBuffer` by design. `SharedArrayBuffer` was the
-original design, and we dropped it after measuring it. It needs COOP/COEP, which
-most JBrowse installs cannot set, and where they can, it gains nothing.
-`decompressAll` copies its input into the wasm heap either way, so shared memory
-removes the host-side slice rather than the boundary copy. Head to head in
-Chrome at 4 workers, a pooled `SAB` was at parity with transferring, and a
-freshly allocated one was slower.
+`SharedArrayBuffer` was the pool's original design, and we dropped it after
+measuring it. It needs COOP/COEP, which most JBrowse installs cannot set, and
+where they can, it gains nothing. `decompressAll` copies its input into the wasm
+heap either way, so shared memory removes the host-side slice rather than the
+boundary copy. Head to head in Chrome at 4 workers, a pooled `SAB` was at parity
+with transferring, and a freshly allocated one was slower.
 
 Without `SharedArrayBuffer`, the pool needs only a Worker and a Blob URL to
 launch it from, so it works whether or not the page is cross-origin isolated.

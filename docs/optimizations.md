@@ -12,12 +12,12 @@ the structure around it rather than the decoding. They address three questions:
 - How often does a call cross the wasm boundary?
 - How much of the file must a reader fetch to read one range of it?
 
-Two terms below have narrow meanings. A **BGZF block** is one gzip member of the
-file: at most 64KB compressed, independently decodable, and the unit every count
-here uses. A bare "block" never means a deflate block. A **chunk** is the
-virtual-offset range a BAM or tabix index resolves a query to, covering a run of
-consecutive BGZF blocks and usually starting and ending partway through the
-outer two. The [README](../README.md#terms) defines both in more detail.
+A **BGZF block** is one gzip member of the file: at most 64KB compressed,
+independently decodable, and the unit every count here uses. A bare "block"
+never means a deflate block. A **chunk** is the virtual-offset range a BAM or
+tabix index resolves a query to, covering a run of consecutive BGZF blocks and
+usually starting and ending partway through the outer two. The
+[README](../README.md#terms) defines both in more detail.
 
 ## The codec
 

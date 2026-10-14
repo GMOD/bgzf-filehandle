@@ -29,8 +29,7 @@ Do **not** apply it. Keep the single shared `decompress_block_into` helper.
   appends only a slice), so the optimization can't replace the shared helper. It
   splits the helper into `parse_block` + `decompress_block_into` + an inlined
   `deflate_decompress` in `decompress_all`, so the header-relative slice and the
-  decode call would appear in two places. The single-helper original reads
-  better.
+  decode call would appear in two places.
 - **Churns the tracked wasm bundle** (`src/wasm/bgzf-wasm-inlined.js`) for no
   real gain.
 
