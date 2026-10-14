@@ -2,7 +2,7 @@
 
 Inflating BGZF blocks is 70-90% of the wall clock of an uncached `@gmod/bam`
 query
-([bam-js ADR 0003](https://github.com/GMOD/bam-js/blob/main/agent-docs/adr/0003-where-bam-query-time-goes.md)),
+([bam-js ADR 0003](https://github.com/GMOD/bam-js/blob/main/agent-docs/architecture-decision-records/0003-where-bam-query-time-goes.md)),
 so a reader spends most of its time in this package's decompression.
 
 The codec already runs close to native speed, so the optimizations below change
