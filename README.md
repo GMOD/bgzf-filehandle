@@ -116,7 +116,9 @@ coordinates, for generating stable feature IDs across chunk boundaries.
 `unzipChunkSlice` takes an optional pool that spreads a chunk's blocks across
 Web Workers.
 
-- Speedup is close to linear to about four workers.
+- On multi-megabyte files, four workers inflate 2.3-2.7x faster, but the whole
+  call gains only 1.1-2.0x, because the caller's thread still concatenates the
+  blocks ([docs/worker-pool.md](docs/worker-pool.md)).
 - Bytes cross as
   [transferable objects](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Transferable_objects)
   rather than copies, so the handoff costs the same whatever the size.

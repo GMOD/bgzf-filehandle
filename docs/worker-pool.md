@@ -217,7 +217,7 @@ rather than falling back to inflating on the calling thread.
 `pnpm bench:pool` runs `scripts/bench-worker-pool.ts`, which serves the repo
 over HTTP with no COOP/COEP and drives `test/browser/scaling.html` under
 puppeteer, alongside `bench:chunksize` and `bench:largechunk` on the same page.
-The benchmark can produce a misleading number in six ways, and we hit five of
+The benchmark can produce a misleading number in seven ways, and we hit six of
 them:
 
 - **Node cannot measure the pool at all.** `workersAvailable()` requires a
