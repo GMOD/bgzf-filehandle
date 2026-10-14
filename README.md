@@ -21,15 +21,16 @@ compiled to WebAssembly and inlined in the bundle as base64, so there is no
 
 ## Terms
 
-The docs here lean on three words, and two of them mean something narrower than
-they sound:
+The docs here use three terms, and two of them have a narrower meaning than
+usual:
 
 - **BGZF block** — bgzip files are so called 'multi-member gzip files',
   basically independently compressed gzip blocks that are concatenated together
   (https://www.htslib.org/doc/bgzip.html). Each is at most 64KB compressed, and
   its trailer records its uncompressed length. Blocks decode independently of
-  each other, enabling both random access and the worker pool. A bare "block"
-  always means this one, never a deflate block.
+  each other, so a reader can start at any block, and the worker pool can decode
+  several in parallel. A bare "block" always means this one, never a deflate
+  block.
 - **Virtual offset** — `{blockPosition, dataPosition}`: which BGZF block, and
   how far into that block's decompressed bytes.
 - **Chunk** — a range between two virtual offsets, `{minv, maxv}`; a BAM or
@@ -45,7 +46,7 @@ npm install @gmod/bgzf-filehandle
 
 ## BgzfFilehandle
 
-Read a bgzip-compressed file with a `.gzi` index as though it never was:
+Read a bgzip-compressed file with a `.gzi` index as though it were uncompressed:
 
 ```typescript
 import { BgzfFilehandle } from '@gmod/bgzf-filehandle'
@@ -62,13 +63,13 @@ const data: Uint8Array = await f.read(300, 0)
 ```
 
 Create the index with `bgzip -i my_file`, or `bgzip -r my_file.gz` for an
-already-compressed one. Everything a read touches arrives as one contiguous
-range and inflates in one call.
+already-compressed one. `BgzfFilehandle` fetches the blocks a read touches as
+one contiguous range and inflates them in one call.
 
 When the file is remote, pass
 [`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle)
-as the filehandle. It caches each contiguous range in 256 KiB chunks, so a later
-read that overlaps one already fetched comes from memory instead of the network.
+as the filehandle. The cache stores each contiguous range in 256 KiB chunks and
+answers a later read that overlaps an already fetched chunk from memory.
 
 ## unzip
 
@@ -83,8 +84,8 @@ const decompressed: Uint8Array = await unzip(compressedData)
 
 ## unzipChunkSlice
 
-Decompress a range of BGZF blocks and slice out a virtual offset range — what
-BAM and tabix readers do with a chunk from a BAI/TBI:
+Decompress a range of BGZF blocks and slice out a virtual offset range. BAM and
+tabix readers do this with each chunk from a BAI or TBI index:
 
 ```typescript
 import { MAX_BGZF_BLOCK_SIZE, unzipChunkSlice } from '@gmod/bgzf-filehandle'
@@ -128,14 +129,15 @@ const pool = await getSharedWorkerPool() // undefined if Workers are unavailable
 const result = await unzipChunkSlice(compressedData, chunk, pool)
 ```
 
-- A chunk under 0.4MB inflated stays on the calling thread, where a worker costs
-  more than it returns. A shared pool starts its workers only once a larger
-  chunk arrives.
-- No read waits on workers. A pool inflates on the calling thread while its
-  workers boot, and for good if one of them fails.
-- Passing `undefined` keeps the sequential wasm path, so the pool is safe to
-  pass unconditionally. Readers that take a pool of their own (`@gmod/bam`'s
-  `bgzfWorkerPool`) accept the same value.
+- `unzipChunkSlice` inflates a chunk under 0.4MB (inflated size) on the calling
+  thread, where a worker would cost more time than it saves. A shared pool
+  starts its workers only when it receives a larger chunk.
+- A pool inflates on the calling thread while its workers boot, and permanently
+  if one of them fails, so a read never waits on a worker.
+- With `undefined` as the pool, `unzipChunkSlice` takes the sequential wasm
+  path, so callers can pass the result of `getSharedWorkerPool()` without
+  checking it. Readers with a pool option, such as `@gmod/bam`'s
+  `bgzfWorkerPool`, accept the same value.
 
 Worker counts, cross-thread sharing, lifecycle and driving a pool directly are
 in [docs/worker-pool.md](docs/worker-pool.md).

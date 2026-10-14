@@ -35,25 +35,25 @@ path against pako and native zlib, and `local.bench.ts` measures the layers
 above inflate — `unzipChunkSlice`, `BgzfFilehandle.read`, and the plain-gzip
 fallback.
 
-`unzip.bench.ts` instead compares two refs, so it needs `pnpm bench` — that
-builds each into `esm_branch1/`/`esm_branch2/` first (`origin/main` and the
-current HEAD by default, or `BRANCH1`/`BRANCH2` to pick). Each ref is built as
-committed, in a throwaway worktree, so uncommitted work is not measured.
+`unzip.bench.ts` compares two refs instead, so it needs `pnpm bench`, which
+first builds each ref into `esm_branch1/` and `esm_branch2/` (`origin/main` and
+the current HEAD by default; set `BRANCH1`/`BRANCH2` to pick others). The script
+builds each ref as committed, in a throwaway worktree, so it does not measure
+uncommitted work.
 
 ## Releasing
 
-Use `pnpm version patch/minor/major` — it runs `check:wasm`, lint, format,
-types, tests, build and `test:pack`, regenerates CHANGELOG.md with git-cliff,
-then pushes the version tag, which triggers the publish workflow.
+`pnpm version patch/minor/major` runs `check:wasm`, lint, format, types, tests,
+build and `test:pack`, regenerates CHANGELOG.md with git-cliff, then pushes the
+version tag, which triggers the publish workflow.
 
-That workflow publishes via npm trusted publishing (OIDC, no stored token),
-which requires `--provenance` and `id-token: write` permissions.
+The publish workflow uses npm trusted publishing (OIDC, no stored token), which
+requires `--provenance` and `id-token: write` permissions.
 
-This repo is already configured. To set up a new package:
+Trusted publishing is already configured for this repo. To set up a new package:
 `npm trust github <pkg> --file publish.yml --repo GMOD/<repo>` (requires
 npm >=11.10.0 and 2FA).
 
 Once npm publish succeeds, the `release` job creates the GitHub release for the
-tag, taking its notes from that version's CHANGELOG.md section — which
-`scripts/release-notes.sh` extracts, so run that with a version to preview the
-notes a release will carry.
+tag. `scripts/release-notes.sh` extracts the notes from that version's
+CHANGELOG.md section; run it with a version to preview a release's notes.

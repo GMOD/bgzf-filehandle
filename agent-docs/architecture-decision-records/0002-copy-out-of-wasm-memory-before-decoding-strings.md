@@ -24,62 +24,64 @@ TypeError: Failed to execute 'decode' on 'TextDecoder':
 The provided ArrayBuffer value must not be resizable
 ```
 
-The only strings this crate returns to JS are **error messages** — `Error(...)`
-at the two `getStringFromWasm0` call sites. So in a browser the module could not
-report its own errors: "invalid bgzf header" arrived as the TypeError above.
+The only strings this crate returns to JS are **error messages**, built with
+`Error(...)` at the two `getStringFromWasm0` call sites, so in a browser the
+module could not report any of its errors. "invalid bgzf header" reached the
+caller as the TypeError above.
 
-Two properties made that expensive rather than merely annoying.
+Two properties of the failure made it slow to diagnose.
 
 - **The error names a type, not a place.** A consumer sees a decoder complaint
   with no bgzf or tabix frame in it, so the natural read is "something upstream
   handed us a bad buffer", and the search starts nowhere near the real fault.
-- **It looks data-dependent.** A file that never trips a wasm error path decodes
-  fine, so the failure sorts by input and invites file-level bisection. One
-  downstream investigation eliminated eight hypotheses that way — file size,
-  window size, compressor, index flavour, CDN vs local server, bundler version —
-  before the masking was understood.
+- **The failure looks data-dependent.** A file that never trips a wasm error
+  path decodes fine, so the failure appears with some inputs and not others,
+  which invites file-level bisection. One downstream investigation eliminated
+  eight hypotheses that way (file size, window size, compressor, index flavour,
+  CDN vs local server, bundler version) before anyone found the masking.
 
-The `Vec<u8>` return path was never affected: wasm-bindgen already emits
-`getArrayU8FromWasm0(r0, r1).slice()` there, so decompressed data always owned
-its bytes. This is the same rule, applied to strings.
+wasm-bindgen already emits `getArrayU8FromWasm0(r0, r1).slice()` on the
+`Vec<u8>` return path, so decompressed data always owned its bytes and never hit
+this error. The fix applies the same copy to strings.
 
 ## Decision
 
-Copy before decoding — `.subarray(ptr, ptr + len).slice()`.
+Copy before decoding, with `.subarray(ptr, ptr + len).slice()`.
 
-Apply it in `crate/build-wasm.sh`, immediately after the `wasm-bindgen`
+Apply the copy in `crate/build-wasm.sh`, immediately after the `wasm-bindgen`
 invocation, **not** by editing its output in `crate/pkg/` directly. The same
-script regenerates that directory, so a hand-edit is silently lost on the next
-build. The patch is idempotent, and exits non-zero if it matches neither the
-unpatched nor the already-patched shape, so a wasm-bindgen upgrade that changes
-the emitted code fails the build instead of quietly dropping the fix.
+script regenerates that directory, so the next build overwrites a hand-edit
+without warning. The patch is idempotent, and exits non-zero if it matches
+neither the unpatched nor the already-patched code, so a wasm-bindgen upgrade
+that changes the emitted code fails the build rather than shipping without the
+fix.
 
 ## Consequences
 
-- One extra copy per string. These are error messages, on error paths only, so
-  the cost is not measurable and does not touch any data path.
-- `test/resizable-buffer.test.ts` pins both halves of the hazard: that `unzip()`
-  on non-BGZF input rejects with its own message rather than with `/resizable/`,
-  and — separately — that **node's `TextDecoder` accepts a view over a resizable
-  buffer while browsers do not**.
-- That second assertion is the one to keep. It is the reason no existing test
-  caught this and could not have: vitest, jest and jsdom all use node's decoder,
+- Each string costs one extra copy. The strings are error messages, on error
+  paths only, so the cost is not measurable and no data path pays it.
+- `test/resizable-buffer.test.ts` asserts two things: that `unzip()` on non-BGZF
+  input rejects with its own message rather than with `/resizable/`, and,
+  separately, that **node's `TextDecoder` accepts a view over a resizable buffer
+  while browsers do not**.
+- Keep the second assertion, because node's behavior is why no existing test
+  caught the bug, or could have. vitest, jest and jsdom all use node's decoder,
   so a suite that exercises every decompress path still passes while every
-  browser consumer breaks. Treat a green suite here as saying nothing about
-  resizable-buffer handling, and reproduce that class in a real browser.
+  browser consumer breaks. A green suite here says nothing about
+  resizable-buffer handling, so reproduce that class of bug in a real browser.
 
 ## Scope beyond this repo
 
 `getStringFromWasm0` is wasm-bindgen's own emitted code, unmodified, so any
-package shipping a wasm-bindgen module has the same hazard — including the
+package shipping a wasm-bindgen module has the same hazard, including the
 sibling inlined-wasm bundles described in `../../../CLAUDE.md` (`bbi-js`,
 `cram-js`). Downstream, `@gmod/tabix`, `@gmod/bam` and JBrowse inherit it
-through this package: before this fix none of them could surface a wasm error in
-a browser.
+through this package, so before this fix none of them could report a wasm error
+in a browser.
 
-The ecosystem has hit the same call site from a different direction — Safari's 2
-GB `TextDecoder` limit produces `RangeError: Bad value` there
+Safari's 2 GB `TextDecoder` limit produces `RangeError: Bad value` at the same
+call site
 ([wasm-bindgen#4185](https://github.com/rustwasm/wasm-bindgen/discussions/4185)).
-That is the same lesson twice: `getStringFromWasm0` is a chokepoint whose
-failures are attributed to the wrong layer, and it is worth defending locally
-rather than waiting for the generator to change.
+Every string from Rust to JS passes through `getStringFromWasm0`, and in both
+bugs its failure looked like a fault in another layer. Patch it here rather than
+wait for wasm-bindgen to change.

@@ -1,11 +1,15 @@
 # Agent documentation
 
-Top level is exactly this file. Everything else is filed:
+This file is the only one at the top level of `agent-docs/`. Everything else
+belongs in one of these places:
 
-- `architecture-decision-records/` — _why_, one per file, `NNNN-slug.md`. Read
-  the relevant one before "simplifying" a design that looks accidental.
-- Tried and declined → a sentence at the code that would re-try it, with the
-  number, or an ADR if the decision deserves a record.
-- What a session did and which commits → git already holds it.
+- `architecture-decision-records/` holds one decision per file, named
+  `NNNN-slug.md`, and records why the design is what it is. Read the relevant
+  one before "simplifying" a design that looks accidental.
+- Record an approach that was tried and declined as a sentence, with the number,
+  at the code that would try it again, or as an ADR if the decision deserves a
+  record.
+- Leave out what a session did and which commits it made; git already holds
+  that.
 
-Cite a doc by its path, so a move is a grep.
+Cite a doc by its path, so that a grep finds every citation when the doc moves.
