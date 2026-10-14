@@ -1,7 +1,7 @@
 # The worker pool
 
-Counts below are in BGZF blocks and chunks, as the [README](../README.md#terms)
-defines them.
+Counts below are in BGZF blocks and chunks, as the
+[optimizations doc](optimizations.md#terms) defines them.
 
 BGZF blocks inflate independently, so the pool can spread the blocks in one
 chunk across Web Workers. An indexed read spends most of its time inflating,

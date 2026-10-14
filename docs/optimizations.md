@@ -12,8 +12,16 @@ the structure around it rather than the decoding. They address three questions:
 - How often does a call cross the wasm boundary?
 - How much of the file must a reader fetch to read one range of it?
 
-A BGZF block is one gzip member, and a chunk is a virtual-offset range from a
-BAM or tabix index; the [README](../README.md#terms) defines both.
+## Terms
+
+- **BGZF block**: one gzip member of a bgzip file, at most 64KB compressed. A
+  decoder can inflate it without the others. A bare "block" always means this,
+  never a deflate block
+- **Virtual offset**: `{blockPosition, dataPosition}`, a BGZF block's file
+  offset plus a position in its decompressed bytes
+- **Chunk**: `{minv, maxv}`, a range between two virtual offsets, as a BAM or
+  tabix index returns them. A chunk spans consecutive BGZF blocks and usually
+  starts and ends partway through the first and last
 
 ## The codec
 
