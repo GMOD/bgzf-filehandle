@@ -134,8 +134,8 @@ data instead of the decoder.
 
 **Rejected: inflating straight into the output buffer.** Without the per-block
 temporary `Vec` in `decompress_all`, a 5.2MB file decoded 3-4% faster, which is
-the noise floor, because libdeflate's decode and the one boundary copy make up
-the cost and the change touches neither. The change also splits a helper that
+the noise floor. libdeflate's decode and the one boundary copy make up the cost,
+and the change touches neither. The change also splits a helper that
 `decompress_chunk_slice` needs, and churns the tracked wasm bundle
 ([ADR 0001](../agent-docs/architecture-decision-records/0001-decompress-into-output-buffer.md)).
 The ADR also explains a spurious "26% faster" result and the lesson from it:
