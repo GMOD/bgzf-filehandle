@@ -3,34 +3,17 @@
 [![NPM version](https://img.shields.io/npm/v/@gmod/bgzf-filehandle.svg?style=flat-square)](https://npmjs.org/package/@gmod/bgzf-filehandle)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/GMOD/bgzf-filehandle/publish.yml?branch=main)](https://github.com/GMOD/bgzf-filehandle/actions/workflows/publish.yml)
 
-Reads [block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files, such
-as those created by bgzip, using coordinates from the uncompressed file.
-[@gmod/indexedfasta](https://github.com/GMOD/indexedfasta),
-[@gmod/bam](https://github.com/GMOD/bam-js) and
-[@gmod/tabix](https://github.com/GMOD/tabix-js) all read their BGZF through it.
+Reads [block-gzipped (BGZF)](http://www.htslib.org/doc/bgzip.html) files using
+uncompressed coordinates. [@gmod/bam](https://github.com/GMOD/bam-js),
+[@gmod/tabix](https://github.com/GMOD/tabix-js) and
+[@gmod/indexedfasta](https://github.com/GMOD/indexedfasta) build on it.
 
-Decompression runs on [libdeflate](https://github.com/ebiggers/libdeflate),
-compiled to WebAssembly and inlined in the bundle as base64, so there is no
-`.wasm` file to serve.
-
-- On this repo's fixtures it inflates two to three times faster than pako, and
-  about twice as fast as the browser's `DecompressionStream`.
-- Tables and reasoning, including
-  [why not just use `DecompressionStream`](docs/optimizations.md#why-not-decompressionstream-for-everything),
-  are in [docs/optimizations.md](docs/optimizations.md).
-
-## Terms
-
-- **BGZF block** — one gzip member of a bgzip file, which concatenates
-  independently compressed members. Each is at most 64KB compressed, its trailer
-  records its uncompressed length, and it decodes independently of the others. A
-  bare "block" always means this one, never a deflate block.
-- **Virtual offset** — `{blockPosition, dataPosition}`: which BGZF block, and
-  how far into that block's decompressed bytes.
-- **Chunk** — a range between two virtual offsets, `{minv, maxv}`; a BAM or
-  tabix index resolves a query to one or more chunks. A chunk covers a run of
-  consecutive BGZF blocks and usually starts and ends partway through the first
-  and last of them.
+- **In:** a bgzip file and its `.gzi` index, or a chunk from a BAI/TBI index
+- **Out:** the decompressed bytes
+- Inflates with [libdeflate](https://github.com/ebiggers/libdeflate) compiled to
+  WebAssembly and inlined as base64, so there is no `.wasm` file to serve. On
+  this repo's fixtures it runs 2-3x faster than pako
+  ([benchmarks](docs/optimizations.md))
 
 ## Install
 
@@ -38,109 +21,91 @@ compiled to WebAssembly and inlined in the bundle as base64, so there is no
 npm install @gmod/bgzf-filehandle
 ```
 
-## BgzfFilehandle
+## Terms
 
-Read a bgzip-compressed file with a `.gzi` index as though it were uncompressed:
+- **BGZF block**: one gzip member of a bgzip file, at most 64KB compressed. A
+  decoder can inflate it without the others. A bare "block" always means this,
+  never a deflate block
+- **Virtual offset**: `{blockPosition, dataPosition}`, a BGZF block's file
+  offset plus a position in its decompressed bytes
+- **Chunk**: `{minv, maxv}`, a range between two virtual offsets, as a BAM or
+  tabix index returns them
+
+## BgzfFilehandle
 
 ```typescript
 import { BgzfFilehandle } from '@gmod/bgzf-filehandle'
 import { LocalFile } from 'generic-filehandle2'
 
 const f = new BgzfFilehandle({
-  filehandle: new LocalFile('path/to/my_file.gz'),
-  gziFilehandle: new LocalFile('path/to/my_file.gz.gzi'),
-  blockConcurrency: 10, // concurrent range requests per read, default 10
+  filehandle: new LocalFile('my_file.gz'),
+  gziFilehandle: new LocalFile('my_file.gz.gzi'),
 })
 
-// read(length, position) — matches generic-filehandle2
-const data: Uint8Array = await f.read(300, 0)
+const data = await f.read(300, 0) // length, position
 ```
 
 Create the index with `bgzip -i my_file`, or `bgzip -r my_file.gz` for an
-already-compressed one. `BgzfFilehandle` fetches the blocks a read touches as
-one contiguous range and inflates them in one call.
-
-When the file is remote, pass
-[`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle)
-as the filehandle, so overlapping reads come from memory.
+existing file. For a remote file, wrap it in
+[`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle).
 
 ## unzip
 
-Decompress a BGZF or plain gzip buffer, falling back to plain gzip if the input
-is not BGZF:
+Decompresses a BGZF or plain gzip buffer:
 
 ```typescript
 import { unzip } from '@gmod/bgzf-filehandle'
 
-const decompressed: Uint8Array = await unzip(compressedData)
+const decompressed = await unzip(compressedData)
 ```
 
 ## unzipChunkSlice
 
-Decompress a range of BGZF blocks and slice out a virtual offset range. BAM and
-tabix readers do this with each chunk from a BAI or TBI index:
+Decompresses a chunk and slices out its bytes:
 
 ```typescript
 import { MAX_BGZF_BLOCK_SIZE, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 
-const minv = { blockPosition: 1234, dataPosition: 56 }
-const maxv = { blockPosition: 9876, dataPosition: 78 }
-
-// input starts at minv.blockPosition and must run through the END of the block
-// at maxv.blockPosition. That block's compressed length is recorded nowhere, so
-// over-read by one maximum-size block to cover it
+// read one max-size block past maxv, since nothing records that block's length
 const compressedData = await filehandle.read(
   maxv.blockPosition + MAX_BGZF_BLOCK_SIZE - minv.blockPosition,
   minv.blockPosition,
 )
-
 const { buffer, cpositions, dpositions } = await unzipChunkSlice(
   compressedData,
   { minv, maxv },
 )
 ```
 
-`buffer` holds the decompressed bytes between the two offsets. `cpositions` and
-`dpositions` are `Float64Array` block boundaries in compressed and decompressed
-coordinates, for generating stable feature IDs across chunk boundaries.
+`cpositions` and `dpositions` hold the block boundaries in compressed and
+decompressed coordinates, for building feature IDs that stay stable across
+chunks.
 
 ## Worker pool
 
-`unzipChunkSlice` takes an optional pool that spreads a chunk's blocks across
-Web Workers.
-
-- On multi-megabyte files, four workers inflate 2.3-2.7x faster, but the whole
-  call gains only 1.1-2.0x, because the caller's thread still concatenates the
-  blocks ([docs/worker-pool.md](docs/worker-pool.md)).
-- Bytes cross as
-  [transferable objects](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Transferable_objects)
-  rather than copies, so the handoff costs the same whatever the size.
-- No cross-origin isolation is needed.
+Pass a pool to spread a chunk's blocks across Web Workers:
 
 ```typescript
 import { getSharedWorkerPool, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 
-const pool = await getSharedWorkerPool() // undefined if Workers are unavailable
+const pool = await getSharedWorkerPool() // undefined without Worker support
 const result = await unzipChunkSlice(compressedData, chunk, pool)
 ```
 
-- `unzipChunkSlice` inflates a chunk under 0.4MB (inflated size) on the calling
-  thread, where a worker would cost more time than it saves. A shared pool
-  starts its workers only when it receives a larger chunk.
-- A pool inflates on the calling thread while its workers boot, and permanently
-  if one of them fails, so a read never waits on a worker.
-- With `undefined` as the pool, `unzipChunkSlice` takes the sequential wasm
-  path, so callers can pass the result of `getSharedWorkerPool()` without
-  checking it, as can readers with a pool option such as `@gmod/bam`'s
-  `bgzfWorkerPool`.
+- A multi-megabyte chunk decodes 1.1-2.0x faster with four workers
+- Chunks under 0.4MB inflated stay on the calling thread, as does everything
+  while the workers boot, so a read never waits on a worker
+- No cross-origin isolation is needed
+
+[docs/worker-pool.md](docs/worker-pool.md) covers sizing, lifecycle and
+measurements.
 
 ## Docs
 
-- [docs/optimizations.md](docs/optimizations.md) — benchmark numbers, and what
-  we measured, kept and rejected
-- [docs/worker-pool.md](docs/worker-pool.md) — pool lifecycle, sizing, sharing,
-  and `scanBgzfBlocks`
-- [CONTRIBUTING.md](CONTRIBUTING.md) — development and release steps
+- [docs/optimizations.md](docs/optimizations.md): benchmarks, including
+  [why not `DecompressionStream`](docs/optimizations.md#why-not-decompressionstream-for-everything)
+- [docs/worker-pool.md](docs/worker-pool.md): the worker pool
+- [CONTRIBUTING.md](CONTRIBUTING.md): development and releases
 
 ## Academic use
 
