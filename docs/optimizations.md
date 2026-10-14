@@ -203,12 +203,12 @@ sizing, sharing across threads, and reaping idle workers. A chunk under
 explicit call creates a pool, since workers are a thread budget the application
 owns.
 
-## What the consumers add
+## `@gmod/bam` and `@gmod/tabix` cache what this package returns
 
 The readers cache what this package returns, because only a reader knows which
-bytes it has already asked for. `@gmod/bam` and `@gmod/tabix` both key parsed
-chunks by virtual-offset span, share reads still in flight, and take a
-`SharedBudget` so several open files share one limit on what they cache.
+bytes it has already asked for. `@gmod/bam` caches each chunk's parsed records
+and `@gmod/tabix` each decompressed chunk. Both share reads still in flight and
+take a `SharedBudget`, so several open files share one limit on what they cache.
 [bam-js's optimizations doc](https://github.com/GMOD/bam-js/blob/main/docs/optimizations.md)
 and
 [tabix-js's](https://github.com/GMOD/tabix-js/blob/main/docs/optimizations.md)
