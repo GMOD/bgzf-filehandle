@@ -1,3 +1,41 @@
+## [6.8.0](https://github.com/GMOD/bgzf-filehandle/compare/v6.7.0...v6.8.0) (2026-10-15)
+
+### Chores
+
+- Keep wasm-bindgen output out of src/ ([6be3c6a](https://github.com/GMOD/bgzf-filehandle/commit/6be3c6aea941480cb55892a582eea8e942870d01))
+- Fail when the committed wasm bundles are stale ([3d49e62](https://github.com/GMOD/bgzf-filehandle/commit/3d49e62e594e71b074199ad268737faca5824215))
+
+### Documentation
+
+- Plainer README wording ([963faba](https://github.com/GMOD/bgzf-filehandle/commit/963fabaa31cd4f7ee18c858a1a13d135cfee9a9c))
+- Break up README walls of text ([fa526bb](https://github.com/GMOD/bgzf-filehandle/commit/fa526bbfd0147520383ce317772905f988016525))
+
+### Other Changes
+
+- Reorganize agent-docs: ADRs folder, CLAUDE.md ([592ed76](https://github.com/GMOD/bgzf-filehandle/commit/592ed76ea0345039ea7f7bebff3b84d1c7f5afdd))
+- Point docs at architecture-decision-records ([b182c8b](https://github.com/GMOD/bgzf-filehandle/commit/b182c8b42478fa0e58d86d286447e0a8dd566da5))
+- Rewrite AI-writing tropes in README and docs ([7c2f32f](https://github.com/GMOD/bgzf-filehandle/commit/7c2f32f7e4ad3ad1a0ac380f1f6357cdae53ce15))
+- Restore claims changed by the tropes rewrite ([3d4d311](https://github.com/GMOD/bgzf-filehandle/commit/3d4d311784fadf89f6b9bad5caf03eba145d4d20))
+- Point ADR links at agent-docs/architecture-decision-records ([dfeb0ac](https://github.com/GMOD/bgzf-filehandle/commit/dfeb0ac87d3ac6385ba7b2ee52133e06c5a13f5f))
+- Fold short verdict sentences into their neighbours ([93d144b](https://github.com/GMOD/bgzf-filehandle/commit/93d144b081ab8ae3dff31b65f896b83a483442bb))
+- Fix doc errors found in the tropes audit ([bc96c87](https://github.com/GMOD/bgzf-filehandle/commit/bc96c8742ea2e7a4c5fc99bc5fb593e303634f92))
+- Restore wording the tropes rewrite changed without a trope ([1d9e670](https://github.com/GMOD/bgzf-filehandle/commit/1d9e670489ec1fafaae6017d17de0d994fc4e292))
+- State the finding in the consumers heading, and fix what each reader caches ([d9a38ea](https://github.com/GMOD/bgzf-filehandle/commit/d9a38eae9b82195abb24718d0a5bd7960203cb60))
+- Trim wordiness in README and docs ([28b830d](https://github.com/GMOD/bgzf-filehandle/commit/28b830d3fb9a967a70989c5048a28059c1e49da2))
+- Shorten README; leave details to docs/ ([31b8a28](https://github.com/GMOD/bgzf-filehandle/commit/31b8a2883afb35dfc0187115d2711b695970b414))
+- Move Terms from README into docs/optimizations.md ([ddb1929](https://github.com/GMOD/bgzf-filehandle/commit/ddb1929e9cbb2adaaa945ad9990ac89015e8a17c))
+- Fold worker pool into unzipChunkSlice section of README ([be29243](https://github.com/GMOD/bgzf-filehandle/commit/be2924314cbc1628cc70c912db180f66f719c37b))
+- Report wasm load failures and traps as worker failures ([9d339ee](https://github.com/GMOD/bgzf-filehandle/commit/9d339ee2a0c67024d3a6a9331bdbe3ad76b59f73))
+- Fall back to the client's thread when a pool host goes away ([b273396](https://github.com/GMOD/bgzf-filehandle/commit/b2733969c793f258843eab6d3d896e6a808e1d0c))
+- Close the client's port once its host is gone, and thin comments ([965ead4](https://github.com/GMOD/bgzf-filehandle/commit/965ead4340918c4e0188355ed9b0f8ea375f2f56))
+- Mark ADR 0001 superseded by 5b4ab22 ([94fdd49](https://github.com/GMOD/bgzf-filehandle/commit/94fdd4971a9bde20080acaf7f618854001d81a0d))
+- Drop the pool's unused timing breakdown ([ef6ff8b](https://github.com/GMOD/bgzf-filehandle/commit/ef6ff8b4d2aa032d806b011cb6407e582f090bc8))
+- Add unzipChunkSegments, which skips the pool's final copy ([31719e9](https://github.com/GMOD/bgzf-filehandle/commit/31719e9fcf8277563b71feac629d353e9a73d0e9))
+
+### Styling
+
+- Prettier on agent-docs/CLAUDE.md and docs/optimizations.md ([3f376f3](https://github.com/GMOD/bgzf-filehandle/commit/3f376f3d9d97b07ce69939299bfe7a4e9921980f))
+
 ## [6.7.0](https://github.com/GMOD/bgzf-filehandle/compare/v6.6.0...v6.7.0) (2026-09-21)
 
 ### Bug Fixes
