@@ -1,6 +1,17 @@
 # ADR 0001 — Keep the per-block temp `Vec` in `decompress_all`
 
-Status: Accepted (rejected the optimization)
+Status: Superseded by `5b4ab22` (2026-07-25)
+
+`decompress_all` now inflates each block straight into a preallocated output,
+the change this ADR rejected.
+
+- This ADR measured that change alone at 3-4% and called it noise.
+- `5b4ab22` made it together with reusing one libdeflate `Decompressor` and one
+  scratch buffer, measured the pair at about 2-4%, and kept it.
+- `decompress_chunk_slice` inflates into that scratch buffer and copies out the
+  trimmed slice, so the shared helper below no longer exists.
+
+The benchmarking lesson at the end still holds.
 
 ## Context
 
