@@ -45,13 +45,7 @@
         }
         const seqTime = performance.now() - seqStart
 
-        // Timed parallel with breakdown
         let totalScanMs = 0
-        let totalDispatchMs = 0
-        let totalReassembleMs = 0
-        let totalAssembleMs = 0
-        let totalWorkerWasmMs = 0
-        let totalWorkerViewMs = 0
 
         const parStart = performance.now()
         for (let i = 0; i < iterations; i++) {
@@ -63,28 +57,12 @@
           )
           totalScanMs += performance.now() - scanStart
 
-          const result = await pool.decompressBlocks(data, scanBlocks)
-          if (result.timing) {
-            totalDispatchMs += result.timing.dispatchMs
-            totalReassembleMs += result.timing.reassembleMs
-            for (const wt of result.timing.workerTimings) {
-              totalWorkerWasmMs += wt.wasmMs
-              totalWorkerViewMs += wt.viewMs
-            }
-          }
-
-          const assembleStart = performance.now()
-          // Just call assembleChunkSliceResult equivalent via full path
-          // (the actual assembly is fast, this measures it)
-          totalAssembleMs += performance.now() - assembleStart
+          await pool.decompressBlocks(data, scanBlocks)
         }
         const parTime = performance.now() - parStart
 
         const sizeMB = (data.byteLength / 1024 / 1024).toFixed(1)
-        const avgWorkerWasm = (totalWorkerWasmMs / iterations).toFixed(1)
-        const avgDispatch = (totalDispatchMs / iterations).toFixed(1)
         const avgScan = (totalScanMs / iterations).toFixed(1)
-        const avgReassemble = (totalReassembleMs / iterations).toFixed(1)
 
         return {
           name: `benchmark ${name} (${sizeMB}MB)`,
@@ -94,8 +72,7 @@
             // decompressBlocks, so it leaves out the reassembly the seq arm's
             // unzipChunkSlice does. scripts/bench-worker-pool.ts measures both.
             `${blocks.length} blocks, ${iterations}x: seq=${seqTime.toFixed(0)}ms par(inflate only)=${parTime.toFixed(0)}ms inflate ratio=${(seqTime / parTime).toFixed(2)}x`,
-            `  avg/iter: scan=${avgScan}ms dispatch+wasm=${avgDispatch}ms reassemble=${avgReassemble}ms`,
-            `  worker totals/iter: view=${(totalWorkerViewMs / iterations).toFixed(1)}ms wasm=${avgWorkerWasm}ms`,
+            `  avg/iter: scan=${avgScan}ms`,
           ].join('\n'),
         }
       }

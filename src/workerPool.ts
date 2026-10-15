@@ -5,11 +5,6 @@ import type { BgzfBlockInfo } from './bgzfBlockScan.ts'
 
 export interface DecompressResult {
   blocks: Uint8Array[]
-  timing?: {
-    workerTimings: WorkerTiming[]
-    dispatchMs: number
-    reassembleMs: number
-  }
 }
 
 /**
@@ -37,29 +32,13 @@ export interface BgzfWorkerPool {
   destroy(): void
 }
 
-export interface WorkerTiming {
-  viewMs: number
-  wasmMs: number
-}
-
 type WorkerMessage =
   | { type: 'ready' }
-  | {
-      type: 'rangeResult'
-      batchId: number
-      data: Uint8Array
-      viewMs: number
-      wasmMs: number
-    }
+  | { type: 'rangeResult'; batchId: number; data: Uint8Array }
   | { type: 'error'; batchId?: number; message?: string }
 
-interface RangeResult {
-  data: Uint8Array
-  timing: WorkerTiming
-}
-
 interface RangeCallback {
-  resolve: (result: RangeResult) => void
+  resolve: (data: Uint8Array) => void
   reject: (err: Error) => void
 }
 
@@ -149,10 +128,7 @@ class ManagedWorker {
       const cb = this.callbacks.get(msg.batchId)
       if (cb) {
         this.callbacks.delete(msg.batchId)
-        cb.resolve({
-          data: msg.data,
-          timing: { viewMs: msg.viewMs, wasmMs: msg.wasmMs },
-        })
+        cb.resolve(msg.data)
       }
     } else if (msg.batchId === undefined) {
       this.fail(new WorkerFailure(msg.message ?? 'bgzf worker failed'))
@@ -177,7 +153,7 @@ class ManagedWorker {
       return Promise.reject(new WorkerFailure('bgzf worker was terminated'))
     }
     const batchId = this.nextBatchId++
-    const promise = new Promise<RangeResult>((resolve, reject) => {
+    const promise = new Promise<Uint8Array>((resolve, reject) => {
       this.callbacks.set(batchId, { resolve, reject })
     })
     // `slice`, not `subarray`: transferring detaches the buffer it is taken
@@ -467,9 +443,8 @@ async function run(
   const blocksPerWorker = Math.ceil(blocks.length / numW)
 
   const rangeInfos: { startBlock: number; endBlock: number }[] = []
-  const promises: Promise<RangeResult>[] = []
+  const promises: Promise<Uint8Array>[] = []
 
-  const dispatchStart = performance.now()
   for (let w = 0; w < numW; w++) {
     const startBlock = w * blocksPerWorker
     const endBlock = Math.min(startBlock + blocksPerWorker, blocks.length)
@@ -487,22 +462,11 @@ async function run(
     promises.push(workers[w]!.decompressRange(input, inputOffset, inputLength))
   }
 
-  const rangeResults = await Promise.all(promises)
-  const dispatchMs = performance.now() - dispatchStart
-
-  const reassembleStart = performance.now()
+  const ranges = await Promise.all(promises)
   const resultBlocks = new Array<Uint8Array>(blocks.length)
-  const workerTimings: WorkerTiming[] = []
   for (let r = 0; r < rangeInfos.length; r++) {
     const { startBlock, endBlock } = rangeInfos[r]!
-    const { data, timing } = rangeResults[r]!
-    workerTimings.push(timing)
-    splitBlocks(data, blocks, startBlock, endBlock, resultBlocks)
+    splitBlocks(ranges[r]!, blocks, startBlock, endBlock, resultBlocks)
   }
-  const reassembleMs = performance.now() - reassembleStart
-
-  return {
-    blocks: resultBlocks,
-    timing: { workerTimings, dispatchMs, reassembleMs },
-  }
+  return { blocks: resultBlocks }
 }

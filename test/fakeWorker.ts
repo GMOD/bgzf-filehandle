@@ -130,8 +130,6 @@ export function installFakeWorker(boot: FakeBoot = 'ready'): FakeWorkerHandle {
                 type: 'rangeResult',
                 batchId: msg.batchId,
                 data,
-                viewMs: 0,
-                wasmMs: 0,
               },
             })
           }

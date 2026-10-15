@@ -14,18 +14,11 @@ async function handleMessage(data) {
   }
 
   if (data.type === 'decompressRange') {
-    const { batchId, inputBuffer } = data
-    const t0 = performance.now()
-    const input = new Uint8Array(inputBuffer)
-    const t1 = performance.now()
-    const decompressed = await decompressAll(input)
-    const t2 = performance.now()
+    const decompressed = await decompressAll(new Uint8Array(data.inputBuffer))
     return {
       type: 'rangeResult',
-      batchId,
+      batchId: data.batchId,
       data: decompressed,
-      viewMs: t1 - t0,
-      wasmMs: t2 - t1,
       transfer: [decompressed.buffer],
     }
   }
