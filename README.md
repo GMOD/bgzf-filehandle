@@ -82,6 +82,10 @@ const pool = await getSharedWorkerPool() // undefined without Worker support
 const result = await unzipChunkSlice(compressedData, { minv, maxv }, pool)
 ```
 
+`unzipChunkSegments` takes the same arguments and skips the final copy into one
+buffer, for readers that can parse across segment boundaries
+([docs/worker-pool.md](docs/worker-pool.md#skipping-the-final-copy-with-unzipchunksegments)).
+
 ## Docs
 
 - [docs/optimizations.md](docs/optimizations.md): terms, benchmarks, and

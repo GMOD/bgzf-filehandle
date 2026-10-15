@@ -79,6 +79,8 @@ The tables show four things:
   four-worker call, and end to end it never reaches 1.3x however many workers
   you add. Reassembly is 23-36% of the four-worker call for the other three
   large fixtures.
+  [`unzipChunkSegments`](#skipping-the-final-copy-with-unzipchunksegments) skips
+  it.
 
 ### How big does the chunk have to be?
 
@@ -282,6 +284,47 @@ import { getSharedWorkerPool, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 const pool = await getSharedWorkerPool()
 const result = await unzipChunkSlice(compressedData, chunk, pool)
 ```
+
+### Skipping the final copy with `unzipChunkSegments`
+
+A pooled `unzipChunkSlice` copies every worker's output into one buffer on the
+calling thread, which is 30-66% of a four-worker call (the
+[reassembly](#what-it-is-worth) above). `unzipChunkSegments` returns the worker
+outputs as they are:
+
+```typescript
+const { segments, cpositions, dpositions } = await unzipChunkSegments(
+  compressedData,
+  chunk,
+  pool,
+)
+```
+
+- Joined, `segments` are exactly `unzipChunkSlice`'s `buffer`, and `cpositions`
+  and `dpositions` index into that joined form.
+- A pooled chunk is one segment per worker range. Without a pool, below
+  `POOL_MIN_DECOMPRESSED_BYTES`, or while the workers boot, it is one segment.
+- Each segment is a view, often at a nonzero `byteOffset`, and holds onto the
+  trimmed head and tail of its range, at most one block at each end.
+- The caller handles a record or line that straddles two segments, usually by
+  copying just that one.
+
+Measured with `pnpm bench:segments` in headless Chrome on an i9-12900K, four
+workers, min of 15, two runs. Each arm times the inflate plus a consumer's walk:
+bam-js's `readBamFeatures` for BAM, tabix's column scan for GFF.
+
+| fixture                   | 1-2MB chunks | 3-16MB chunks |
+| ------------------------- | ------------ | ------------- |
+| shortreads_300x.bam       | 1.54-1.81x   | 1.47-1.58x    |
+| chr22_nanopore_subset.bam | 1.19-1.48x   | 1.36-1.40x    |
+| ultra-long-ont.bam        | 1.03-1.34x   | 1.31-1.38x    |
+| out.sorted.gff.gz         | 1.28-1.31x   | 1.28-1.35x    |
+
+The figures are segments against the joined buffer, both pooled. At 0.4MB, the
+pool threshold, the result is 0.8-1.2x. Against no pool, BAM goes from about 2x
+to 2.6-3.2x, and GFF from parity to 1.3-1.4x.
+
+### Handing the pool to a reader
 
 A reader can take the pool instead:
 [`@gmod/bam`](https://github.com/GMOD/bam-js) takes it as a constructor option

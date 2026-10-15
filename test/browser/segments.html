@@ -1,0 +1,389 @@
+<!doctype html>
+<html>
+  <head>
+    <title>BGZF Chunk Segments</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "pako-esm2": "/node_modules/pako-esm2/esm/main.js",
+          "generic-filehandle2": "/node_modules/generic-filehandle2/esm/browser.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <script type="module">
+      import {
+        createBgzfWorkerPool,
+        scanBgzfBlocks,
+        unzip,
+        unzipChunkSegments,
+        unzipChunkSlice,
+      } from '/esm/index.js'
+
+      async function fetchFile(path) {
+        const response = await fetch(path)
+        return new Uint8Array(await response.arrayBuffer())
+      }
+
+      function concat(a, b) {
+        const out = new Uint8Array(a.length + b.length)
+        out.set(a, 0)
+        out.set(b, a.length)
+        return out
+      }
+
+      // bam-js's BAMFeature constructor stores these and decodes lazily
+      class Rec {
+        constructor(ba, start, end, fileOffset, dataView) {
+          this.ba = ba
+          this.start = start
+          this.end = end
+          this.fileOffset = fileOffset
+          this.dataView = dataView
+        }
+      }
+
+      function blockSizeAt(dataView, offset) {
+        const size = dataView.getInt32(offset, true)
+        if (size < 32) {
+          throw new Error(`corrupt record size ${size} at ${offset}`)
+        }
+        return size
+      }
+
+      // bam-js readBamFeatures, with its virtual-offset id
+      function bamJoined(ba, cpos, dpos, minData) {
+        const sink = []
+        const dataView = new DataView(ba.buffer, ba.byteOffset, ba.byteLength)
+        let blockStart = 0
+        let pos = 0
+        while (blockStart + 4 < ba.length) {
+          const blockEnd =
+            blockStart + 4 + blockSizeAt(dataView, blockStart) - 1
+          const target = blockStart + minData
+          while (pos < dpos.length && target >= dpos[pos]) {
+            pos++
+          }
+          if (blockEnd < ba.length) {
+            sink.push(
+              new Rec(
+                ba,
+                blockStart,
+                blockEnd,
+                cpos[pos] * 256 + (blockStart - dpos[pos]) + minData + 1,
+                dataView,
+              ),
+            )
+          }
+          blockStart = blockEnd + 1
+        }
+        return sink
+      }
+
+      // the same walk over segments, copying only a record that straddles two
+      function bamSegments(segments, cpos, dpos, minData) {
+        const sink = []
+        let pos = 0
+        let base = 0
+        let carry
+        let carryAt = 0
+        const emit = (ba, start, end, joined, dataView) => {
+          const target = joined + minData
+          while (pos < dpos.length && target >= dpos[pos]) {
+            pos++
+          }
+          sink.push(
+            new Rec(
+              ba,
+              start,
+              end,
+              cpos[pos] * 256 + (joined - dpos[pos]) + minData + 1,
+              dataView,
+            ),
+          )
+        }
+        for (const seg of segments) {
+          let blockStart = 0
+          if (carry) {
+            const head = concat(
+              carry.subarray(0, 4),
+              seg.subarray(0, Math.max(0, 4 - carry.length)),
+            )
+            const total =
+              head.length < 4
+                ? Infinity
+                : 4 + blockSizeAt(new DataView(head.buffer), 0)
+            const need = total - carry.length
+            if (need > seg.length) {
+              carry = concat(carry, seg)
+              base += seg.length
+              continue
+            }
+            const rec = concat(carry, seg.subarray(0, need))
+            emit(rec, 0, total - 1, carryAt, new DataView(rec.buffer))
+            blockStart = need
+            carry = undefined
+          }
+          const dataView = new DataView(
+            seg.buffer,
+            seg.byteOffset,
+            seg.byteLength,
+          )
+          while (blockStart + 4 < seg.length) {
+            const blockEnd =
+              blockStart + 4 + blockSizeAt(dataView, blockStart) - 1
+            if (blockEnd >= seg.length) {
+              break
+            }
+            emit(seg, blockStart, blockEnd, base + blockStart, dataView)
+            blockStart = blockEnd + 1
+          }
+          if (blockStart < seg.length) {
+            carry = seg.slice(blockStart)
+            carryAt = base + blockStart
+          }
+          base += seg.length
+        }
+        return sink
+      }
+
+      function bamDigest(records) {
+        let hash = 0
+        for (const r of records) {
+          hash =
+            (Math.imul(hash, 31) +
+              r.fileOffset +
+              (r.end - r.start) +
+              r.dataView.getInt32(r.start + 8, true)) |
+            0
+        }
+        return `${records.length}:${hash}`
+      }
+
+      // tabix's per-line work: find the tabs through column 5 and parse the
+      // start and end columns, into one reused array as tabix does
+      const tabs = new Int32Array(5)
+      function scanLine(buf, start, end, state) {
+        let tab = start - 1
+        for (let c = 0; c < 5; c++) {
+          const t = tab < end ? buf.indexOf(9, tab + 1) : -1
+          tab = t === -1 || t >= end ? end : t
+          tabs[c] = tab
+        }
+        let s = 0
+        for (let i = tabs[2] + 1; i < tabs[3]; i++) {
+          s = s * 10 + buf[i] - 48
+        }
+        let e = 0
+        for (let i = tabs[3] + 1; i < tabs[4]; i++) {
+          e = e * 10 + buf[i] - 48
+        }
+        state.hash = (Math.imul(state.hash, 31) + s + e + (end - start)) | 0
+        state.lines++
+      }
+
+      function linesJoined(buf, cpos, dpos, minData) {
+        const state = { hash: 0, lines: 0 }
+        let lineStart = 0
+        let pos = 0
+        while (lineStart < buf.length) {
+          const nl = buf.indexOf(10, lineStart)
+          if (nl === -1) {
+            break
+          }
+          const target = lineStart + minData
+          while (pos < dpos.length && target >= dpos[pos]) {
+            pos++
+          }
+          state.hash = (state.hash + cpos[pos]) | 0
+          scanLine(buf, lineStart, nl, state)
+          lineStart = nl + 1
+        }
+        return `${state.lines}:${state.hash}`
+      }
+
+      function linesSegments(segments, cpos, dpos, minData) {
+        const state = { hash: 0, lines: 0 }
+        let pos = 0
+        let base = 0
+        let carry
+        let carryAt = 0
+        const visit = joined => {
+          const target = joined + minData
+          while (pos < dpos.length && target >= dpos[pos]) {
+            pos++
+          }
+          state.hash = (state.hash + cpos[pos]) | 0
+        }
+        for (const seg of segments) {
+          let lineStart = 0
+          if (carry) {
+            const nl = seg.indexOf(10)
+            if (nl === -1) {
+              carry = concat(carry, seg)
+              base += seg.length
+              continue
+            }
+            const line = concat(carry, seg.subarray(0, nl))
+            visit(carryAt)
+            scanLine(line, 0, line.length, state)
+            lineStart = nl + 1
+            carry = undefined
+          }
+          while (lineStart < seg.length) {
+            const nl = seg.indexOf(10, lineStart)
+            if (nl === -1) {
+              break
+            }
+            visit(base + lineStart)
+            scanLine(seg, lineStart, nl, state)
+            lineStart = nl + 1
+          }
+          if (lineStart < seg.length) {
+            carry = seg.slice(lineStart)
+            carryAt = base + lineStart
+          }
+          base += seg.length
+        }
+        return `${state.lines}:${state.hash}`
+      }
+
+      // decompressed offsets where a BAM record starts, so a chunk can begin
+      // on one as an index's minv does
+      async function bamRecordStarts(data) {
+        const bytes = await unzip(data)
+        const dv = new DataView(
+          bytes.buffer,
+          bytes.byteOffset,
+          bytes.byteLength,
+        )
+        let p = 8 + dv.getInt32(4, true)
+        const nRef = dv.getInt32(p, true)
+        p += 4
+        for (let i = 0; i < nRef; i++) {
+          p += 8 + dv.getInt32(p, true)
+        }
+        const starts = new Set()
+        while (p + 4 <= bytes.length) {
+          starts.add(p)
+          p += 4 + dv.getInt32(p, true)
+        }
+        return starts
+      }
+
+      // `count` blocks from the middle of the file, the first starting on a
+      // record for BAM, and the input sliced the way bam-js reads it
+      function middleChunk(data, allBlocks, count, recordStarts) {
+        const offsets = []
+        let d = 0
+        for (const b of allBlocks) {
+          offsets.push(d)
+          d += b.decompressedSize
+        }
+        let start = Math.max(0, Math.floor((allBlocks.length - count) / 2))
+        while (recordStarts && start > 0 && !recordStarts.has(offsets[start])) {
+          start--
+        }
+        const first = allBlocks[start]
+        const last = allBlocks[Math.min(start + count, allBlocks.length) - 1]
+        return {
+          input: data.slice(
+            first.inputOffset,
+            last.inputOffset + last.compressedSize,
+          ),
+          chunk: {
+            minv: { dataPosition: 0, blockPosition: first.filePosition },
+            maxv: { dataPosition: 65535, blockPosition: last.filePosition },
+          },
+        }
+      }
+
+      function armsFor(kind, input, chunk, pool) {
+        const minData = chunk.minv.dataPosition
+        const joinedWalk = kind === 'bam' ? bamJoined : linesJoined
+        const segWalk = kind === 'bam' ? bamSegments : linesSegments
+        return {
+          seq: async () => {
+            const r = await unzipChunkSlice(input, chunk)
+            return joinedWalk(r.buffer, r.cpositions, r.dpositions, minData)
+          },
+          joined: async () => {
+            const r = await unzipChunkSlice(input, chunk, pool)
+            return joinedWalk(r.buffer, r.cpositions, r.dpositions, minData)
+          },
+          segments: async () => {
+            const r = await unzipChunkSegments(input, chunk, pool)
+            return segWalk(r.segments, r.cpositions, r.dpositions, minData)
+          },
+        }
+      }
+
+      async function timeArm(run, reps) {
+        const start = performance.now()
+        for (let i = 0; i < reps; i++) {
+          await run()
+        }
+        return (performance.now() - start) / reps
+      }
+
+      window.runSegments = async config => {
+        const pool = await createBgzfWorkerPool(config.workers, undefined, 0)
+        const results = []
+        for (const f of config.files) {
+          const data = await fetchFile(f.path)
+          const allBlocks = scanBgzfBlocks(data, 0, data.length)
+          const recordStarts =
+            f.kind === 'bam' ? await bamRecordStarts(data) : undefined
+          const rows = []
+          for (const count of config.blockCounts) {
+            if (count > allBlocks.length) {
+              continue
+            }
+            const { input, chunk } = middleChunk(
+              data,
+              allBlocks,
+              count,
+              recordStarts,
+            )
+            const arms = armsFor(f.kind, input, chunk, pool)
+            const digest = r => (f.kind === 'bam' ? bamDigest(r) : r)
+            const expected = digest(await arms.seq())
+            const identical =
+              digest(await arms.joined()) === expected &&
+              digest(await arms.segments()) === expected
+            const segs = (await unzipChunkSegments(input, chunk, pool)).segments
+            const uncompressed = segs.reduce((n, s) => n + s.length, 0)
+            const reps = Math.max(2, Math.round(2e7 / uncompressed))
+            const keys = ['seq', 'joined', 'segments']
+            const samples = { seq: [], joined: [], segments: [] }
+            for (const k of keys) {
+              await timeArm(arms[k], reps)
+            }
+            for (let r = 0; r < config.rounds; r++) {
+              const order = r % 2 ? [...keys].reverse() : keys
+              for (const k of order) {
+                samples[k].push(await timeArm(arms[k], reps))
+              }
+            }
+            rows.push({
+              blocks: count,
+              uncompressed,
+              segments: segs.length,
+              identical,
+              expected,
+              samples,
+            })
+          }
+          results.push({ name: f.name, kind: f.kind, rows })
+        }
+        pool.destroy()
+        return {
+          workers: config.workers,
+          hardwareConcurrency: navigator.hardwareConcurrency,
+          results,
+        }
+      }
+    </script>
+  </body>
+</html>

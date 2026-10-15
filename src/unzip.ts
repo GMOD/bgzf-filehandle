@@ -133,12 +133,12 @@ export interface ChunkSlice {
  * `minv.dataPosition` and the last to `maxv.dataPosition`, and record each
  * block's compressed offset and its uncompressed offset within the result.
  */
-function assembleChunkSliceResult(
+function trimBlocks(
   blocks: Uint8Array[],
   infos: BgzfBlockInfo[],
   minv: VirtualOffset,
   maxv: VirtualOffset,
-): ChunkSlice {
+) {
   const cpositions: number[] = []
   const dpositions: number[] = []
   const slices: Uint8Array[] = []
@@ -169,12 +169,101 @@ function assembleChunkSliceResult(
   }
 
   return {
-    buffer: concatUint8Array(slices),
+    slices,
     // Float64Array to match the wasm path's shape exactly — a caller must not
     // be able to tell which one produced its result
     cpositions: Float64Array.from(cpositions),
     dpositions: Float64Array.from(dpositions),
   }
+}
+
+function assembleChunkSliceResult(
+  blocks: Uint8Array[],
+  infos: BgzfBlockInfo[],
+  minv: VirtualOffset,
+  maxv: VirtualOffset,
+): ChunkSlice {
+  const { slices, cpositions, dpositions } = trimBlocks(
+    blocks,
+    infos,
+    minv,
+    maxv,
+  )
+  return { buffer: concatUint8Array(slices), cpositions, dpositions }
+}
+
+/**
+ * A chunk slice whose bytes are split across several buffers, in order. Joined,
+ * `segments` are exactly `ChunkSlice.buffer`, and `cpositions`/`dpositions`
+ * index into that joined form. Each segment is a view, possibly at a nonzero
+ * `byteOffset`, into a buffer that can be larger than the segment.
+ */
+export interface ChunkSegments {
+  segments: Uint8Array[]
+  cpositions: Float64Array
+  dpositions: Float64Array
+}
+
+function mergeContiguous(slices: Uint8Array[]) {
+  const segments: Uint8Array[] = []
+  let current: Uint8Array | undefined
+  for (const slice of slices) {
+    if (
+      current?.buffer === slice.buffer &&
+      current.byteOffset + current.length === slice.byteOffset
+    ) {
+      current = new Uint8Array(
+        current.buffer,
+        current.byteOffset,
+        current.length + slice.length,
+      )
+    } else {
+      if (current) {
+        segments.push(current)
+      }
+      current = slice
+    }
+  }
+  if (current) {
+    segments.push(current)
+  }
+  return segments
+}
+
+/**
+ * {@link unzipChunkSlice} without the final copy. A pooled chunk comes back as
+ * one segment per worker range, which spares the calling thread a serial pass
+ * over the whole decompressed chunk; a consumer has to handle a record or line
+ * that straddles two segments.
+ */
+export async function unzipChunkSegments(
+  inputData: Uint8Array,
+  chunk: Chunk,
+  workerPool?: BgzfWorkerPool,
+): Promise<ChunkSegments> {
+  const { minv, maxv } = chunk
+  if (workerPool) {
+    const blocks = scanBgzfBlocks(
+      inputData,
+      minv.blockPosition,
+      maxv.blockPosition,
+    )
+    if (decompressedBytes(blocks) >= POOL_MIN_DECOMPRESSED_BYTES) {
+      const result = await workerPool.decompressBlocks(inputData, blocks)
+      const { slices, cpositions, dpositions } = trimBlocks(
+        result.blocks,
+        blocks,
+        minv,
+        maxv,
+      )
+      return { segments: mergeContiguous(slices), cpositions, dpositions }
+    }
+  }
+  const { buffer, cpositions, dpositions } = await unzipChunkSlice(
+    inputData,
+    chunk,
+  )
+  return { segments: [buffer], cpositions, dpositions }
 }
 
 /**

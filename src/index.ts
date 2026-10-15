@@ -2,8 +2,18 @@ export { default as BgzfFilehandle } from './bgzFilehandle.ts'
 export { MAX_BGZF_BLOCK_SIZE } from './constants.ts'
 export { scanBgzfBlocks } from './bgzfBlockScan.ts'
 export type { BgzfBlockInfo } from './bgzfBlockScan.ts'
-export { POOL_MIN_DECOMPRESSED_BYTES, unzip, unzipChunkSlice } from './unzip.ts'
-export type { Chunk, ChunkSlice, VirtualOffset } from './unzip.ts'
+export {
+  POOL_MIN_DECOMPRESSED_BYTES,
+  unzip,
+  unzipChunkSegments,
+  unzipChunkSlice,
+} from './unzip.ts'
+export type {
+  Chunk,
+  ChunkSegments,
+  ChunkSlice,
+  VirtualOffset,
+} from './unzip.ts'
 export {
   createBgzfWorkerPool,
   destroySharedWorkerPool,
