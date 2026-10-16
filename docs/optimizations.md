@@ -131,7 +131,9 @@ ever grows. Three rules in the API follow from that:
   MiB.
   - `unzipChunkSegments` returns one segment per run, with no extra copy.
   - `unzip` fills a preallocated output run by run, which costs one extra copy
-    past the cap.
+    past the cap. In Chrome that took the 606 MiB index from 336 to 490 ms. A
+    wasm-side `decompressAllInto` writing straight into the output would win
+    that back, at the cost of a bundle rebuild.
 
 Everything wasm returns to JS has to own its bytes. wasm-bindgen's `Vec<u8>`
 path already `.slice()`s out of the heap, but its string path decodes a view
