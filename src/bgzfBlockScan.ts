@@ -1,3 +1,5 @@
+import { MAX_BGZF_BLOCK_SIZE } from './constants.ts'
+
 /** Where one BGZF block sits, and how big it is on both sides of the inflate. */
 export interface BgzfBlockInfo {
   /** Offset of the block's first byte within the scanned buffer. */
@@ -24,8 +26,9 @@ const BGZF_MIN_BLOCK_SIZE = BGZF_HEADER_SIZE + BGZF_TRAILER_SIZE
  * @param minBlockPosition - the file offset `input` starts at, i.e. a chunk's
  * `minv.blockPosition`.
  * @param maxBlockPosition - the last block wanted, i.e. `maxv.blockPosition`.
- * That block is included; scanning also stops early at the end of `input` or
- * at the first bytes that are not a valid BGZF header.
+ * That block is included; scanning also stops early at the end of `input`, at
+ * the first bytes that are not a valid BGZF header, or at an `ISIZE` over the
+ * spec's 64 KiB, as the wasm `parse_block` does.
  */
 export function scanBgzfBlocks(
   input: Uint8Array,
@@ -67,6 +70,10 @@ export function scanBgzfBlocks(
         (input[trailerPos + 6]! << 16) |
         (input[trailerPos + 7]! << 24)) >>>
       0
+
+    if (isize > MAX_BGZF_BLOCK_SIZE) {
+      break
+    }
 
     blocks.push({
       inputOffset: offset,

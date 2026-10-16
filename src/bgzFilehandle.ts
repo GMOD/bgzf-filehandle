@@ -10,8 +10,7 @@ const DEFAULT_BLOCK_CONCURRENCY = 10
 // Blocks are adjacent in the file, so every block a read touches can be
 // fetched as one contiguous byte range and handed to a single decompress call.
 // Batches are capped by uncompressed size so an enormous read still streams
-// through in pieces rather than materializing at once in the wasm heap, which
-// only ever grows.
+// through in pieces.
 const MAX_BATCH_UNCOMPRESSED_SIZE = 32 * 1024 * 1024
 
 // Small fixed-concurrency limiter to replace p-limit (which is pure ESM in

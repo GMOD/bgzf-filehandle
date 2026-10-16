@@ -112,16 +112,26 @@ pako too.
 ## Crossing into wasm
 
 Calling into wasm copies the whole input into the wasm heap, and that heap only
-ever grows. Two rules in the API follow from that:
+ever grows. Three rules in the API follow from that:
 
 - **Non-BGZF input never reaches wasm.** `unzip` sniffs the gzip magic, the
   deflate method, the FEXTRA flag and the `BC` subfield id in JS first. If
   `unzip` sent a plain gzip file through wasm only for wasm to reject it, the
   heap would grow by the file's full size and stay that size.
-- **Each chunk crosses the boundary once, not each block.** A chunk spanning 300
-  blocks makes a single call. One call per block would multiply the copies
-  across the boundary by the block count for no gain, since libdeflate already
-  decodes those blocks back to back inside the one call.
+- **A chunk within the 8 MiB cap below crosses the boundary once, not once per
+  block.** A chunk spanning 300 blocks makes a single call. One call per block
+  would multiply the copies across the boundary by the block count for no gain,
+  since libdeflate already decodes those blocks back to back inside the one
+  call.
+- **No call holds more than 8 MiB.** `MAX_INFLATE_BYTES` caps a call's
+  compressed plus inflated bytes. A larger chunk, whole file or worker range
+  goes through as runs of consecutive blocks under the cap, so the heap stays at
+  9-15 MiB. Without the cap, one window of 1000x long reads reserved 262 MiB for
+  the life of the process, and `unzip` of a 606 MiB tabix index reserved 611
+  MiB.
+  - `unzipChunkSegments` returns one segment per run, with no extra copy.
+  - `unzip` fills a preallocated output run by run, which costs one extra copy
+    past the cap.
 
 Everything wasm returns to JS has to own its bytes. wasm-bindgen's `Vec<u8>`
 path already `.slice()`s out of the heap, but its string path decodes a view
@@ -152,9 +162,9 @@ adjacent on disk, so every block a read touches falls in one contiguous byte
 range, and a read spanning 300 blocks is a single request and a single inflate.
 The rest of the read path works as follows:
 
-- **Reads batch at 32MB of uncompressed output**, one request per batch. The cap
-  limits the growth of the wasm heap rather than network use. Without it, one
-  enormous read decompresses whole into the heap and leaves the heap that size.
+- **Reads batch at 32MB of uncompressed output**, one request per batch, so an
+  enormous read streams through in pieces. `unzip` keeps the wasm heap itself
+  under `MAX_INFLATE_BYTES` per call.
 - **`blockConcurrency` (default 10) caps how many batch requests are in
   flight**; it limits requests, not threads. Neither it nor the 32MB batch size
   rests on a benchmark, so treat them as defaults to tune from rather than an

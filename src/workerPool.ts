@@ -1,4 +1,9 @@
-import { inflateHere, splitBlocks } from './inflateBlocks.ts'
+import {
+  inflateHere,
+  inflateRuns,
+  runInputRange,
+  splitBlocks,
+} from './inflateBlocks.ts'
 import workerSource from './wasm/bgzf-worker-source.ts'
 
 import type { BgzfBlockInfo } from './bgzfBlockScan.ts'
@@ -442,30 +447,25 @@ async function run(
   const numW = workers.length
   const blocksPerWorker = Math.ceil(blocks.length / numW)
 
-  const rangeInfos: { startBlock: number; endBlock: number }[] = []
+  const runs: [number, number][] = []
   const promises: Promise<Uint8Array>[] = []
 
   for (let w = 0; w < numW; w++) {
     const startBlock = w * blocksPerWorker
     const endBlock = Math.min(startBlock + blocksPerWorker, blocks.length)
-    if (startBlock >= endBlock) {
-      continue
+    for (const run of inflateRuns(blocks, startBlock, endBlock)) {
+      const { inputOffset, inputLength } = runInputRange(blocks, ...run)
+      runs.push(run)
+      promises.push(
+        workers[w]!.decompressRange(input, inputOffset, inputLength),
+      )
     }
-
-    const firstBlock = blocks[startBlock]!
-    const lastBlock = blocks[endBlock - 1]!
-    const inputOffset = firstBlock.inputOffset
-    const inputLength =
-      lastBlock.inputOffset + lastBlock.compressedSize - inputOffset
-
-    rangeInfos.push({ startBlock, endBlock })
-    promises.push(workers[w]!.decompressRange(input, inputOffset, inputLength))
   }
 
   const ranges = await Promise.all(promises)
   const resultBlocks = new Array<Uint8Array>(blocks.length)
-  for (let r = 0; r < rangeInfos.length; r++) {
-    const { startBlock, endBlock } = rangeInfos[r]!
+  for (let r = 0; r < runs.length; r++) {
+    const [startBlock, endBlock] = runs[r]!
     splitBlocks(ranges[r]!, blocks, startBlock, endBlock, resultBlocks)
   }
   return { blocks: resultBlocks }

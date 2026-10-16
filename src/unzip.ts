@@ -1,6 +1,13 @@
 import { ungzip } from 'pako-esm2'
 
 import { scanBgzfBlocks } from './bgzfBlockScan.ts'
+import {
+  MAX_INFLATE_BYTES,
+  inflateFootprint,
+  inflateHere,
+  inflateRuns,
+  runInputRange,
+} from './inflateBlocks.ts'
 import { concatUint8Array } from './util.ts'
 import {
   decompressAll,
@@ -98,8 +105,11 @@ export async function unzip(inputData: Uint8Array): Promise<Uint8Array> {
       'problem decompressing block: not a valid bgzf or gzip block',
     )
   }
+  const blocks = scanBgzfBlocks(inputData, 0, Infinity)
   try {
-    return await decompressAll(inputData)
+    return inflateFootprint(blocks) > MAX_INFLATE_BYTES
+      ? await inflateInRuns(inputData, blocks)
+      : await decompressAll(inputData)
   } catch (error) {
     // A valid-looking header that wasm still rejects means the first block is
     // truncated; the generic gzip path gives a better error for that.
@@ -108,6 +118,20 @@ export async function unzip(inputData: Uint8Array): Promise<Uint8Array> {
     }
     throw wrapGzipHeaderError(error)
   }
+}
+
+async function inflateInRuns(input: Uint8Array, blocks: BgzfBlockInfo[]) {
+  const output = new Uint8Array(decompressedBytes(blocks))
+  let offset = 0
+  for (const [start, end] of inflateRuns(blocks)) {
+    const { inputOffset, inputLength } = runInputRange(blocks, start, end)
+    const run = await decompressAll(
+      input.subarray(inputOffset, inputOffset + inputLength),
+    )
+    output.set(run, offset)
+    offset += run.length
+  }
+  return output
 }
 
 /**
@@ -159,7 +183,7 @@ function trimBlocks(
     if (start < end) {
       slices.push(block.subarray(start, end))
     }
-    dpos += block.length - start
+    dpos += Math.max(0, block.length - start)
 
     if (isLast) {
       cpositions.push(info.filePosition + info.compressedSize)
@@ -242,24 +266,22 @@ export async function unzipChunkSegments(
   workerPool?: BgzfWorkerPool,
 ): Promise<ChunkSegments> {
   const { minv, maxv } = chunk
-  if (workerPool) {
-    const blocks = scanBgzfBlocks(
-      inputData,
-      minv.blockPosition,
-      maxv.blockPosition,
+  const blocks = scanBgzfBlocks(
+    inputData,
+    minv.blockPosition,
+    maxv.blockPosition,
+  )
+  const inflated = await inflateEachBlock(inputData, blocks, workerPool)
+  if (inflated) {
+    const { slices, cpositions, dpositions } = trimBlocks(
+      inflated,
+      blocks,
+      minv,
+      maxv,
     )
-    if (decompressedBytes(blocks) >= POOL_MIN_DECOMPRESSED_BYTES) {
-      const result = await workerPool.decompressBlocks(inputData, blocks)
-      const { slices, cpositions, dpositions } = trimBlocks(
-        result.blocks,
-        blocks,
-        minv,
-        maxv,
-      )
-      return { segments: mergeContiguous(slices), cpositions, dpositions }
-    }
+    return { segments: mergeContiguous(slices), cpositions, dpositions }
   }
-  const { buffer, cpositions, dpositions } = await unzipChunkSlice(
+  const { buffer, cpositions, dpositions } = await decompressChunkInOneCall(
     inputData,
     chunk,
   )
@@ -284,25 +306,29 @@ function decompressedBytes(blocks: BgzfBlockInfo[]) {
   return total
 }
 
-export async function unzipChunkSlice(
+/**
+ * Each block inflated separately: through the pool when there is one and the
+ * chunk is worth it, or on this thread when one wasm call would exceed
+ * `MAX_INFLATE_BYTES`. Undefined when a single call is the cheaper path.
+ */
+async function inflateEachBlock(
   inputData: Uint8Array,
-  chunk: Chunk,
+  blocks: BgzfBlockInfo[],
   workerPool?: BgzfWorkerPool,
-): Promise<ChunkSlice> {
-  const { minv, maxv } = chunk
-
-  if (workerPool) {
-    const blocks = scanBgzfBlocks(
-      inputData,
-      minv.blockPosition,
-      maxv.blockPosition,
-    )
-    if (decompressedBytes(blocks) >= POOL_MIN_DECOMPRESSED_BYTES) {
-      const result = await workerPool.decompressBlocks(inputData, blocks)
-      return assembleChunkSliceResult(result.blocks, blocks, minv, maxv)
-    }
+) {
+  if (workerPool && decompressedBytes(blocks) >= POOL_MIN_DECOMPRESSED_BYTES) {
+    return (await workerPool.decompressBlocks(inputData, blocks)).blocks
   }
+  if (inflateFootprint(blocks) > MAX_INFLATE_BYTES) {
+    return (await inflateHere(inputData, blocks)).blocks
+  }
+  return undefined
+}
 
+async function decompressChunkInOneCall(
+  inputData: Uint8Array,
+  { minv, maxv }: Chunk,
+): Promise<ChunkSlice> {
   try {
     const result = await decompressChunkSlice(
       inputData,
@@ -319,4 +345,21 @@ export async function unzipChunkSlice(
   } catch (error) {
     throw wrapGzipHeaderError(error)
   }
+}
+
+export async function unzipChunkSlice(
+  inputData: Uint8Array,
+  chunk: Chunk,
+  workerPool?: BgzfWorkerPool,
+): Promise<ChunkSlice> {
+  const { minv, maxv } = chunk
+  const blocks = scanBgzfBlocks(
+    inputData,
+    minv.blockPosition,
+    maxv.blockPosition,
+  )
+  const inflated = await inflateEachBlock(inputData, blocks, workerPool)
+  return inflated
+    ? assembleChunkSliceResult(inflated, blocks, minv, maxv)
+    : decompressChunkInOneCall(inputData, chunk)
 }

@@ -232,15 +232,16 @@ them:
   single sample.
 - **Pass `idleTimeoutMs: 0` to the pools under test**, or a reap between arms
   puts a worker respawn and a wasm instantiate inside a timed region.
-- **Watch the tab's memory once the chunks get large.** A worker's wasm heap
-  only ever grows, so a sweep holding several pools alive across a 400MB chunk
-  runs the renderer out of memory, and puppeteer reports it as a detached frame
-  or a dropped websocket rather than as anything about memory. One worker is the
-  worst case, not the cheapest, since the whole range goes into a single heap.
-  Either keep the chunk in the low hundreds of MB or measure one worker count
-  per page load. If you split the passes, each gets a separate sequential
-  baseline, and drift between baselines once produced an 8w column whose raw
-  times were _slower_ than 4w while its ratio came out higher.
+- **Watch the tab's memory once the chunks get large.** Before each worker took
+  its range in runs of at most `MAX_INFLATE_BYTES`, a worker's grow-only wasm
+  heap held its whole range, so a sweep holding several pools alive across a
+  400MB chunk ran the renderer out of memory, and puppeteer reported it as a
+  detached frame or a dropped websocket rather than as anything about memory.
+  The inflated output still has to fit in the tab. Either keep the chunk in the
+  low hundreds of MB or measure one worker count per page load. If you split the
+  passes, each gets a separate sequential baseline, and drift between baselines
+  once produced an 8w column whose raw times were _slower_ than 4w while its
+  ratio came out higher.
 
 ## Getting a pool
 
