@@ -1,3 +1,11 @@
+## [6.8.1](https://github.com/GMOD/bgzf-filehandle/compare/v6.8.0...v6.8.1) (2026-10-17)
+
+### Other Changes
+
+- Cap each wasm inflate call at 8 MiB so the grow-only heap stays small ([3b97524](https://github.com/GMOD/bgzf-filehandle/commit/3b975247baa74748ff59d4750b82b087a60b3e51))
+- Note the measured cost of unzip's extra copy past the inflate cap ([2f876a7](https://github.com/GMOD/bgzf-filehandle/commit/2f876a76c9958459788c32b18f61cf5ff409dce2))
+- Copy unzip runs straight out of the wasm heap; bound one-call input ([362ca1e](https://github.com/GMOD/bgzf-filehandle/commit/362ca1e4b68422718c6b65db9d8b695e23cfef8a))
+
 ## [6.8.0](https://github.com/GMOD/bgzf-filehandle/compare/v6.7.0...v6.8.0) (2026-10-15)
 
 ### Chores
