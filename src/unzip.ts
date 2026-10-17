@@ -3,10 +3,12 @@ import { ungzip } from 'pako-esm2'
 import { scanBgzfBlocks } from './bgzfBlockScan.ts'
 import {
   MAX_INFLATE_BYTES,
+  decompressAllInto,
   inflateFootprint,
   inflateHere,
   inflateRuns,
   runInputRange,
+  scannedInput,
 } from './inflateBlocks.ts'
 import { concatUint8Array } from './util.ts'
 import {
@@ -109,7 +111,7 @@ export async function unzip(inputData: Uint8Array): Promise<Uint8Array> {
   try {
     return inflateFootprint(blocks) > MAX_INFLATE_BYTES
       ? await inflateInRuns(inputData, blocks)
-      : await decompressAll(inputData)
+      : await decompressAll(scannedInput(inputData, blocks))
   } catch (error) {
     // A valid-looking header that wasm still rejects means the first block is
     // truncated; the generic gzip path gives a better error for that.
@@ -125,11 +127,11 @@ async function inflateInRuns(input: Uint8Array, blocks: BgzfBlockInfo[]) {
   let offset = 0
   for (const [start, end] of inflateRuns(blocks)) {
     const { inputOffset, inputLength } = runInputRange(blocks, start, end)
-    const run = await decompressAll(
+    offset += await decompressAllInto(
       input.subarray(inputOffset, inputOffset + inputLength),
+      output,
+      offset,
     )
-    output.set(run, offset)
-    offset += run.length
   }
   return output
 }
@@ -255,10 +257,11 @@ function mergeContiguous(slices: Uint8Array[]) {
 }
 
 /**
- * {@link unzipChunkSlice} without the final copy. A pooled chunk comes back as
- * one segment per worker range, which spares the calling thread a serial pass
- * over the whole decompressed chunk; a consumer has to handle a record or line
- * that straddles two segments.
+ * {@link unzipChunkSlice} without the final copy. A chunk inflated in more than
+ * one wasm call (pooled, or over `MAX_INFLATE_BYTES`) comes back as one segment
+ * per call, which spares the calling thread a serial pass over the whole
+ * decompressed chunk; a consumer has to handle a record or line that straddles
+ * two segments.
  */
 export async function unzipChunkSegments(
   inputData: Uint8Array,
@@ -283,6 +286,7 @@ export async function unzipChunkSegments(
   }
   const { buffer, cpositions, dpositions } = await decompressChunkInOneCall(
     inputData,
+    blocks,
     chunk,
   )
   return { segments: [buffer], cpositions, dpositions }
@@ -327,11 +331,12 @@ async function inflateEachBlock(
 
 async function decompressChunkInOneCall(
   inputData: Uint8Array,
+  blocks: BgzfBlockInfo[],
   { minv, maxv }: Chunk,
 ): Promise<ChunkSlice> {
   try {
     const result = await decompressChunkSlice(
-      inputData,
+      scannedInput(inputData, blocks),
       minv.blockPosition,
       minv.dataPosition,
       maxv.blockPosition,
@@ -361,5 +366,5 @@ export async function unzipChunkSlice(
   const inflated = await inflateEachBlock(inputData, blocks, workerPool)
   return inflated
     ? assembleChunkSliceResult(inflated, blocks, minv, maxv)
-    : decompressChunkInOneCall(inputData, chunk)
+    : decompressChunkInOneCall(inputData, blocks, chunk)
 }

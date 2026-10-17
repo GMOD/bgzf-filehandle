@@ -125,15 +125,16 @@ ever grows. Three rules in the API follow from that:
   call.
 - **No call holds more than 8 MiB.** `MAX_INFLATE_BYTES` caps a call's
   compressed plus inflated bytes. A larger chunk, whole file or worker range
-  goes through as runs of consecutive blocks under the cap, so the heap stays at
-  9-15 MiB. Without the cap, one window of 1000x long reads reserved 262 MiB for
-  the life of the process, and `unzip` of a 606 MiB tabix index reserved 611
-  MiB.
+  goes through as runs of consecutive blocks under the cap, so the heap levels
+  off at about 20 MiB, roughly twice the cap. Without the cap, one window of
+  1000x long reads reserved 262 MiB for the life of the process, and `unzip` of
+  a 606 MiB tabix index reserved 611 MiB.
   - `unzipChunkSegments` returns one segment per run, with no extra copy.
-  - `unzip` fills a preallocated output run by run, which costs one extra copy
-    past the cap. In Chrome that took the 606 MiB index from 336 to 490 ms. A
-    wasm-side `decompressAllInto` writing straight into the output would win
-    that back, at the cost of a bundle rebuild.
+  - `unzip` fills a preallocated output run by run, copying each run straight
+    out of the wasm heap through the raw wasm-bindgen exports. Through the
+    glue's `.slice()` that was a second copy, and the 606 MiB index took 336 →
+    490 ms in Chrome. A bundle whose exports no longer match falls back to that
+    path.
 
 Everything wasm returns to JS has to own its bytes. wasm-bindgen's `Vec<u8>`
 path already `.slice()`s out of the heap, but its string path decodes a view

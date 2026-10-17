@@ -303,8 +303,10 @@ const { segments, cpositions, dpositions } = await unzipChunkSegments(
 
 - Joined, `segments` are exactly `unzipChunkSlice`'s `buffer`, and `cpositions`
   and `dpositions` index into that joined form.
-- A pooled chunk is one segment per worker range. Without a pool, below
-  `POOL_MIN_DECOMPRESSED_BYTES`, or while the workers boot, it is one segment.
+- A chunk is one segment per wasm call: one per worker range when pooled, split
+  further into runs of at most `MAX_INFLATE_BYTES`. Without a pool, below
+  `POOL_MIN_DECOMPRESSED_BYTES`, or while the workers boot, a chunk under that
+  cap is one segment.
 - Each segment is a view, often at a nonzero `byteOffset`, and holds onto the
   trimmed head and tail of its range, at most one block at each end.
 - The caller handles a record or line that straddles two segments, usually by

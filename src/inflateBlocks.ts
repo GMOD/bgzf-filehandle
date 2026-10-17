@@ -1,3 +1,4 @@
+import { MAX_BGZF_BLOCK_SIZE } from './constants.ts'
 import { decompressAll, init } from './wasm/bgzf-wasm-inlined.js'
 
 import type { BgzfBlockInfo } from './bgzfBlockScan.ts'
@@ -58,6 +59,83 @@ export function runInputRange(
     inputOffset: first.inputOffset,
     inputLength: last.inputOffset + last.compressedSize - first.inputOffset,
   }
+}
+
+/**
+ * The prefix of `input` that holds the scanned blocks, so a one-call inflate
+ * copies no bytes past the last block wasm would read. With no blocks, wasm
+ * rejects the first header, which it reads within one maximum-size block.
+ */
+export function scannedInput(input: Uint8Array, blocks: BgzfBlockInfo[]) {
+  const last = blocks.at(-1)
+  return input.subarray(
+    0,
+    last ? last.inputOffset + last.compressedSize : MAX_BGZF_BLOCK_SIZE,
+  )
+}
+
+interface RawWasm {
+  memory: WebAssembly.Memory
+  decompress_all: (retptr: number, ptr: number, len: number) => void
+  __wbindgen_add_to_stack_pointer: (delta: number) => number
+  __wbindgen_export: (ptr: number, len: number, align: number) => void
+  __wbindgen_export2: (len: number, align: number) => number
+}
+
+const RAW_ARITY = {
+  decompress_all: 3,
+  __wbindgen_add_to_stack_pointer: 1,
+  __wbindgen_export: 3,
+  __wbindgen_export2: 2,
+}
+
+/**
+ * The wasm-bindgen exports `decompress_all`'s glue calls, when this bundle has
+ * them under the names and arities it was built with. A rebuild with another
+ * wasm-bindgen can rename them; callers then take the glue path.
+ */
+export function rawWasm(exports: Record<string, unknown>) {
+  const named = Object.entries(RAW_ARITY).every(([name, arity]) => {
+    const fn = exports[name]
+    return typeof fn === 'function' && fn.length === arity
+  })
+  return named && exports.memory instanceof WebAssembly.Memory
+    ? (exports as unknown as RawWasm)
+    : undefined
+}
+
+/**
+ * `decompressAll(input)` written into `output` at `offset`, copied straight out
+ * of the wasm heap rather than through the glue's `.slice()`. Returns the
+ * inflated length.
+ */
+export async function decompressAllInto(
+  input: Uint8Array,
+  output: Uint8Array,
+  offset: number,
+) {
+  const raw = rawWasm(await init())
+  if (raw) {
+    const retptr = raw.__wbindgen_add_to_stack_pointer(-16)
+    try {
+      const ptr = raw.__wbindgen_export2(input.length, 1) >>> 0
+      new Uint8Array(raw.memory.buffer).set(input, ptr)
+      raw.decompress_all(retptr, ptr, input.length)
+      const ret = new DataView(raw.memory.buffer)
+      if (ret.getInt32(retptr + 12, true) === 0) {
+        const outPtr = ret.getUint32(retptr, true)
+        const outLen = ret.getUint32(retptr + 4, true)
+        output.set(new Uint8Array(raw.memory.buffer, outPtr, outLen), offset)
+        raw.__wbindgen_export(outPtr, outLen, 1)
+        return outLen
+      }
+    } finally {
+      raw.__wbindgen_add_to_stack_pointer(16)
+    }
+  }
+  const run = await decompressAll(input)
+  output.set(run, offset)
+  return run.length
 }
 
 export function splitBlocks(
