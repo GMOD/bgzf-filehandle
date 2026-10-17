@@ -129,12 +129,15 @@ ever grows. Three rules in the API follow from that:
   off at about 20 MiB, roughly twice the cap. Without the cap, one window of
   1000x long reads reserved 262 MiB for the life of the process, and `unzip` of
   a 606 MiB tabix index reserved 611 MiB.
-  - `unzipChunkSegments` returns one segment per run, with no extra copy.
-  - `unzip` fills a preallocated output run by run, copying each run straight
-    out of the wasm heap through the raw wasm-bindgen exports. Through the
-    glue's `.slice()` that was a second copy, and the 606 MiB index took 336 →
-    490 ms in Chrome. A bundle whose exports no longer match falls back to that
-    path.
+  - Both fill one preallocated output run by run, copying each run straight out
+    of the wasm heap through the raw wasm-bindgen exports. `unzip` returns it,
+    and `unzipChunkSegments` returns it as one segment with no extra copy.
+    Through the glue's `.slice()` each run was a second copy, and the 606 MiB
+    index took 336 → 490 ms in Chrome. A bundle whose exports no longer match
+    falls back to that path.
+  - One buffer, not one per run: glibc keeps freed run-sized buffers in its heap
+    rather than returning them to the OS, which in R's V8 held 150-250 MiB more
+    RSS after one wide BAM read.
 
 Everything wasm returns to JS has to own its bytes. wasm-bindgen's `Vec<u8>`
 path already `.slice()`s out of the heap, but its string path decodes a view

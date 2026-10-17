@@ -7,6 +7,7 @@ import { scanBgzfBlocks } from '../src/bgzfBlockScan.ts'
 import {
   MAX_INFLATE_BYTES,
   inflateFootprint,
+  inflateHere,
   inflateRuns,
 } from '../src/inflateBlocks.ts'
 import { unzip, unzipChunkSegments, unzipChunkSlice } from '../src/unzip.ts'
@@ -130,18 +131,16 @@ test('random chunks through a pool whose worker ranges exceed the cap', async ()
   }
 }, 60_000)
 
-test('a chunk over the cap comes back in segments of at most the cap', async () => {
+test('a chunk over the cap inflates into one buffer, not one per run', async () => {
   const { data, blocks } = fixtures[0]!
   const chunk: Chunk = {
     minv: { blockPosition: 0, dataPosition: 0 },
     maxv: { blockPosition: blocks.at(-1)!.filePosition, dataPosition: 65535 },
   }
-  const { segments } = await unzipChunkSegments(data, chunk)
-  expect(segments.length).toBe(inflateRuns(blocks).length)
-  expect(segments.length).toBeGreaterThan(1)
-  for (const segment of segments) {
-    expect(segment.length).toBeLessThanOrEqual(MAX_INFLATE_BYTES)
-  }
+  expect(inflateRuns(blocks).length).toBeGreaterThan(1)
+  expect((await unzipChunkSegments(data, chunk)).segments).toHaveLength(1)
+  const inflated = await inflateHere(data, blocks)
+  expect(new Set(inflated.blocks.map(b => b.buffer)).size).toBe(1)
 })
 
 test('inflateRuns covers every block once, each run within the cap', () => {

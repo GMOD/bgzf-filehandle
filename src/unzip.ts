@@ -3,11 +3,9 @@ import { ungzip } from 'pako-esm2'
 import { scanBgzfBlocks } from './bgzfBlockScan.ts'
 import {
   MAX_INFLATE_BYTES,
-  decompressAllInto,
   inflateFootprint,
   inflateHere,
-  inflateRuns,
-  runInputRange,
+  inflateInRuns,
   scannedInput,
 } from './inflateBlocks.ts'
 import { concatUint8Array } from './util.ts'
@@ -120,20 +118,6 @@ export async function unzip(inputData: Uint8Array): Promise<Uint8Array> {
     }
     throw wrapGzipHeaderError(error)
   }
-}
-
-async function inflateInRuns(input: Uint8Array, blocks: BgzfBlockInfo[]) {
-  const output = new Uint8Array(decompressedBytes(blocks))
-  let offset = 0
-  for (const [start, end] of inflateRuns(blocks)) {
-    const { inputOffset, inputLength } = runInputRange(blocks, start, end)
-    offset += await decompressAllInto(
-      input.subarray(inputOffset, inputOffset + inputLength),
-      output,
-      offset,
-    )
-  }
-  return output
 }
 
 /**
@@ -257,11 +241,10 @@ function mergeContiguous(slices: Uint8Array[]) {
 }
 
 /**
- * {@link unzipChunkSlice} without the final copy. A chunk inflated in more than
- * one wasm call (pooled, or over `MAX_INFLATE_BYTES`) comes back as one segment
- * per call, which spares the calling thread a serial pass over the whole
- * decompressed chunk; a consumer has to handle a record or line that straddles
- * two segments.
+ * {@link unzipChunkSlice} without the final copy. A pooled chunk comes back as
+ * one segment per worker call, which spares the calling thread a serial pass
+ * over the whole decompressed chunk; a consumer has to handle a record or line
+ * that straddles two segments.
  */
 export async function unzipChunkSegments(
   inputData: Uint8Array,

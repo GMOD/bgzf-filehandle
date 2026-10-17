@@ -153,19 +153,45 @@ export function splitBlocks(
   }
 }
 
+/**
+ * Every block inflated into one buffer, run by run. One allocation rather than
+ * one per run: glibc keeps freed run-sized buffers in its heap instead of
+ * returning them to the OS.
+ */
+export async function inflateInRuns(
+  input: Uint8Array,
+  blocks: BgzfBlockInfo[],
+) {
+  let total = 0
+  for (const block of blocks) {
+    total += block.decompressedSize
+  }
+  const output = new Uint8Array(total)
+  let offset = 0
+  for (const [start, end] of inflateRuns(blocks)) {
+    const { inputOffset, inputLength } = runInputRange(blocks, start, end)
+    offset += await decompressAllInto(
+      input.subarray(inputOffset, inputOffset + inputLength),
+      output,
+      offset,
+    )
+  }
+  return output
+}
+
 /** The same blocks a worker would return, inflated on the calling thread. */
 export async function inflateHere(
   input: Uint8Array,
   blocks: BgzfBlockInfo[],
 ): Promise<DecompressResult> {
   const resultBlocks = new Array<Uint8Array>(blocks.length)
-  for (const [start, end] of inflateRuns(blocks)) {
-    const { inputOffset, inputLength } = runInputRange(blocks, start, end)
-    const decompressed = await decompressAll(
-      input.subarray(inputOffset, inputOffset + inputLength),
-    )
-    splitBlocks(decompressed, blocks, start, end, resultBlocks)
-  }
+  splitBlocks(
+    await inflateInRuns(input, blocks),
+    blocks,
+    0,
+    blocks.length,
+    resultBlocks,
+  )
   return { blocks: resultBlocks }
 }
 
