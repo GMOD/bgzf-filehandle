@@ -1,3 +1,9 @@
+## [6.8.2](https://github.com/GMOD/bgzf-filehandle/compare/v6.8.1...v6.8.2) (2026-10-17)
+
+### Other Changes
+
+- Inflate a chunk past the cap into one buffer, not one per run ([80f5f9f](https://github.com/GMOD/bgzf-filehandle/commit/80f5f9fccfc47ecb5c8ebe39731fa0cd5b74f5b7))
+
 ## [6.8.1](https://github.com/GMOD/bgzf-filehandle/compare/v6.8.0...v6.8.1) (2026-10-17)
 
 ### Other Changes
