@@ -29,17 +29,12 @@ pnpm build
 
 ## Benchmarks
 
-`pnpm benchonly <name>` runs one file from `benchmarks/`. Two of them import
-`src/` directly, so they need no build: `inflate.bench.ts` measures the wasm
-path against pako and native zlib, and `local.bench.ts` measures the layers
-above inflate — `unzipChunkSlice`, `BgzfFilehandle.read`, and the plain-gzip
-fallback.
-
-`unzip.bench.ts` instead compares two refs, so it needs `pnpm bench`, which
-first builds each ref into `esm_branch1/` and `esm_branch2/` (`origin/main` and
-the current HEAD by default; set `BRANCH1`/`BRANCH2` to pick others). The script
-builds each ref as committed, in a throwaway worktree, so it does not measure
-uncommitted work.
+- `pnpm bench:inflate` times the wasm path against pako, native zlib and
+  `DecompressionStream`, one process per arm. It imports `src/`, so it needs no
+  build.
+- `pnpm bench:pool`, `bench:chunksize`, `bench:largechunk` and `bench:segments`
+  measure the worker pool in headless Chrome; see
+  [docs/worker-pool.md](docs/worker-pool.md).
 
 ## Releasing
 

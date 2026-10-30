@@ -2,8 +2,8 @@
  * What the worker pool is worth, swept over worker count.
  *
  * Needs a browser: `getSharedWorkerPool` wants a global `Worker` plus Blob
- * URLs, which node has not got, so every vitest bench in `benchmarks/` is blind
- * to the pool and reports parity forever.
+ * URLs, which node has not got, so a node benchmark is blind to the pool and
+ * reports parity forever.
  *
  *   pnpm build:esm && pnpm bench:pool
  *

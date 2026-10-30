@@ -41,8 +41,8 @@ a different file format;
 [bbi-js's wasm doc](https://github.com/GMOD/bbi-js/blob/main/docs/wasm.md)
 covers that side.
 
-Mean ms per file, lower is better, after asserting all four arms byte-identical
-(`pnpm benchonly inflate`):
+Mean ms per file, lower is better, after asserting all four arms byte-identical.
+`pnpm bench:inflate` reruns these arms, each in its own process:
 
 | fixture                            | wasm libdeflate | pako | node zlib |
 | ---------------------------------- | --------------- | ---- | --------- |
@@ -51,9 +51,10 @@ Mean ms per file, lower is better, after asserting all four arms byte-identical
 | shortreads_300x.bam (5.1MB)        | 63              | 220  | 82        |
 | chr22_nanopore_subset.bam (14.1MB) | 141             | 374  | 133       |
 
-_Measured 2026-08-15 on an Intel i9-9880H under Node 24.13.0. Absolute times
-depend on the machine and the Node version (node zlib's especially, which
-changes between Node majors), so rerun the benchmark rather than trust these._
+_Measured 2026-08-15 on an Intel i9-9880H under Node 24.13.0, with the vitest
+bench that `bench:inflate` replaced. Absolute times depend on the machine and
+the Node version (node zlib's especially, which changes between Node majors), so
+rerun the benchmark rather than trust these._
 
 Wasm libdeflate is two to three and a half times faster than pako and in the
 same range as the platform's zlib, and it runs where zlib is not available at
@@ -73,7 +74,7 @@ whole buffer decodes in **one** call rather than one per block.
 `DecompressionStream` pays the overhead once and still loses to wasm.
 
 Best of three runs, mean ms per file, again after asserting all arms
-byte-identical (`pnpm benchonly inflate`):
+byte-identical, measured with the vitest bench under Node 24.13.0:
 
 | fixture                            | wasm libdeflate | `DecompressionStream` | pako | node zlib |
 | ---------------------------------- | --------------- | --------------------- | ---- | --------- |
@@ -89,6 +90,12 @@ arm against ±4-7% for the others). Compare along a row rather than between
 tables. These are also Node numbers, where the API is zlib with little code
 around it; a browser adds the `Blob` → stream → `Response` path, so the
 `DecompressionStream` column shows its best case.
+
+**Node 24.22 no longer decodes the whole buffer in one call.** It rejects a
+second gzip member with `ERR_TRAILING_JUNK_AFTER_STREAM_END`, so
+`pnpm bench:inflate` runs the `DecompressionStream` arm once per block. On
+2026-10-30, under heavy machine load, that arm took 3-5x the wasm time by
+minimum, which strengthens the case for wasm.
 
 We keep `DecompressionStream` off the BGZF path for two more reasons:
 

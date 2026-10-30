@@ -14,9 +14,7 @@ export default defineConfig(
       'dist/*',
       'crate/*',
       'esm/*',
-      'esm_*/*',
       'example/*',
-      'benchmarks/*',
       'eslint.config.mjs',
       'coverage',
       // agent worktrees are whole checkouts of this repo living inside it, so

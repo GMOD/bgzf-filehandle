@@ -6,7 +6,6 @@ coverage/
 test/data/extended/
 .eslintcache
 esm
-esm_*/
 crate/target
 crate/pkg/
 build/

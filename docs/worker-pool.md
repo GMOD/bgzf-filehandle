@@ -214,8 +214,8 @@ them:
 
 - **Node cannot measure the pool at all.** `workersAvailable()` requires a
   global `Worker` plus Blob URLs, and `worker_threads` is a different API, so
-  the pool resolves to `undefined` and the in-process path runs. Every vitest
-  bench in `benchmarks/` therefore runs without the pool and reports parity.
+  the pool resolves to `undefined` and the in-process path runs. A node
+  benchmark therefore runs without the pool and reports parity.
 - **Don't time `decompressBlocks` against `unzipChunkSlice`.** See above.
 - **Slice the input to the chunk.** `scanBgzfBlocks` treats the buffer as
   _starting_ at `minv.blockPosition`, and the sequential path hands the whole
