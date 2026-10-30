@@ -1,4 +1,4 @@
-import { ungzip } from 'pako-esm2'
+import { Inflate } from 'pako-esm2'
 
 import { scanBgzfBlocks } from './bgzfBlockScan.ts'
 import {
@@ -61,15 +61,43 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : `${error}`
 }
 
+/**
+ * Every member of a gzip file, which may hold several back to back (`cat a.gz
+ * b.gz`); gunzip decodes them as one stream. Bytes after the last member that
+ * do not open another are ignored, as gunzip ignores trailing garbage.
+ */
+function ungzipMembers(inputData: Uint8Array) {
+  const members: Uint8Array[] = []
+  let offset = 0
+  while (
+    offset < inputData.length &&
+    hasGzipHeader(inputData.subarray(offset))
+  ) {
+    const inflator = new Inflate(undefined)
+    inflator.push(inputData.subarray(offset), true)
+    if (inflator.err) {
+      throw new Error(`problem decompressing gzip: ${inflator.msg}`)
+    }
+    members.push(inflator.result as Uint8Array)
+    offset += inflator.strm!.next_in
+  }
+  return concatUint8Array(members)
+}
+
+// DecompressionStream rejects a second member, so a file with several takes
+// the pako path, which also gives the error for corrupt input
 async function decompressGzip(inputData: Uint8Array) {
   if (typeof DecompressionStream !== 'undefined') {
-    const stream = new Blob([inputData as Uint8Array<ArrayBuffer>])
-      .stream()
-      .pipeThrough(new DecompressionStream('gzip'))
-    return new Uint8Array(await new Response(stream).arrayBuffer())
-  } else {
-    return ungzip(inputData, undefined)
+    try {
+      const stream = new Blob([inputData as Uint8Array<ArrayBuffer>])
+        .stream()
+        .pipeThrough(new DecompressionStream('gzip'))
+      return new Uint8Array(await new Response(stream).arrayBuffer())
+    } catch {
+      return ungzipMembers(inputData)
+    }
   }
+  return ungzipMembers(inputData)
 }
 
 function wrapGzipHeaderError(error: unknown) {
