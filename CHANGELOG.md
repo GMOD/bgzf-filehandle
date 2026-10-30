@@ -1,3 +1,9 @@
+## [6.8.4](https://github.com/GMOD/bgzf-filehandle/compare/v6.8.3...v6.8.4) (2026-10-30)
+
+### Bug Fixes
+
+- Throw on truncated gzip input ([96b63be](https://github.com/GMOD/bgzf-filehandle/commit/96b63bed5a0ed09760e748c255a3efbea5b9d25d))
+
 ## [6.8.3](https://github.com/GMOD/bgzf-filehandle/compare/v6.8.2...v6.8.3) (2026-10-30)
 
 ### Bug Fixes
