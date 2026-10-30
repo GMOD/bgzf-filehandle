@@ -1,3 +1,14 @@
+## [6.8.3](https://github.com/GMOD/bgzf-filehandle/compare/v6.8.2...v6.8.3) (2026-10-30)
+
+### Bug Fixes
+
+- Decode every member of a multi-member plain gzip ([697977c](https://github.com/GMOD/bgzf-filehandle/commit/697977c03d3628881a6d75b6ad1038c675bf8cfd))
+
+### Chores
+
+- Replace the vitest benchmarks with a node inflate script ([9c2b2c6](https://github.com/GMOD/bgzf-filehandle/commit/9c2b2c673ad9bd499d95fb269ecb9d447f466c68))
+- Preversion builds before testing, as CI does ([bf04d35](https://github.com/GMOD/bgzf-filehandle/commit/bf04d35c59c39083199a8e149df4126079cc098d))
+
 ## [6.8.2](https://github.com/GMOD/bgzf-filehandle/compare/v6.8.1...v6.8.2) (2026-10-17)
 
 ### Other Changes
