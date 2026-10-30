@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 
-import { expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { unzip } from '../src/unzip.ts'
 import * as wasm from '../src/wasm/bgzf-wasm-inlined.js'
@@ -60,7 +60,7 @@ test('ignores trailing bytes that open no further member', async () => {
   expect(new TextDecoder().decode(await unzip(gz))).toBe('data\n')
 })
 
-test('the same without DecompressionStream', async () => {
+test('decodes a multi-member gzip without DecompressionStream', async () => {
   vi.stubGlobal('DecompressionStream', undefined)
   try {
     const gz = new Uint8Array(
@@ -73,4 +73,47 @@ test('the same without DecompressionStream', async () => {
   } finally {
     vi.unstubAllGlobals()
   }
+})
+
+// A cut-off download or a short server response has to throw
+const whole = gzipSync(Buffer.from('x'.repeat(10_000)))
+const truncated = {
+  'missing its trailer': whole.subarray(0, whole.length - 4),
+  'cut mid-stream': whole.subarray(0, 20),
+  'cut in its second member': Buffer.concat([whole, whole.subarray(0, 25)]),
+  'followed by a lone gzip magic': Buffer.concat([
+    whole,
+    Buffer.from([0x1f, 0x8b]),
+  ]),
+  'BGZF, cut inside the first block': readFileSync(
+    'test/data/bgzip-1.txt.gz',
+  ).subarray(0, 200),
+}
+
+describe.each([
+  ['with DecompressionStream', false],
+  ['without DecompressionStream', true],
+])('truncated gzip throws %s', (_, stub) => {
+  beforeEach(() => {
+    if (stub) {
+      vi.stubGlobal('DecompressionStream', undefined)
+    }
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+  test.each(Object.entries(truncated))('%s', async (_, gz) => {
+    await expect(unzip(new Uint8Array(gz))).rejects.toThrow(
+      'problem decompressing',
+    )
+  })
+})
+
+test('a bad CRC in a later member throws', async () => {
+  const second = gzipSync(Buffer.from('b\n'))
+  second[second.length - 8]! ^= 1
+  const gz = Buffer.concat([gzipSync(Buffer.from('a\n')), second])
+  await expect(unzip(new Uint8Array(gz))).rejects.toThrow(
+    'incorrect data check',
+  )
 })

@@ -74,18 +74,25 @@ function ungzipMembers(inputData: Uint8Array) {
     hasGzipHeader(inputData.subarray(offset))
   ) {
     const inflator = new Inflate(undefined)
-    inflator.push(inputData.subarray(offset), true)
+    // With Z_FINISH, pako returns a truncated member's prefix as success.
+    // Without it, `ended` stays false until pako reads and checks the trailer
+    inflator.push(inputData.subarray(offset), false)
     if (inflator.err) {
-      throw new Error(`problem decompressing gzip: ${inflator.msg}`)
+      throw new Error(
+        `problem decompressing gzip: ${inflator.msg || `zlib error ${inflator.err}`}`,
+      )
+    }
+    if (!inflator.ended) {
+      throw new Error('problem decompressing gzip: unexpected end of file')
     }
     members.push(inflator.result as Uint8Array)
     offset += inflator.strm!.next_in
   }
-  return concatUint8Array(members)
+  return members.length === 1 ? members[0]! : concatUint8Array(members)
 }
 
 // DecompressionStream rejects a second member, so a file with several takes
-// the pako path, which also gives the error for corrupt input
+// the pako path, which also gives the error for corrupt or truncated input
 async function decompressGzip(inputData: Uint8Array) {
   if (typeof DecompressionStream !== 'undefined') {
     try {
