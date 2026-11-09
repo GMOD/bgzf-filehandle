@@ -91,7 +91,6 @@ buffer, for readers that can parse across segment boundaries
 - [docs/optimizations.md](docs/optimizations.md): terms, benchmarks, and
   [why not `DecompressionStream`](docs/optimizations.md#why-not-decompressionstream-for-everything)
 - [docs/worker-pool.md](docs/worker-pool.md): sizing, lifecycle and measurements
-- [CONTRIBUTING.md](CONTRIBUTING.md): development and releases
 
 ## Academic use
 
