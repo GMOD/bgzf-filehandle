@@ -1,3 +1,23 @@
+## [6.8.5](https://github.com/GMOD/bgzf-filehandle/compare/v6.8.4...v6.8.5) (2026-11-15)
+
+### Bug Fixes
+
+- Throw when a block inflates shorter than its ISIZE ([cd1fd18](https://github.com/GMOD/bgzf-filehandle/commit/cd1fd1846db255d315d97c3d2553b5a7389e6bd3))
+
+### Chores
+
+- Pin the runner image for the wasm build ([6537643](https://github.com/GMOD/bgzf-filehandle/commit/6537643d637de05ade7f95fb73fba06d60eace5d))
+- Drop persisted checkout credentials and the publish job's cache ([54e591b](https://github.com/GMOD/bgzf-filehandle/commit/54e591b2a9e212b713172149eec1a7a598a9e790))
+
+### Documentation
+
+- Drop CONTRIBUTING from the README docs list ([b10686c](https://github.com/GMOD/bgzf-filehandle/commit/b10686cc0ad3f66d49d39982a7e199af1e732524))
+- Trusted publishing adds provenance without a --provenance flag ([b82f7a0](https://github.com/GMOD/bgzf-filehandle/commit/b82f7a0ed9e979bc11064dbfb98969b3027768ea))
+
+### Other Changes
+
+- Bump deps, drop unused dev deps and stale ignores ([27bccdd](https://github.com/GMOD/bgzf-filehandle/commit/27bccdd68b5bd409926555ea81f95d1a4fbbff65))
+
 ## [6.8.4](https://github.com/GMOD/bgzf-filehandle/compare/v6.8.3...v6.8.4) (2026-10-30)
 
 ### Bug Fixes
