@@ -87,10 +87,10 @@ fn inflate_block(
     decompressor: &mut Decompressor,
 ) -> Result<(), &'static str> {
     let deflate_data = &input[BGZF_HEADER_SIZE..block_size - BGZF_TRAILER_SIZE];
-    decompressor
-        .deflate_decompress(deflate_data, out)
-        .map(|_| ())
-        .map_err(|_| ERR_INFLATE)
+    match decompressor.deflate_decompress(deflate_data, out) {
+        Ok(written) if written == out.len() => Ok(()),
+        _ => Err(ERR_INFLATE),
+    }
 }
 
 #[wasm_bindgen]

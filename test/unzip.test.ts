@@ -200,3 +200,18 @@ test('minv.dataPosition beyond the block length does not wrap dpositions', async
     expect(pos).toBeLessThan(2 ** 32)
   }
 })
+
+test('a block that inflates shorter than its ISIZE throws', async () => {
+  const data = fs.readFileSync(require.resolve('./data/paired.bam'))
+  const blockSize = data.readUInt16LE(16) + 1
+  const corrupt = Buffer.from(data.subarray(0, blockSize))
+  corrupt.writeUInt32LE(corrupt.readUInt32LE(blockSize - 4) + 1, blockSize - 4)
+
+  await expect(unzip(corrupt)).rejects.toThrow()
+  await expect(
+    unzipChunkSlice(corrupt, {
+      minv: { dataPosition: 0, blockPosition: 0 },
+      maxv: { dataPosition: 100, blockPosition: 0 },
+    }),
+  ).rejects.toThrow()
+})
