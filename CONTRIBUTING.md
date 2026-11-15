@@ -42,8 +42,9 @@ Use `pnpm version patch/minor/major` — it runs `check:wasm`, lint, format,
 types, tests, build and `test:pack`, regenerates CHANGELOG.md with git-cliff,
 then pushes the version tag, which triggers the publish workflow.
 
-The publish workflow uses npm trusted publishing (OIDC, no stored token), which
-requires `--provenance` and `id-token: write` permissions.
+The publish workflow uses npm trusted publishing (OIDC, no stored token). The
+publish job needs `id-token: write`; trusted publishing attaches provenance
+without a `--provenance` flag.
 
 Trusted publishing is already configured for this repo. To set up a new package:
 `npm trust github <pkg> --file publish.yml --repo GMOD/<repo>` (requires
