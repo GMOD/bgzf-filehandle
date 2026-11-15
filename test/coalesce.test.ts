@@ -23,12 +23,9 @@ class CountingFile {
     this.inner = new LocalFile(path)
   }
 
-  read(length: number, position: number, opts?: FilehandleOptions) {
+  read(length: number, position: number) {
     this.reads++
     this.bytes += length
-    // opts is accepted to satisfy GenericFilehandle, but LocalFile.read takes
-    // no options argument at all -- it cannot honour a signal.
-    void opts
     return this.inner.read(length, position)
   }
   // The overload pair rather than one signature, because GenericFilehandle's

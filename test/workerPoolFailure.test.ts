@@ -2,7 +2,6 @@ import fs from 'node:fs'
 
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
-import { installFakeWorker } from './fakeWorker.ts'
 import { scanBgzfBlocks } from '../src/bgzfBlockScan.ts'
 import { POOL_MIN_DECOMPRESSED_BYTES, unzipChunkSlice } from '../src/unzip.ts'
 import {
@@ -10,6 +9,7 @@ import {
   destroySharedWorkerPool,
   getSharedWorkerPool,
 } from '../src/workerPool.ts'
+import { installFakeWorker } from './fakeWorker.ts'
 
 import type { Chunk } from '../src/unzip.ts'
 import type { BgzfWorkerPool } from '../src/workerPool.ts'

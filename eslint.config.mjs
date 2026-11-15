@@ -6,7 +6,6 @@ import tseslint from 'typescript-eslint'
 export default defineConfig(
   {
     ignores: [
-      'webpack.config.js',
       'src/wasm/*',
       // where webpack drops the worker bundle before inline-worker.sh wraps it.
       // gitignored, but eslint does not read .gitignore
@@ -14,7 +13,6 @@ export default defineConfig(
       'dist/*',
       'crate/*',
       'esm/*',
-      'example/*',
       'eslint.config.mjs',
       'coverage',
       // agent worktrees are whole checkouts of this repo living inside it, so

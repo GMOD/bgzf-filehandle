@@ -2,7 +2,6 @@ import fs from 'node:fs'
 
 import { afterEach, expect, test, vi } from 'vitest'
 
-import { installFakeWorker } from './fakeWorker.ts'
 import { scanBgzfBlocks } from '../src/bgzfBlockScan.ts'
 import {
   MAX_INFLATE_BYTES,
@@ -17,6 +16,7 @@ import {
   decompressChunkSlice,
 } from '../src/wasm/bgzf-wasm-inlined.js'
 import { createBgzfWorkerPool } from '../src/workerPool.ts'
+import { installFakeWorker } from './fakeWorker.ts'
 
 import type { Chunk } from '../src/unzip.ts'
 import type { BgzfWorkerPool } from '../src/workerPool.ts'

@@ -27,10 +27,7 @@ class StatWatcher {
     this.inner = inner
   }
 
-  read(length: number, position: number, opts?: FilehandleOptions) {
-    // opts is accepted to satisfy GenericFilehandle, but LocalFile.read takes
-    // no options argument at all -- it cannot honour a signal.
-    void opts
+  read(length: number, position: number) {
     return this.inner.read(length, position)
   }
   // The overload pair rather than one signature, because GenericFilehandle's

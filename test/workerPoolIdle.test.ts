@@ -2,12 +2,12 @@ import fs from 'node:fs'
 
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
-import { installFakeWorker } from './fakeWorker.ts'
 import { scanBgzfBlocks } from '../src/bgzfBlockScan.ts'
 import {
   createBgzfWorkerPool,
   destroySharedWorkerPool,
 } from '../src/workerPool.ts'
+import { installFakeWorker } from './fakeWorker.ts'
 
 // A pool reaps its workers while idle and spawns a fresh set on the next call,
 // WITHOUT the pool object becoming invalid. That last part is the requirement:
